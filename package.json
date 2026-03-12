@@ -1,0 +1,59 @@
+{
+  "name": "markdown-review",
+  "displayName": "Markdown Review",
+  "description": "Markdown preview with interactive commenting for document review",
+  "version": "0.3.1",
+  "publisher": "jinqishen",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:markdownReview.openPreview",
+    "onCommand:markdownReview.exportComments",
+    "onLanguage:markdown"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "markdownReview.openPreview",
+        "title": "Markdown Review: Open Preview with Comments",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "markdownReview.exportComments",
+        "title": "Markdown Review: Export Comments"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdownReview.openPreview",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "bundle": "npx esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run bundle && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@traptitech/markdown-it-katex": "^3.6.0",
+    "katex": "^0.16.38",
+    "markdown-it": "^14.0.0"
+  }
+}
