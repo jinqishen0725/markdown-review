@@ -7,6 +7,8 @@ export interface Comment {
     selectedText: string;
     comment: string;
     sourceLine: number;
+    startOffset: number;
+    endOffset: number;
     contextBefore: string;
     contextAfter: string;
     anchorLocation: 'inline' | 'before-block' | 'fallback';
@@ -55,13 +57,15 @@ export class CommentsManager {
         comment: string,
         sourceLine: number,
         contextBefore: string = '',
-        contextAfter: string = ''
+        contextAfter: string = '',
+        startOffset: number = -1,
+        endOffset: number = -1
     ): Comment {
         const id = 'c' + Date.now();
         const anchor = `<!--@${id}-->`;
 
         // Try to insert anchor into the markdown source
-        const anchorLocation = this.insertAnchor(id, selectedText, sourceLine, contextBefore, contextAfter);
+        const anchorLocation = this.insertAnchor(id, selectedText, sourceLine, contextBefore, contextAfter, startOffset, endOffset);
 
         const newComment: Comment = {
             id,
@@ -69,6 +73,8 @@ export class CommentsManager {
             selectedText,
             comment,
             sourceLine,
+            startOffset,
+            endOffset,
             contextBefore,
             contextAfter,
             anchorLocation,
@@ -86,8 +92,64 @@ export class CommentsManager {
      */
     private looksLikeRenderedFormula(text: string): boolean {
         // Unicode math italic letters (U+1D400-U+1D7FF), common KaTeX output chars
-        const mathUnicodePattern = /[\u2200-\u22FF\u2190-\u21FF\u1D400-\u1D7FF∑∏∫∂∇∞√∩∪∈∉⊂⊃≤≥≠≈≡∧∨]/;
+        const mathUnicodePattern = /[\u2200-\u22FF\u2190-\u21FF\u1D400-\u1D7FF\u2211\u220F\u222B\u2202\u2207\u221E\u221A\u2229\u222A\u2208\u2209\u2282\u2283\u2264\u2265\u2260\u2248\u2261\u2227\u2228]/;
         return mathUnicodePattern.test(text);
+    }
+
+    /**
+     * Check if a given offset range falls inside a formula ($..$ or $$...$$).
+     */
+    private isOffsetInsideFormula(source: string, start: number, end: number): boolean {
+        // Check display math $$...$$
+        let idx = 0;
+        let insideDisplay = false;
+        let displayStart = -1;
+        while (idx < source.length) {
+            const pos = source.indexOf('$$', idx);
+            if (pos === -1) break;
+            if (!insideDisplay) {
+                displayStart = pos;
+                insideDisplay = true;
+            } else {
+                if (start >= displayStart && start <= pos + 2) return true;
+                if (end >= displayStart && end <= pos + 2) return true;
+                insideDisplay = false;
+            }
+            idx = pos + 2;
+        }
+
+        // Check inline math $...$
+        // Find all $...$ pairs (not $$) on the line containing our offset
+        const lineStart = source.lastIndexOf('\n', start) + 1;
+        const lineEnd = source.indexOf('\n', end);
+        const line = source.substring(lineStart, lineEnd !== -1 ? lineEnd : source.length);
+        const lineOffset = lineStart;
+
+        let i = 0;
+        while (i < line.length) {
+            // Skip $$ (already handled above)
+            if (line[i] === '$' && i + 1 < line.length && line[i + 1] === '$') {
+                i += 2;
+                continue;
+            }
+            if (line[i] === '$' && (i === 0 || line[i - 1] !== '\\')) {
+                // Found opening $, look for closing $
+                const openPos = lineOffset + i;
+                let j = i + 1;
+                while (j < line.length && line[j] !== '$') j++;
+                if (j < line.length) {
+                    const closePos = lineOffset + j;
+                    // Check if our range overlaps with this $...$ span
+                    if (start >= openPos && start <= closePos + 1) return true;
+                    if (end >= openPos && end <= closePos + 1) return true;
+                    i = j + 1;
+                    continue;
+                }
+            }
+            i++;
+        }
+
+        return false;
     }
 
     /**
@@ -99,14 +161,104 @@ export class CommentsManager {
         selectedText: string,
         sourceLine: number,
         contextBefore: string,
-        contextAfter: string
+        contextAfter: string,
+        startOffset: number = -1,
+        endOffset: number = -1
     ): 'inline' | 'before-block' | 'fallback' {
         try {
             let source = fs.readFileSync(this.markdownPath, 'utf-8');
             const anchor = `<!--@${id}-->`;
 
+            // Strategy 0 (best): Use exact source offset from remark AST
+            if (startOffset >= 0 && startOffset < source.length) {
+                const blockEnd = endOffset >= 0 ? Math.min(endOffset, source.length) : source.length;
+                const blockText = source.substring(startOffset, blockEnd);
+
+                // Check if this block is inside or contains a $$ formula
+                const isInsideFormula = this.isOffsetInsideFormula(source, startOffset, blockEnd);
+                // Only treat display $$ blocks as formula blocks to avoid
+                // Inline $...$ is handled by the word-boundary and offset checks
+                const blockContainsDisplayFormula = blockText.includes('$$');
+
+                if (!isInsideFormula && !blockContainsDisplayFormula) {
+                    // Try to find the exact selectedText within this block
+                    const idx = blockText.indexOf(selectedText);
+                    if (idx !== -1) {
+                        const insertPos = startOffset + idx;
+                        // Safety: don't insert if it would split a word
+                        if (insertPos > 0 && /[a-zA-Z0-9]/.test(source[insertPos - 1]) && /[a-zA-Z0-9]/.test(source[insertPos])) {
+                            // Would split a word — find the beginning of this word instead
+                            let wordStart = insertPos;
+                            while (wordStart > 0 && /[a-zA-Z0-9_\-]/.test(source[wordStart - 1])) wordStart--;
+                            source = source.substring(0, wordStart) + anchor + source.substring(wordStart);
+                        } else {
+                            source = source.substring(0, insertPos) + anchor + source.substring(insertPos);
+                        }
+                        fs.writeFileSync(this.markdownPath, source, 'utf-8');
+                        return 'inline';
+                    }
+                }
+
+                // Text not found verbatim, or inside/contains formula
+                // For display formulas ($$...$$): insert anchor INSIDE the formula
+                // using LaTeX % comment so KaTeX ignores it: %<!--@ID-->
+                if (isInsideFormula || blockContainsDisplayFormula) {
+                    // Find the opening $$ 
+                    let dollarPos = source.lastIndexOf('$$', Math.max(startOffset, blockEnd));
+                    // Make sure we find the OPENING $$, not closing
+                    // Search backward from startOffset to find the opening $$
+                    let openingDollar = source.lastIndexOf('$$', startOffset);
+                    if (openingDollar === -1) {
+                        openingDollar = source.indexOf('$$', startOffset);
+                    }
+                    if (openingDollar !== -1) {
+                        // Find the end of the $$ line (right after $$)
+                        const afterDollar = openingDollar + 2;
+                        // Check if this is a single-line $$ formula ($$...$$)
+                        const nextDollar = source.indexOf('$$', afterDollar);
+                        const nextNewline = source.indexOf('\n', afterDollar);
+                        
+                        if (nextNewline !== -1 && (nextDollar === -1 || nextNewline < nextDollar)) {
+                            // Multi-line formula: insert %anchor as new line after opening $$
+                            const insertPos = nextNewline + 1;
+                            const formulaAnchor = `%${anchor}\n`;
+                            source = source.substring(0, insertPos) + formulaAnchor + source.substring(insertPos);
+                        } else {
+                            // Single-line formula $$...$$: insert anchor before the $$
+                            source = source.substring(0, openingDollar) + anchor + source.substring(openingDollar);
+                        }
+                        fs.writeFileSync(this.markdownPath, source, 'utf-8');
+                        return 'inline';
+                    }
+                    
+                    // Check for inline $...$ formula
+                    const inlineDollarBefore = source.lastIndexOf('$', startOffset);
+                    if (inlineDollarBefore !== -1 && source[inlineDollarBefore - 1] !== '$' &&
+                        (inlineDollarBefore + 1 >= source.length || source[inlineDollarBefore + 1] !== '$')) {
+                        // Place anchor right before the opening $
+                        source = source.substring(0, inlineDollarBefore) + anchor + source.substring(inlineDollarBefore);
+                        fs.writeFileSync(this.markdownPath, source, 'utf-8');
+                        return 'inline';
+                    }
+                }
+
+                // For headings/tables/other blocks: use startOffset directly
+                // remark AST gives us the exact start of the block element
+                const charBefore = startOffset > 0 ? source[startOffset - 1] : '\n';
+                if (charBefore === '\n' || startOffset === 0) {
+                    // Already at line start — insert directly
+                    source = source.substring(0, startOffset) + anchor + source.substring(startOffset);
+                } else {
+                    // Mid-line — go to line start
+                    const lineStart = source.lastIndexOf('\n', startOffset);
+                    const insertPos = lineStart !== -1 ? lineStart + 1 : 0;
+                    source = source.substring(0, insertPos) + anchor + source.substring(insertPos);
+                }
+                fs.writeFileSync(this.markdownPath, source, 'utf-8');
+                return 'before-block';
+            }
+
             // If the selected text looks like rendered formula output, skip text matching
-            // and go directly to block-level anchoring
             if (this.looksLikeRenderedFormula(selectedText)) {
                 return this.anchorNearBlock(source, anchor, sourceLine, contextBefore);
             }
@@ -120,7 +272,7 @@ export class CommentsManager {
                 return 'inline';
             }
 
-            // Strategy 2: Block-level anchoring (for formulas or when text match fails)
+            // Strategy 2: Block-level anchoring
             return this.anchorNearBlock(source, anchor, sourceLine, contextBefore);
 
         } catch {

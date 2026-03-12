@@ -2,9 +2,39 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { CommentsManager, Comment } from './comments';
 
-// We'll use require for markdown-it since it's a CommonJS module
-const MarkdownIt = require('markdown-it');
-const markdownItKatex = require('@traptitech/markdown-it-katex');
+// Remark/unified ecosystem for precise source mapping
+const { unified } = require('unified');
+const remarkParse = require('remark-parse').default || require('remark-parse');
+const remarkMath = require('remark-math').default || require('remark-math');
+const remarkGfm = require('remark-gfm').default || require('remark-gfm');
+const remarkRehype = require('remark-rehype').default || require('remark-rehype');
+const rehypeKatex = require('rehype-katex').default || require('rehype-katex');
+const rehypeStringify = require('rehype-stringify').default || require('rehype-stringify');
+const rehypeRaw = require('rehype-raw').default || require('rehype-raw');
+
+/**
+ * Custom rehype plugin that injects data-start-offset and data-end-offset
+ * attributes on every HTML element that has position info from the AST.
+ */
+function rehypeSourcePositions() {
+    return (tree: any) => {
+        visit(tree);
+    };
+    function visit(node: any) {
+        if (node.type === 'element' && node.position) {
+            if (!node.properties) node.properties = {};
+            node.properties['data-start-offset'] = node.position.start.offset;
+            node.properties['data-end-offset'] = node.position.end.offset;
+            node.properties['data-start-line'] = node.position.start.line;
+            node.properties['data-end-line'] = node.position.end.line;
+        }
+        if (node.children) {
+            for (const child of node.children) {
+                visit(child);
+            }
+        }
+    }
+}
 
 export class PreviewPanel {
     public static currentPanels: Map<string, PreviewPanel> = new Map();
@@ -76,111 +106,62 @@ export class PreviewPanel {
     private handleMessage(message: any) {
         switch (message.command) {
             case 'addComment':
-                this.commentsManager.addComment(
+                const newComment = this.commentsManager.addComment(
                     message.selectedText,
                     message.comment,
                     message.sourceLine,
                     message.contextBefore || '',
-                    message.contextAfter || ''
+                    message.contextAfter || '',
+                    message.startOffset ?? -1,
+                    message.endOffset ?? -1
                 );
-                this.updateContent();
+                // Optimistic UI: send the new comment back to the webview for instant highlight
+                // instead of doing a full re-render
+                this.panel.webview.postMessage({
+                    command: 'commentAdded',
+                    comment: newComment
+                });
                 return;
             case 'resolveComment':
                 this.commentsManager.resolveComment(message.id);
-                this.updateContent();
+                // Send optimistic update
+                this.panel.webview.postMessage({
+                    command: 'commentResolved',
+                    id: message.id
+                });
                 return;
             case 'deleteComment':
                 this.commentsManager.deleteComment(message.id);
-                this.updateContent();
+                this.panel.webview.postMessage({
+                    command: 'commentDeleted',
+                    id: message.id
+                });
                 return;
             case 'unresolveComment':
                 this.commentsManager.unresolveComment(message.id);
-                this.updateContent();
+                this.panel.webview.postMessage({
+                    command: 'commentUnresolved',
+                    id: message.id
+                });
                 return;
         }
     }
 
     private renderMarkdown(text: string): string {
-        const md = new MarkdownIt({
-            html: true,
-            linkify: true,
-            typographer: true,
-        });
+        const processor = unified()
+            .use(remarkParse)
+            .use(remarkGfm)
+            .use(remarkMath)
+            .use(remarkRehype, { allowDangerousHtml: true })
+            .use(rehypeRaw)
+            .use(rehypeKatex, { throwOnError: false })
+            .use(rehypeSourcePositions)
+            .use(rehypeStringify, { allowDangerousHtml: true });
 
-        // Use markdown-it-katex plugin for LaTeX math rendering
-        md.use(markdownItKatex, { throwOnError: false });
-
-        // Add source line tracking via custom renderer rules
-        // Inject data-source-line attributes on block-level elements
-        const defaultRender = md.renderer.rules.heading_open ||
-            function (tokens: any, idx: any, options: any, env: any, self: any) {
-                return self.renderToken(tokens, idx, options);
-            };
-
-        md.renderer.rules.heading_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
-            const token = tokens[idx];
-            if (token.map && token.map[0] !== null) {
-                token.attrSet('data-source-line', String(token.map[0]));
-            }
-            return defaultRender(tokens, idx, options, env, self);
-        };
-
-        const defaultParagraphOpen = md.renderer.rules.paragraph_open ||
-            function (tokens: any, idx: any, options: any, env: any, self: any) {
-                return self.renderToken(tokens, idx, options);
-            };
-
-        md.renderer.rules.paragraph_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
-            const token = tokens[idx];
-            if (token.map && token.map[0] !== null) {
-                token.attrSet('data-source-line', String(token.map[0]));
-            }
-            return defaultParagraphOpen(tokens, idx, options, env, self);
-        };
-
-        const defaultTableOpen = md.renderer.rules.table_open ||
-            function (tokens: any, idx: any, options: any, env: any, self: any) {
-                return self.renderToken(tokens, idx, options);
-            };
-
-        md.renderer.rules.table_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
-            const token = tokens[idx];
-            if (token.map && token.map[0] !== null) {
-                token.attrSet('data-source-line', String(token.map[0]));
-            }
-            return defaultTableOpen(tokens, idx, options, env, self);
-        };
-
-        const defaultBlockquoteOpen = md.renderer.rules.blockquote_open ||
-            function (tokens: any, idx: any, options: any, env: any, self: any) {
-                return self.renderToken(tokens, idx, options);
-            };
-
-        md.renderer.rules.blockquote_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
-            const token = tokens[idx];
-            if (token.map && token.map[0] !== null) {
-                token.attrSet('data-source-line', String(token.map[0]));
-            }
-            return defaultBlockquoteOpen(tokens, idx, options, env, self);
-        };
-
-        const defaultListItemOpen = md.renderer.rules.list_item_open ||
-            function (tokens: any, idx: any, options: any, env: any, self: any) {
-                return self.renderToken(tokens, idx, options);
-            };
-
-        md.renderer.rules.list_item_open = function (tokens: any, idx: any, options: any, env: any, self: any) {
-            const token = tokens[idx];
-            if (token.map && token.map[0] !== null) {
-                token.attrSet('data-source-line', String(token.map[0]));
-            }
-            return defaultListItemOpen(tokens, idx, options, env, self);
-        };
-
-        let html = md.render(text);
+        const result = processor.processSync(text);
+        let html = String(result);
 
         // Convert <!--@COMMENT_ID--> anchors into invisible spans with data attributes
-        // markdown-it with html:true passes HTML comments through as-is
         html = html.replace(/<!--@(c\d+)-->/g, '<span class="comment-anchor" data-anchor-id="$1"></span>');
 
         return html;
@@ -394,7 +375,7 @@ export class PreviewPanel {
     <script>
         const vscode = acquireVsCodeApi();
         const comments = ${commentsJson};
-        let pendingSelection = { text: '', sourceLine: -1, contextBefore: '', contextAfter: '' };
+        let pendingSelection = { text: '', sourceLine: -1, startOffset: -1, endOffset: -1, contextBefore: '', contextAfter: '' };
         let activePopoverCommentId = null;
         let commentListVisible = false;
 
@@ -571,26 +552,36 @@ export class PreviewPanel {
             }
             var text = selection.toString().trim();
             if (text.length > 0 && text.length < 500) {
-                var sourceLine = -1;
+                // Find the nearest element with source position data
+                var startOffset = -1, endOffset = -1, sourceLine = -1;
                 var el = selection.anchorNode;
                 while (el && el !== document.body) {
-                    if (el.nodeType === 1 && el.dataset && el.dataset.sourceLine) {
-                        sourceLine = parseInt(el.dataset.sourceLine);
-                        break;
+                    if (el.nodeType === 1) {
+                        var ds = el.dataset;
+                        if (ds && ds.startOffset) {
+                            startOffset = parseInt(ds.startOffset);
+                            endOffset = parseInt(ds.endOffset || '-1');
+                            sourceLine = parseInt(ds.startLine || '-1');
+                            break;
+                        }
                     }
                     el = el.parentElement;
                 }
-                pendingSelection = { text: text, sourceLine: sourceLine, contextBefore: '', contextAfter: '' };
+                pendingSelection = {
+                    text: text,
+                    sourceLine: sourceLine,
+                    startOffset: startOffset,
+                    endOffset: endOffset,
+                    contextBefore: '',
+                    contextAfter: ''
+                };
 
-                // Capture surrounding text context for precise location
+                // Capture surrounding text context
                 try {
-                    var range = selection.getRangeAt(0);
-                    // Get text before selection (up to 80 chars)
-                    var beforeRange = document.createRange();
-                    var container = range.startContainer;
+                    var container = selection.anchorNode;
                     var blockEl = container;
                     while (blockEl && blockEl.nodeType !== 1) blockEl = blockEl.parentNode;
-                    while (blockEl && !blockEl.getAttribute('data-source-line') && blockEl !== document.getElementById('content')) blockEl = blockEl.parentElement;
+                    while (blockEl && !(blockEl.dataset && blockEl.dataset.startOffset) && blockEl !== document.getElementById('content')) blockEl = blockEl.parentElement;
                     if (blockEl) {
                         var fullText = blockEl.textContent || '';
                         var selIdx = fullText.indexOf(text);
@@ -627,6 +618,8 @@ export class PreviewPanel {
                 selectedText: pendingSelection.text,
                 comment: commentText,
                 sourceLine: pendingSelection.sourceLine,
+                startOffset: pendingSelection.startOffset,
+                endOffset: pendingSelection.endOffset,
                 contextBefore: pendingSelection.contextBefore,
                 contextAfter: pendingSelection.contextAfter
             });
@@ -638,6 +631,67 @@ export class PreviewPanel {
         function resolveComment(id) { vscode.postMessage({ command: 'resolveComment', id: id }); }
         function deleteComment(id) { vscode.postMessage({ command: 'deleteComment', id: id }); }
         function unresolveComment(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); }
+
+        // Handle optimistic UI updates from extension host
+        window.addEventListener('message', function(event) {
+            var msg = event.data;
+            if (!msg || !msg.command) return;
+
+            switch (msg.command) {
+                case 'commentAdded':
+                    // Instantly highlight the new comment without full re-render
+                    var c = msg.comment;
+                    comments.push(c);
+                    highlightInElement(document.getElementById('content'), c);
+                    updateBadge();
+                    buildCommentList();
+                    break;
+                case 'commentResolved':
+                    var mark = document.querySelector('[data-comment-id="' + msg.id + '"]');
+                    if (mark) mark.classList.add('resolved');
+                    var ci = comments.find(function(x) { return x.id === msg.id; });
+                    if (ci) ci.resolved = true;
+                    updateBadge();
+                    buildCommentList();
+                    // Hide popover
+                    document.getElementById('comment-popover').style.display = 'none';
+                    break;
+                case 'commentDeleted':
+                    var mark = document.querySelector('[data-comment-id="' + msg.id + '"]');
+                    if (mark) {
+                        // Unwrap the highlight span
+                        var parent = mark.parentNode;
+                        while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+                        parent.removeChild(mark);
+                    }
+                    comments = comments.filter(function(x) { return x.id !== msg.id; });
+                    updateBadge();
+                    buildCommentList();
+                    document.getElementById('comment-popover').style.display = 'none';
+                    break;
+                case 'commentUnresolved':
+                    var mark = document.querySelector('[data-comment-id="' + msg.id + '"]');
+                    if (mark) mark.classList.remove('resolved');
+                    var ci = comments.find(function(x) { return x.id === msg.id; });
+                    if (ci) ci.resolved = false;
+                    updateBadge();
+                    buildCommentList();
+                    document.getElementById('comment-popover').style.display = 'none';
+                    break;
+            }
+        });
+
+        function updateBadge() {
+            var badge = document.getElementById('comment-badge');
+            var countEl = document.getElementById('comment-count');
+            var unresolved = comments.filter(function(c) { return !c.resolved; });
+            if (comments.length > 0) {
+                badge.style.display = 'block';
+                countEl.textContent = unresolved.length + ' / ' + comments.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
 
         // Initialize
         highlightComments();
