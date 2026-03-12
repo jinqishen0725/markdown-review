@@ -212,6 +212,18 @@ export class PreviewPanel {
         img { max-width: 100%; }
         .katex-display { overflow-x: auto; margin: 16px 0; }
         .comment-anchor { display: none; } /* Hidden anchor markers */
+        .comment-block-highlight {
+            outline: 2px solid #ffc107;
+            outline-offset: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .comment-block-highlight:hover { outline-color: #ff9800; }
+        .comment-fallback-marker {
+            display: inline !important;
+            cursor: pointer;
+            font-size: 16px;
+        }
 
         /* Comment highlights */
         .comment-highlight {
@@ -397,7 +409,6 @@ export class PreviewPanel {
                     // Find the next text node after the anchor and highlight from there
                     var nextNode = anchorEl.nextSibling;
                     if (nextNode && nextNode.nodeType === 3) {
-                        // Text node — highlight the selectedText portion
                         var text = nextNode.textContent || '';
                         var selText = comment.selectedText;
                         var idx = text.indexOf(selText);
@@ -410,10 +421,29 @@ export class PreviewPanel {
                         }
                     }
                     if (!highlighted) {
-                        // Anchor exists but text not immediately after — search nearby
+                        // Search in the anchor's parent element
                         var parent = anchorEl.parentElement;
                         if (parent) {
                             highlighted = highlightInElement(parent, comment);
+                        }
+                    }
+                    if (!highlighted) {
+                        // For formula/table comments where text doesn't match:
+                        // highlight the next sibling ELEMENT (the formula or table itself)
+                        var nextEl = anchorEl.nextElementSibling;
+                        if (!nextEl) {
+                            // anchor might be at start of line, check parent's next sibling
+                            nextEl = anchorEl.parentElement ? anchorEl.parentElement.nextElementSibling : null;
+                        }
+                        if (nextEl) {
+                            // Wrap the next element in a highlight border instead of text highlight
+                            nextEl.classList.add('comment-block-highlight');
+                            nextEl.setAttribute('data-comment-id', comment.id);
+                            nextEl.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                showCommentPopover(comment, nextEl);
+                            });
+                            highlighted = true;
                         }
                     }
                 }
@@ -421,6 +451,18 @@ export class PreviewPanel {
                 // Strategy 2: Fall back to text search in entire content
                 if (!highlighted) {
                     highlighted = highlightInElement(document.getElementById('content'), comment);
+                }
+
+                // Strategy 3: If still not highlighted, at least mark the anchor visible for scrolling
+                if (!highlighted && anchorEl) {
+                    anchorEl.style.display = 'inline';
+                    anchorEl.textContent = '\uD83D\uDCAC';
+                    anchorEl.classList.add('comment-fallback-marker');
+                    anchorEl.setAttribute('data-comment-id', comment.id);
+                    anchorEl.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        showCommentPopover(comment, anchorEl);
+                    });
                 }
             });
             buildCommentList();
@@ -514,8 +556,11 @@ export class PreviewPanel {
                     '<div class="item-actions">' + resolveBtn +
                     '<button onclick="event.stopPropagation();deleteComment(\\''+comment.id+'\\')">Delete</button></div>';
                 div.addEventListener('click', function() {
-                    // Scroll to the highlighted text in the preview
+                    // Scroll to the highlighted text or anchor in the preview
                     var highlight = document.querySelector('[data-comment-id="'+comment.id+'"]');
+                    if (!highlight) {
+                        highlight = document.querySelector('[data-anchor-id="'+comment.id+'"]');
+                    }
                     if (highlight) {
                         highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         highlight.classList.add('active');
@@ -552,31 +597,51 @@ export class PreviewPanel {
             }
             var text = selection.toString().trim();
             if (text.length > 0 && text.length < 500) {
-                // Find the nearest element with source position data
-                var startOffset = -1, endOffset = -1, sourceLine = -1;
-                var el = selection.anchorNode;
-                while (el && el !== document.body) {
-                    if (el.nodeType === 1) {
-                        var ds = el.dataset;
-                        if (ds && ds.startOffset) {
-                            startOffset = parseInt(ds.startOffset);
-                            endOffset = parseInt(ds.endOffset || '-1');
-                            sourceLine = parseInt(ds.startLine || '-1');
-                            break;
+                // Find the CLOSEST (most specific) element with source position data
+                // Check both anchorNode and focusNode, pick the smallest range
+                var candidates = [];
+                [selection.anchorNode, selection.focusNode].forEach(function(startNode) {
+                    var el = startNode;
+                    while (el && el !== document.body) {
+                        if (el.nodeType === 1) {
+                            var ds = el.dataset;
+                            if (ds && ds.startOffset) {
+                                candidates.push({
+                                    startOffset: parseInt(ds.startOffset),
+                                    endOffset: parseInt(ds.endOffset || '-1'),
+                                    sourceLine: parseInt(ds.startLine || '-1'),
+                                    range: parseInt(ds.endOffset || '0') - parseInt(ds.startOffset || '0')
+                                });
+                                break; // Take the first (closest) match from each node
+                            }
                         }
+                        el = el.parentElement;
                     }
-                    el = el.parentElement;
+                });
+
+                // Pick the candidate with the smallest range (most specific block)
+                var best = { startOffset: -1, endOffset: -1, sourceLine: -1 };
+                var bestRange = Infinity;
+                candidates.forEach(function(c) {
+                    if (c.range > 0 && c.range < bestRange) {
+                        bestRange = c.range;
+                        best = c;
+                    }
+                });
+                if (best.startOffset === -1 && candidates.length > 0) {
+                    best = candidates[0];
                 }
+
                 pendingSelection = {
                     text: text,
-                    sourceLine: sourceLine,
-                    startOffset: startOffset,
-                    endOffset: endOffset,
+                    sourceLine: best.sourceLine,
+                    startOffset: best.startOffset,
+                    endOffset: best.endOffset,
                     contextBefore: '',
                     contextAfter: ''
                 };
 
-                // Capture surrounding text context
+                // Capture surrounding text context from the closest positioned element
                 try {
                     var container = selection.anchorNode;
                     var blockEl = container;

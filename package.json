@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Review",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "0.4.2",
+  "version": "0.5.1",
   "publisher": "jinqishen",
   "engines": {
     "vscode": "^1.85.0"
@@ -65,5 +65,7 @@
     "unified": "^11.0.5"
   }
 }
+
+
 
 
