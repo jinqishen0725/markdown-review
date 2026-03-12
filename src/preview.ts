@@ -199,6 +199,11 @@ export class PreviewPanel {
                 this.immediateRender();
                 return;
             }
+            case 'editReply': {
+                this.commentsManager.editReply(message.commentId, message.replyId, message.text);
+                this.immediateRender();
+                return;
+            }
             case 'refresh':
                 this.commentsManager.reload();
                 this.updateContent();
@@ -570,6 +575,11 @@ img { max-width: 100%; }
     color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
 }
 .pop-reply-input button:hover { background: #444; }
+.inline-edit-btn {
+    font-size: 10px; padding: 0 4px; border: 1px solid #555; background: #333;
+    color: #ccc; border-radius: 2px; cursor: pointer; margin-left: 4px;
+}
+.inline-edit-btn:hover { background: #444; }
 </style>
 </head>
 <body>
@@ -700,20 +710,21 @@ img { max-width: 100%; }
         if (comment.replies && comment.replies.length > 0) {
             repliesHtml = '<div class="pop-replies">';
             comment.replies.forEach(function(r) {
-                repliesHtml += '<div class="pop-reply"><div class="pop-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) + '</div>' +
+                repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
+                    ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button></div>' +
                     '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
             });
             repliesHtml += '</div>';
         }
         pop.innerHTML =
-            '<div class="pop-text"><span class="role-badge role-' + (comment.role || 'user') + '">' + (comment.role || 'user') + '</span>' + esc(comment.comment) + '</div>' +
+            '<div class="pop-text" id="pop-comment-' + comment.id + '"><span class="role-badge role-' + (comment.role || 'user') + '">' + (comment.role || 'user') + '</span>' + esc(comment.comment) +
+            ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button></div>' +
             '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() +
             (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
             repliesHtml +
             '<div class="pop-reply-input"><textarea id="reply-input" placeholder="Reply..." rows="2"></textarea>' +
             '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
-            '<button onclick="startEditComment(\\'' + comment.id + '\\', this)">Edit</button>' +
             '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button></div>';
         var rect = anchorEl.getBoundingClientRect();
         pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
@@ -773,10 +784,9 @@ img { max-width: 100%; }
     window.startEditComment = function(id) {
         var c = comments.find(function(x) { return x.id === id; });
         if (!c) return;
-        var pop = document.getElementById('comment-popover');
-        var popText = pop.querySelector('.pop-text');
-        if (!popText) return;
-        popText.innerHTML =
+        var el = document.getElementById('pop-comment-' + id) || document.getElementById('list-comment-' + id);
+        if (!el) return;
+        el.innerHTML =
             '<textarea id="edit-input" style="width:100%;min-height:60px;padding:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:4px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;">' + esc(c.comment) + '</textarea>' +
             '<div style="margin-top:6px;display:flex;gap:6px;">' +
             '<button onclick="saveEditComment(\\'' + id + '\\')">Save</button>' +
@@ -792,6 +802,28 @@ img { max-width: 100%; }
     };
     window.cancelEditComment = function() {
         document.getElementById('comment-popover').style.display = 'none';
+    };
+    window.startEditReply = function(commentId, replyId) {
+        var c = comments.find(function(x) { return x.id === commentId; });
+        if (!c || !c.replies) return;
+        var r = c.replies.find(function(x) { return x.id === replyId; });
+        if (!r) return;
+        var el = document.getElementById('pop-reply-' + replyId) || document.getElementById('list-reply-' + replyId);
+        if (!el) return;
+        var textEl = el.querySelector('.pop-reply-text') || el.querySelector('.item-reply-text') || el;
+        textEl.innerHTML =
+            '<textarea id="edit-reply-input" style="width:100%;min-height:40px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box;">' + esc(r.text) + '</textarea>' +
+            '<div style="margin-top:4px;display:flex;gap:4px;">' +
+            '<button onclick="saveEditReply(\\'' + commentId + '\\',\\'' + replyId + '\\')">Save</button>' +
+            '<button onclick="cancelEditComment()">Cancel</button></div>';
+        var ta = document.getElementById('edit-reply-input');
+        if (ta) { ta.focus(); }
+    };
+    window.saveEditReply = function(commentId, replyId) {
+        var input = document.getElementById('edit-reply-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'editReply', commentId: commentId, replyId: replyId, text: text });
     };
 
     // ========== comment list panel ==========
@@ -817,14 +849,16 @@ img { max-width: 100%; }
             if (c.replies && c.replies.length > 0) {
                 repliesHtml = '<div class="item-replies">';
                 c.replies.forEach(function(r) {
-                    repliesHtml += '<div class="item-reply"><div class="item-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) + '</div>' +
+                    repliesHtml += '<div class="item-reply" id="list-reply-' + r.id + '"><div class="item-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
+                        ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button></div>' +
                         '<div class="item-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
                 });
                 repliesHtml += '</div>';
             }
             div.innerHTML =
                 '<div class="item-preview">' + esc(c.blockPreview || '(block)') + '</div>' +
-                '<div class="item-comment"><span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>' + esc(c.comment) + '</div>' +
+                '<div class="item-comment" id="list-comment-' + c.id + '"><span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>' + esc(c.comment) +
+                ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + c.id + '\\')">edit</button></div>' +
                 '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() +
                 (c.resolved ? ' \\u2705' : '') + '</div>' +
                 repliesHtml +

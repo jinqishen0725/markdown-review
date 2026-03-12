@@ -119,6 +119,17 @@ export class CommentsManager {
         }
     }
 
+    editReply(commentId: string, replyId: string, newText: string): void {
+        const c = this.data.comments.find(x => x.id === commentId);
+        if (c && c.replies) {
+            const r = c.replies.find(x => x.id === replyId);
+            if (r) {
+                r.text = newText;
+                this.save();
+            }
+        }
+    }
+
     unresolveComment(id: string): void {
         const c = this.data.comments.find(x => x.id === id);
         if (c) {
