@@ -122,6 +122,21 @@ export class PreviewPanel {
         );
 
         this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+
+        // Source → Preview: scroll preview to match editor cursor
+        vscode.window.onDidChangeTextEditorSelection(
+            (e) => {
+                if (e.textEditor.document.uri.fsPath !== this.document.uri.fsPath) { return; }
+                if (e.kind === vscode.TextEditorSelectionChangeKind.Command) { return; }
+                const cursorOffset = this.document.offsetAt(e.selections[0].active);
+                // Convert doc offset to clean offset
+                const text = this.document.getText();
+                const cleanOff = this.docOffsetToCleanOffset(text, cursorOffset);
+                this.panel.webview.postMessage({ command: 'scrollToOffset', cleanOffset: cleanOff });
+            },
+            null,
+            this.disposables,
+        );
     }
 
     public static createOrShow(context: vscode.ExtensionContext, document: vscode.TextDocument) {
@@ -178,6 +193,18 @@ export class PreviewPanel {
                 this.commentsManager.reload();
                 this.updateContent();
                 return;
+            case 'jumpToSource': {
+                // Map clean-text offset to document position and reveal
+                const text = this.document.getText();
+                const docOff = this.cleanOffsetToDocOffset(text, message.cleanOffset);
+                const pos = this.document.positionAt(docOff);
+                vscode.window.showTextDocument(this.document, {
+                    viewColumn: vscode.ViewColumn.One,
+                    selection: new vscode.Range(pos, pos),
+                    preserveFocus: false,
+                });
+                return;
+            }
         }
     }
 
@@ -188,9 +215,22 @@ export class PreviewPanel {
      * Uses vscode.workspace.applyEdit so the document buffer stays in sync.
      */
     private async insertAnchorViaApi(id: string, cleanOffset: number): Promise<void> {
-        const text = this.document.getText(); // LF-normalized by VS Code
-        // Find the target position in the VS Code document text (which has existing anchors)
-        // We need to map the clean offset to the document offset (skip existing anchors)
+        const text = this.document.getText();
+        const docOffset = this.cleanOffsetToDocOffset(text, cleanOffset);
+        // Snap back to beginning of line
+        let lineStart = docOffset;
+        while (lineStart > 0 && text[lineStart - 1] !== '\n') {
+            lineStart--;
+        }
+        const pos = this.document.positionAt(lineStart);
+        const eol = this.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(this.document.uri, pos, `<!--@${id}-->${eol}`);
+        await vscode.workspace.applyEdit(edit);
+    }
+
+    /** Map clean-text offset (anchor-free) to document offset (with anchors). */
+    private cleanOffsetToDocOffset(text: string, cleanOffset: number): number {
         const anchorRe = /<!--@c\d+-->\r?\n?/g;
         const anchors: { start: number; length: number }[] = [];
         let m: RegExpExecArray | null;
@@ -209,21 +249,30 @@ export class PreviewPanel {
             docOffset++;
             clean++;
         }
-        // Skip any anchor at this exact position
+        // If we landed exactly on an anchor, skip past it
         while (anchorIdx < anchors.length && docOffset === anchors[anchorIdx].start) {
             docOffset += anchors[anchorIdx].length;
             anchorIdx++;
         }
-        // Snap back to beginning of line
-        let lineStart = docOffset;
-        while (lineStart > 0 && text[lineStart - 1] !== '\n') {
-            lineStart--;
+        return docOffset;
+    }
+
+    /** Map document offset (with anchors) to clean-text offset (anchor-free). */
+    private docOffsetToCleanOffset(text: string, docOffset: number): number {
+        const anchorRe = /<!--@c\d+-->\r?\n?/g;
+        let totalAnchorChars = 0;
+        let m: RegExpExecArray | null;
+        while ((m = anchorRe.exec(text)) !== null) {
+            if (m.index >= docOffset) { break; }
+            const anchorEnd = m.index + m[0].length;
+            if (anchorEnd <= docOffset) {
+                totalAnchorChars += m[0].length;
+            } else {
+                // Cursor is inside an anchor — count up to docOffset
+                totalAnchorChars += docOffset - m.index;
+            }
         }
-        const pos = this.document.positionAt(lineStart);
-        const eol = this.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
-        const edit = new vscode.WorkspaceEdit();
-        edit.insert(this.document.uri, pos, `<!--@${id}-->${eol}`);
-        await vscode.workspace.applyEdit(edit);
+        return docOffset - totalAnchorChars;
     }
 
     /**
@@ -758,6 +807,45 @@ img { max-width: 100%; }
     placeGutterButtons();
     highlightCommentedBlocks();
     attachBlockClickHandlers();
+
+    // ========== Preview → Source: double-click to jump ==========
+    document.getElementById('content').addEventListener('dblclick', function(e) {
+        // Find the closest element with data-start-offset
+        var target = e.target;
+        while (target && target !== this) {
+            if (target.getAttribute && target.getAttribute('data-start-offset') !== null) {
+                var offset = parseInt(target.getAttribute('data-start-offset'));
+                vscode.postMessage({ command: 'jumpToSource', cleanOffset: offset });
+                return;
+            }
+            target = target.parentElement;
+        }
+    });
+
+    // ========== Source → Preview: scroll to matching block ==========
+    window.addEventListener('message', function(event) {
+        var msg = event.data;
+        if (!msg) return;
+        if (msg.command === 'scrollToOffset') {
+            // Find the block closest to cleanOffset
+            var best = null;
+            var bestDist = Infinity;
+            blocks.forEach(function(b) {
+                var dist = Math.abs(b.startOffset - msg.cleanOffset);
+                if (dist < bestDist) { bestDist = dist; best = b; }
+            });
+            if (best) {
+                var content = document.getElementById('content');
+                var el = content.querySelector('[data-start-offset=\"' + best.startOffset + '\"]');
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Brief highlight flash
+                    el.style.outline = '2px solid #0078d4';
+                    setTimeout(function() { el.style.outline = ''; }, 1500);
+                }
+            }
+        }
+    });
 })();
 </script>
 </body>
