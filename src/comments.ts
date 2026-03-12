@@ -1,6 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+export type Role = 'user' | 'agent';
+
+export interface Reply {
+    id: string;
+    role: Role;
+    text: string;
+    timestamp: string;
+}
+
 export interface Comment {
     id: string;
     anchor: string;
@@ -9,8 +18,10 @@ export interface Comment {
     blockType: string;
     blockPreview: string;
     comment: string;
+    role: Role;
     timestamp: string;
     resolved: boolean;
+    replies?: Reply[];
 }
 
 export interface CommentsFile {
@@ -78,6 +89,7 @@ export class CommentsManager {
             blockType,
             blockPreview,
             comment,
+            role: 'user',
             timestamp: new Date().toISOString(),
             resolved: false,
         };
@@ -105,5 +117,20 @@ export class CommentsManager {
             c.resolved = false;
             this.save();
         }
+    }
+
+    addReply(commentId: string, text: string, role: Role = 'user'): Reply | null {
+        const c = this.data.comments.find(x => x.id === commentId);
+        if (!c) { return null; }
+        if (!c.replies) { c.replies = []; }
+        const reply: Reply = {
+            id: 'r' + Date.now(),
+            role,
+            text,
+            timestamp: new Date().toISOString(),
+        };
+        c.replies.push(reply);
+        this.save();
+        return reply;
     }
 }

@@ -189,6 +189,11 @@ export class PreviewPanel {
                 this.commentsManager.unresolveComment(message.id);
                 this.immediateRender();
                 return;
+            case 'replyComment': {
+                this.commentsManager.addReply(message.id, message.text);
+                this.immediateRender();
+                return;
+            }
             case 'refresh':
                 this.commentsManager.reload();
                 this.updateContent();
@@ -538,6 +543,28 @@ img { max-width: 100%; }
     color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
 }
 .clist-item button:hover { background: #444; }
+
+/* ---------- reply styles ---------- */
+.pop-replies, .item-replies { margin: 8px 0; padding-left: 12px; border-left: 2px solid #555; }
+.pop-reply, .item-reply { margin-bottom: 6px; }
+.pop-reply-text, .item-reply-text { font-size: 12px; white-space: pre-wrap; }
+.pop-reply-meta, .item-reply-meta { font-size: 10px; color: #888; }
+.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; }
+.role-user { background: #0e639c; color: #fff; }
+.role-agent { background: #6a1b9a; color: #fff; }
+.pop-reply-input { margin-top: 8px; }
+.pop-reply-input textarea {
+    width: 100%; padding: 4px; border: 1px solid #555;
+    background: var(--vscode-input-background, #3c3c3c);
+    color: var(--vscode-input-foreground, #ccc);
+    border-radius: 3px; font-family: inherit; font-size: 12px;
+    resize: none; box-sizing: border-box;
+}
+.pop-reply-input button {
+    margin-top: 4px; padding: 2px 8px; border: 1px solid #555; background: #333;
+    color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
+}
+.pop-reply-input button:hover { background: #444; }
 </style>
 </head>
 <body>
@@ -664,10 +691,22 @@ img { max-width: 100%; }
         var resolveBtn = comment.resolved
             ? '<button onclick="unresolveComment(\\'' + comment.id + '\\')">Reopen</button>'
             : '<button class="btn-resolve" onclick="resolveComment(\\'' + comment.id + '\\')">Resolve</button>';
+        var repliesHtml = '';
+        if (comment.replies && comment.replies.length > 0) {
+            repliesHtml = '<div class="pop-replies">';
+            comment.replies.forEach(function(r) {
+                repliesHtml += '<div class="pop-reply"><div class="pop-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) + '</div>' +
+                    '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
+            });
+            repliesHtml += '</div>';
+        }
         pop.innerHTML =
-            '<div class="pop-text">' + esc(comment.comment) + '</div>' +
+            '<div class="pop-text"><span class="role-badge role-' + (comment.role || 'user') + '">' + (comment.role || 'user') + '</span>' + esc(comment.comment) + '</div>' +
             '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() +
             (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
+            repliesHtml +
+            '<div class="pop-reply-input"><textarea id="reply-input" placeholder="Reply..." rows="2"></textarea>' +
+            '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
             '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button></div>';
         var rect = anchorEl.getBoundingClientRect();
@@ -719,6 +758,12 @@ img { max-width: 100%; }
     window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
     window.deleteComment = function(id) { vscode.postMessage({ command: 'deleteComment', id: id }); };
     window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
+    window.submitReply = function(id) {
+        var input = document.getElementById('reply-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'replyComment', id: id, text: text });
+    };
 
     // ========== comment list panel ==========
     window.togglePanel = function() {
@@ -739,11 +784,24 @@ img { max-width: 100%; }
             var resolveBtn = c.resolved
                 ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
                 : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
+            var repliesHtml = '';
+            if (c.replies && c.replies.length > 0) {
+                repliesHtml = '<div class="item-replies">';
+                c.replies.forEach(function(r) {
+                    repliesHtml += '<div class="item-reply"><div class="item-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) + '</div>' +
+                        '<div class="item-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
+                });
+                repliesHtml += '</div>';
+            }
             div.innerHTML =
                 '<div class="item-preview">' + esc(c.blockPreview || '(block)') + '</div>' +
-                '<div class="item-comment">' + esc(c.comment) + '</div>' +
+                '<div class="item-comment"><span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>' + esc(c.comment) + '</div>' +
                 '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() +
                 (c.resolved ? ' \\u2705' : '') + '</div>' +
+                repliesHtml +
+                '<div class="item-reply-input" onclick="event.stopPropagation()">' +
+                '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
+                '<button onclick="event.stopPropagation();var inp=document.getElementById(\\'list-reply-' + c.id + '\\');var t=inp.value.trim();if(t){vscode.postMessage({command:\\'replyComment\\',id:\\'' + c.id + '\\',text:t});}" style="margin-top:4px;">Reply</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
                 '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button></div>';
             div.addEventListener('click', function() {
