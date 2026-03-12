@@ -194,6 +194,11 @@ export class PreviewPanel {
                 this.immediateRender();
                 return;
             }
+            case 'editComment': {
+                this.commentsManager.editComment(message.id, message.text);
+                this.immediateRender();
+                return;
+            }
             case 'refresh':
                 this.commentsManager.reload();
                 this.updateContent();
@@ -708,6 +713,7 @@ img { max-width: 100%; }
             '<div class="pop-reply-input"><textarea id="reply-input" placeholder="Reply..." rows="2"></textarea>' +
             '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
+            '<button onclick="startEditComment(\\'' + comment.id + '\\', this)">Edit</button>' +
             '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button></div>';
         var rect = anchorEl.getBoundingClientRect();
         pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
@@ -763,6 +769,29 @@ img { max-width: 100%; }
         var text = input ? input.value.trim() : '';
         if (!text) return;
         vscode.postMessage({ command: 'replyComment', id: id, text: text });
+    };
+    window.startEditComment = function(id) {
+        var c = comments.find(function(x) { return x.id === id; });
+        if (!c) return;
+        var pop = document.getElementById('comment-popover');
+        var popText = pop.querySelector('.pop-text');
+        if (!popText) return;
+        popText.innerHTML =
+            '<textarea id="edit-input" style="width:100%;min-height:60px;padding:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:4px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;">' + esc(c.comment) + '</textarea>' +
+            '<div style="margin-top:6px;display:flex;gap:6px;">' +
+            '<button onclick="saveEditComment(\\'' + id + '\\')">Save</button>' +
+            '<button onclick="cancelEditComment()">Cancel</button></div>';
+        var ta = document.getElementById('edit-input');
+        if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    };
+    window.saveEditComment = function(id) {
+        var input = document.getElementById('edit-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'editComment', id: id, text: text });
+    };
+    window.cancelEditComment = function() {
+        document.getElementById('comment-popover').style.display = 'none';
     };
 
     // ========== comment list panel ==========

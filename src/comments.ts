@@ -111,6 +111,14 @@ export class CommentsManager {
         this.save();
     }
 
+    editComment(id: string, newText: string): void {
+        const c = this.data.comments.find(x => x.id === id);
+        if (c) {
+            c.comment = newText;
+            this.save();
+        }
+    }
+
     unresolveComment(id: string): void {
         const c = this.data.comments.find(x => x.id === id);
         if (c) {
