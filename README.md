@@ -60,6 +60,10 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 - Are stripped during rendering so they don't affect the preview
 - Are invisible in standard markdown renderers (GitHub, VS Code preview, etc.)
 
+> **Note on file impact:** This extension creates two things in your workspace:
+> 1. **Anchors** (`<!--@cXXX-->`) inserted into the markdown file — these are standard HTML comments and are **completely invisible** to all markdown compilers, renderers, and viewers (GitHub, Pandoc, VS Code preview, Jekyll, Hugo, etc.). Your markdown compiles and renders identically with or without them.
+> 2. **A sidecar comment file** (`.filename.md.comments.json`) — a dot-prefixed JSON file stored next to the markdown. It contains all comment data and is hidden on macOS/Linux. You can safely `.gitignore` it or commit it for shared reviews.
+
 ### Additional Features
 - **Keyboard shortcut**: `Ctrl+Shift+V` to open review preview
 - **Right-click menu**: Available in both editor and file explorer
