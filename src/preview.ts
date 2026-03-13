@@ -144,14 +144,14 @@ export class PreviewPanel {
         const key = document.uri.fsPath;
         const existing = PreviewPanel.currentPanels.get(key);
         if (existing) {
-            existing.panel.reveal(vscode.ViewColumn.Beside);
+            existing.panel.reveal(vscode.ViewColumn.Active);
             existing.updateContent();
             return;
         }
         const panel = vscode.window.createWebviewPanel(
             'markdownReview',
             'Review: ' + path.basename(document.uri.fsPath),
-            vscode.ViewColumn.Beside,
+            vscode.ViewColumn.Active,
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,
@@ -619,6 +619,7 @@ img { max-width: 100%; }
     &#x1F4AC; <span id="badge-count">0</span> comments
 </div>
 <div class="export-buttons">
+    <button class="export-btn" onclick="jumpToSource()" title="Jump to source editor at current scroll position. You can also double-click anywhere in the preview to jump to that block in the source.">&#x2190; Source</button>
     <button class="export-btn" onclick="exportPdf()" title="Export to PDF">&#x1F4C4; PDF</button>
     <button class="export-btn" onclick="exportDocx()" title="Export to DOCX">&#x1F4DD; DOCX</button>
 </div>
@@ -807,6 +808,23 @@ img { max-width: 100%; }
     });
 
     // ========== export actions ==========
+    window.jumpToSource = function() {
+        // Find the block closest to the current scroll position
+        var scrollTop = window.scrollY;
+        var best = null;
+        var bestDist = Infinity;
+        var content = document.getElementById('content');
+        blocks.forEach(function(b) {
+            var el = content.querySelector('[data-start-offset="' + b.startOffset + '"]');
+            if (!el) return;
+            var rect = el.getBoundingClientRect();
+            var dist = Math.abs(rect.top);
+            if (dist < bestDist) { bestDist = dist; best = b; }
+        });
+        if (best) {
+            vscode.postMessage({ command: 'jumpToSource', cleanOffset: best.startOffset });
+        }
+    };
     window.exportPdf = function() {
         vscode.postMessage({ command: 'exportPdf' });
     };
@@ -1281,6 +1299,8 @@ mermaid.run({ querySelector: '.mermaid' });
                 htmlPath,
             ];
             execFile(chromePath, args, { timeout: 30000 }, (err: any) => {
+                // Clean up temp HTML
+                try { fs.unlinkSync(htmlPath); } catch {}
                 if (err) {
                     // Fallback: open in browser for manual print
                     vscode.env.openExternal(vscode.Uri.file(htmlPath));
@@ -1289,7 +1309,6 @@ mermaid.run({ querySelector: '.mermaid' });
                     );
                 } else {
                     vscode.window.showInformationMessage(`PDF exported to: ${path.basename(pdfPath)}`);
-                    // Open the PDF
                     vscode.env.openExternal(vscode.Uri.file(pdfPath));
                 }
             });
@@ -1353,9 +1372,9 @@ mermaid.run({ querySelector: '.mermaid' });
         ];
 
         execFile(pandocPath, args, { timeout: 30000 }, (err: any) => {
-            // Keep temp files for debugging
-            // try { fs.unlinkSync(cleanMdPath); } catch {}
-            // for (const pf of pngFiles) { try { fs.unlinkSync(pf.pngPath); } catch {} }
+            // Clean up temp files
+            try { fs.unlinkSync(cleanMdPath); } catch {}
+            for (const pf of pngFiles) { try { fs.unlinkSync(pf.pngPath); } catch {} }
 
             if (err) {
                 vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);
@@ -1369,6 +1388,11 @@ mermaid.run({ querySelector: '.mermaid' });
     /** Scroll the preview to a clean-text offset */
     public scrollToOffset(cleanOffset: number) {
         this.panel.webview.postMessage({ command: 'scrollToOffset', cleanOffset });
+    }
+
+    /** Bring the preview panel to focus */
+    public reveal() {
+        this.panel.reveal();
     }
 
     /** Delete a comment (remove anchor + JSON entry + re-render) */

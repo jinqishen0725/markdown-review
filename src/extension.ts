@@ -24,7 +24,35 @@ export function activate(context: vscode.ExtensionContext) {
             } catch {
                 vscode.window.showInformationMessage('No comments file found for this document.');
             }
-        })
+        }),
+
+        vscode.commands.registerCommand('markdownReview.jumpToSource', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document.languageId === 'markdown') {
+                const panel = PreviewPanel.currentPanels.get(editor.document.uri.fsPath);
+                if (panel) {
+                    const cursorOffset = editor.document.offsetAt(editor.selection.active);
+                    panel.scrollToOffset(cursorOffset);
+                } else {
+                    vscode.window.showInformationMessage('Open the review preview first.');
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('markdownReview.jumpToPreview', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor && editor.document.languageId === 'markdown') {
+                const panel = PreviewPanel.currentPanels.get(editor.document.uri.fsPath);
+                if (panel) {
+                    const cursorOffset = editor.document.offsetAt(editor.selection.active);
+                    panel.scrollToOffset(cursorOffset);
+                    panel.reveal();
+                } else {
+                    // Open preview first, then it auto-syncs
+                    PreviewPanel.createOrShow(context, editor.document);
+                }
+            }
+        }),
     );
 
     // Register Copilot tools

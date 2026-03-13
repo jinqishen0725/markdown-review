@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Review with AI Agent Tools",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "3.6.5",
+  "version": "3.7.4",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -31,6 +31,14 @@
       {
         "command": "markdownReview.exportComments",
         "title": "Markdown Review: Export Comments"
+      },
+      {
+        "command": "markdownReview.jumpToPreview",
+        "title": "Markdown Review: Jump to Preview"
+      },
+      {
+        "command": "markdownReview.jumpToSource",
+        "title": "Markdown Review: Jump to Source"
       }
     ],
     "menus": {
@@ -45,7 +53,12 @@
         {
           "when": "resourceLangId == markdown",
           "command": "markdownReview.openPreview",
-          "group": "navigation"
+          "group": "markdownReview@1"
+        },
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdownReview.jumpToPreview",
+          "group": "markdownReview@2"
         }
       ],
       "explorer/context": [

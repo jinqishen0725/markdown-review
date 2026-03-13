@@ -12,6 +12,12 @@ Markdown Review brings Quip/Google Docs-style inline commenting to your markdown
 
 ![Markdown Review Preview](examples/screenshot.png)
 
+### Rich Rendering
+- **LaTeX Math** — Full support for `$inline$` and `$$display$$` math formulas via KaTeX
+- **Mermaid Diagrams** — Sequence diagrams, flowcharts, gantt charts, class diagrams, state diagrams, and more rendered natively in the preview
+- **GitHub Flavored Markdown** — Tables, task lists, strikethrough via remark-gfm
+- **Syntax Highlighting** — Code blocks with language-specific formatting
+
 ### Inline Commenting
 - **"+" gutter buttons** — Click the `+` button next to any block (heading, paragraph, table, formula, list item, blockquote) to add a review comment
 - **Comment highlighting** — Commented blocks are highlighted with a yellow border
@@ -24,12 +30,12 @@ Markdown Review brings Quip/Google Docs-style inline commenting to your markdown
 - Edit comments and replies inline
 
 ### Cross-Reference Jumping
-- **Preview → Source**: Double-click any block in the preview to jump to that line in the editor
+- **Preview → Source**: Double-click any block in the preview to jump to that line in the editor (also available via right-click → "Jump to Source")
 - **Source → Preview**: Move your cursor in the editor and the preview scrolls to match
 
 ### Export
-- **PDF Export** — One-click export via Chrome headless (no headers/footers, KaTeX formulas preserved)
-- **DOCX Export** — One-click export via Pandoc with native Word equations (OMML)
+- **PDF Export** — One-click export via Chrome headless. Supports KaTeX formulas, Mermaid diagrams, tables, and all formatting. No headers/footers.
+- **DOCX Export** — One-click export via Pandoc with native Word equations (OMML). Mermaid diagrams rendered as high-resolution (2x DPI) PNG images via Chrome headless.
 
 ### 7 Copilot Tools for Agent Mode
 This is what makes Markdown Review uniquely **agent-friendly**. When you enable the extension's tools in Copilot Agent Mode, AI agents can:
@@ -81,6 +87,12 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 3. Press `Ctrl+Shift+V` (or right-click → "Markdown Review: Open Preview with Comments")
 4. Click the `+` buttons in the gutter to add comments
 5. In Copilot Agent Mode, enable the Markdown Review tools to let AI participate in the review
+
+### Navigation Between Source and Preview
+
+- **Preview → Source**: **Double-click** any block in the preview to jump to that line in the editor
+- **Source → Preview**: Move your cursor in the editor — the preview scrolls to the matching block with a brief blue highlight
+- The keyboard shortcut `Ctrl+Shift+V` is customizable via VS Code's **Preferences: Open Keyboard Shortcuts** (`Ctrl+K Ctrl+S`)
 
 ---
 
