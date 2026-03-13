@@ -208,6 +208,10 @@ export class PreviewPanel {
                 this.commentsManager.reload();
                 this.updateContent();
                 return;
+            case 'exportPdf': {
+                this.exportAsHtml();
+                return;
+            }
             case 'jumpToSource': {
                 // Map clean-text offset to document position and reveal
                 const text = this.document.getText();
@@ -580,12 +584,26 @@ img { max-width: 100%; }
     color: #ccc; border-radius: 2px; cursor: pointer; margin-left: 4px;
 }
 .inline-edit-btn:hover { background: #444; }
+
+/* ---------- export buttons ---------- */
+.export-buttons {
+    position: fixed; top: 10px; right: 220px; z-index: 100;
+    display: flex; gap: 6px;
+}
+.export-btn {
+    padding: 4px 10px; border-radius: 12px; border: 1px solid #555;
+    background: #333; color: #ccc; font-size: 12px; cursor: pointer;
+}
+.export-btn:hover { background: #444; }
 </style>
 </head>
 <body>
 
 <div class="comment-badge" id="comment-badge" style="display:none" onclick="togglePanel()">
     &#x1F4AC; <span id="badge-count">0</span> comments
+</div>
+<div class="export-buttons">
+    <button class="export-btn" onclick="exportPdf()" title="Export to PDF">&#x1F4C4; PDF</button>
 </div>
 
 <div id="wrapper">
@@ -770,6 +788,11 @@ img { max-width: 100%; }
     document.getElementById('dlg-input').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { submitComment(); }
     });
+
+    // ========== export actions ==========
+    window.exportPdf = function() {
+        vscode.postMessage({ command: 'exportPdf' });
+    };
 
     // ========== comment actions ==========
     window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
@@ -991,6 +1014,99 @@ img { max-width: 100%; }
     public refresh() {
         this.commentsManager.reload();
         this.updateContent();
+    }
+
+    /** Export clean rendered HTML (no comments/anchors) and open in browser for PDF printing */
+    private exportAsHtml() {
+        const text = this.document.getText();
+        // Strip all anchors to get clean markdown
+        const cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
+
+        // Re-render with remark pipeline (same as renderMarkdown but without blocks/anchorMap)
+        const processor = unified()
+            .use(remarkParse)
+            .use(remarkGfm)
+            .use(remarkMath)
+            .use(remarkRehype, { allowDangerousHtml: true })
+            .use(rehypeRaw)
+            .use(rehypeKatex, { throwOnError: false })
+            .use(rehypeStringify, { allowDangerousHtml: true });
+
+        const html = String(processor.processSync(cleanText));
+
+        const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${path.basename(this.document.uri.fsPath, '.md')}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #24292e; max-width: 860px; margin: auto; padding: 20px 40px; }
+h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1em; }
+code { background: #f6f8fa; padding: .2em .4em; border-radius: 3px; font-size: 85%; }
+pre { background: #f6f8fa; padding: 16px; border-radius: 6px; overflow: auto; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 4px solid #dfe2e5; padding: 0 16px; margin: 0 0 16px 0; color: #6a737d; }
+table { border-collapse: collapse; width: auto; margin-bottom: 16px; }
+th, td { border: 1px solid #dfe2e5; padding: 6px 13px; }
+th { font-weight: 600; background: #f6f8fa; }
+tr:nth-child(2n) { background: rgba(246,248,250,.5); }
+hr { border: none; border-top: 1px solid #eaecef; margin: 24px 0; }
+img { max-width: 100%; }
+.katex-display { overflow-x: auto; margin: 16px 0; }
+@media print { @page { margin: 0.75in; } }
+</style>
+</head>
+<body>
+${html}
+</body>
+</html>`;
+
+        const fs = require('fs');
+        const { execFile } = require('child_process');
+        const htmlPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.html';
+        fs.writeFileSync(htmlPath, fullHtml, 'utf-8');
+
+        // Try Chrome headless for direct PDF generation
+        const pdfPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.pdf';
+        const chromePaths = [
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            process.env.CHROME_PATH || '',
+        ];
+        const chromePath = chromePaths.find(p => p && fs.existsSync(p));
+
+        if (chromePath) {
+            const args = [
+                '--headless=new', '--disable-gpu',
+                `--print-to-pdf=${pdfPath}`,
+                '--no-pdf-header-footer',
+                '--virtual-time-budget=10000',
+                htmlPath,
+            ];
+            execFile(chromePath, args, { timeout: 30000 }, (err: any) => {
+                if (err) {
+                    // Fallback: open in browser for manual print
+                    vscode.env.openExternal(vscode.Uri.file(htmlPath));
+                    vscode.window.showWarningMessage(
+                        `Chrome PDF failed. HTML opened in browser — use Ctrl+P → Save as PDF.`
+                    );
+                } else {
+                    vscode.window.showInformationMessage(`PDF exported to: ${path.basename(pdfPath)}`);
+                    // Open the PDF
+                    vscode.env.openExternal(vscode.Uri.file(pdfPath));
+                }
+            });
+        } else {
+            // No Chrome found: fallback to browser
+            vscode.env.openExternal(vscode.Uri.file(htmlPath));
+            vscode.window.showInformationMessage(
+                `Preview opened in browser. Ctrl+P → uncheck "Headers and footers" → Save as PDF.`
+            );
+        }
     }
 
     /** Scroll the preview to a clean-text offset */
