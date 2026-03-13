@@ -212,6 +212,10 @@ export class PreviewPanel {
                 this.exportAsHtml();
                 return;
             }
+            case 'exportDocx': {
+                this.exportAsDocx();
+                return;
+            }
             case 'jumpToSource': {
                 // Map clean-text offset to document position and reveal
                 const text = this.document.getText();
@@ -604,6 +608,7 @@ img { max-width: 100%; }
 </div>
 <div class="export-buttons">
     <button class="export-btn" onclick="exportPdf()" title="Export to PDF">&#x1F4C4; PDF</button>
+    <button class="export-btn" onclick="exportDocx()" title="Export to DOCX">&#x1F4DD; DOCX</button>
 </div>
 
 <div id="wrapper">
@@ -792,6 +797,9 @@ img { max-width: 100%; }
     // ========== export actions ==========
     window.exportPdf = function() {
         vscode.postMessage({ command: 'exportPdf' });
+    };
+    window.exportDocx = function() {
+        vscode.postMessage({ command: 'exportDocx' });
     };
 
     // ========== comment actions ==========
@@ -1107,6 +1115,60 @@ ${html}
                 `Preview opened in browser. Ctrl+P → uncheck "Headers and footers" → Save as PDF.`
             );
         }
+    }
+
+    /** Export clean markdown to DOCX via Pandoc */
+    private exportAsDocx() {
+        const fs = require('fs');
+        const { execFile } = require('child_process');
+
+        const text = this.document.getText();
+        const cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
+
+        // Write clean markdown to temp file
+        const cleanMdPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_clean.md';
+        const docxPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.docx';
+        fs.writeFileSync(cleanMdPath, cleanText, 'utf-8');
+
+        // Find Pandoc
+        const { execFileSync } = require('child_process');
+        let pandocPath = 'pandoc';
+        try {
+            execFileSync('pandoc', ['--version'], { stdio: 'ignore' });
+        } catch {
+            // Pandoc not in PATH
+            const installUrl = 'https://pandoc.org/installing.html';
+            vscode.window.showErrorMessage(
+                `Pandoc is required for DOCX export but was not found. [Install Pandoc](${installUrl})`,
+                'Open Install Page'
+            ).then(choice => {
+                if (choice === 'Open Install Page') {
+                    vscode.env.openExternal(vscode.Uri.parse(installUrl));
+                }
+            });
+            // Clean up temp file
+            try { fs.unlinkSync(cleanMdPath); } catch {}
+            return;
+        }
+
+        const args = [
+            cleanMdPath,
+            '-o', docxPath,
+            '--from=markdown+tex_math_dollars',
+            '--to=docx',
+        ];
+
+        execFile(pandocPath, args, { timeout: 30000 }, (err: any) => {
+            // Clean up temp file
+            try { fs.unlinkSync(cleanMdPath); } catch {}
+
+            if (err) {
+                vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);
+            } else {
+                vscode.window.showInformationMessage(`DOCX exported: ${path.basename(docxPath)}`);
+                vscode.env.openExternal(vscode.Uri.file(docxPath));
+            }
+        });
     }
 
     /** Scroll the preview to a clean-text offset */

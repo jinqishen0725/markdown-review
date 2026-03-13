@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Review",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "3.1.5",
+  "version": "3.2.0",
   "publisher": "jinqishen",
   "engines": {
     "vscode": "^1.93.0"
@@ -178,6 +178,7 @@
   },
   "dependencies": {
     "@traptitech/markdown-it-katex": "^3.6.0",
+    "html-to-docx": "^1.8.0",
     "katex": "^0.16.38",
     "markdown-it": "^14.0.0",
     "rehype-katex": "^7.0.1",
