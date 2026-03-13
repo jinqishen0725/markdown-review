@@ -10,6 +10,8 @@ Markdown Review brings Quip/Google Docs-style inline commenting to your markdown
 
 ## Features
 
+![Markdown Review Preview](examples/screenshot.png)
+
 ### Inline Commenting
 - **"+" gutter buttons** — Click the `+` button next to any block (heading, paragraph, table, formula, list item, blockquote) to add a review comment
 - **Comment highlighting** — Commented blocks are highlighted with a yellow border
