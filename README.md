@@ -8,6 +8,22 @@ Markdown Review brings Quip/Google Docs-style inline commenting to your markdown
 
 ---
 
+## Quick Start
+
+### 1. Open a Review Preview
+Open any `.md` file and press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-click → **"Markdown Review: Open Preview with Comments"**.
+
+### 2. Add Review Comments
+In the preview, click the **`+`** button in the gutter next to any block (heading, paragraph, table, formula, list, blockquote) to add a comment. Reply to comments, edit them, or mark them resolved — all inline.
+
+### 3. Enable AI Agent Tools
+In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enable the 7 Markdown Review tools (they start with `#listReviewComments`, `#readReviewComment`, etc.). Now you can ask the agent:
+> *"Review this document and respond to all open comments"*
+
+The agent will list comments, read context, post replies, and resolve items — all autonomously.
+
+---
+
 ## Features
 
 ![Markdown Review Preview](examples/screenshot.png)
@@ -80,19 +96,11 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 
 ---
 
-## Quick Start
-
-1. Install the extension from VSIX
-2. Open any `.md` file
-3. Press `Ctrl+Shift+R` (or right-click → "Markdown Review: Open Preview with Comments")
-4. Click the `+` buttons in the gutter to add comments
-5. In Copilot Agent Mode, enable the Markdown Review tools to let AI participate in the review
-
-### Navigation Between Source and Preview
+## Navigation Tips
 
 - **Preview → Source**: **Double-click** any block in the preview to jump to that line in the editor
 - **Source → Preview**: Move your cursor in the editor — the preview scrolls to the matching block with a brief blue highlight
-- The keyboard shortcut `Ctrl+Shift+R` is customizable via VS Code's **Preferences: Open Keyboard Shortcuts** (`Ctrl+K Ctrl+S`)
+- The keyboard shortcut `Ctrl+Shift+R` is customizable via **Preferences: Open Keyboard Shortcuts** (`Ctrl+K Ctrl+S`)
 
 ---
 
