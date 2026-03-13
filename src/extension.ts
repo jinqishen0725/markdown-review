@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { PreviewPanel } from './preview';
+import { registerTools } from './tools';
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -24,6 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
             }
         })
     );
+
+    // Register Copilot tools
+    registerTools(context);
 }
 
 export function deactivate() {}

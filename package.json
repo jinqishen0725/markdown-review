@@ -2,10 +2,10 @@
   "name": "markdown-review",
   "displayName": "Markdown Review",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "2.4.4",
+  "version": "3.0.1",
   "publisher": "jinqishen",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
     "Other"
@@ -36,7 +36,132 @@
           "group": "navigation"
         }
       ]
-    }
+    },
+    "languageModelTools": [
+      {
+        "name": "markdownReview_list_comments",
+        "displayName": "List Review Comments",
+        "toolReferenceName": "listReviewComments",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(comment)",
+        "modelDescription": "Lists all review comments on the currently active markdown document. Returns each comment's ID, text, status (resolved/unresolved), block type, surrounding context, reply count, and role. Use this to get an overview of the review discussion.",
+        "inputSchema": {}
+      },
+      {
+        "name": "markdownReview_read_comment",
+        "displayName": "Read Review Comment",
+        "toolReferenceName": "readReviewComment",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(comment-discussion)",
+        "modelDescription": "Reads a specific review comment by ID, including its full text, all replies, and the surrounding markdown context (5 lines before and after the anchored block). Use this to understand the full context of a review discussion.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "commentId": {
+              "type": "string",
+              "description": "The ID of the comment to read (e.g., 'c1773348143590')"
+            }
+          },
+          "required": [
+            "commentId"
+          ]
+        }
+      },
+      {
+        "name": "markdownReview_reply_to_comment",
+        "displayName": "Reply to Review Comment",
+        "toolReferenceName": "replyToReviewComment",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(reply)",
+        "modelDescription": "Replies to an existing review comment. The reply is added with role 'agent'. Use this to respond to user review comments on the markdown document.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "commentId": {
+              "type": "string",
+              "description": "The ID of the comment to reply to"
+            },
+            "text": {
+              "type": "string",
+              "description": "The reply text"
+            }
+          },
+          "required": [
+            "commentId",
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "markdownReview_resolve_comment",
+        "displayName": "Resolve Review Comment",
+        "toolReferenceName": "resolveReviewComment",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(check)",
+        "modelDescription": "Marks a review comment as resolved. Use this when a review comment has been addressed.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "commentId": {
+              "type": "string",
+              "description": "The ID of the comment to resolve"
+            }
+          },
+          "required": [
+            "commentId"
+          ]
+        }
+      },
+      {
+        "name": "markdownReview_delete_comment",
+        "displayName": "Delete Review Comment",
+        "toolReferenceName": "deleteReviewComment",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(trash)",
+        "modelDescription": "Deletes a review comment and removes its anchor from the markdown file. Use this to remove a comment that is no longer needed.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "commentId": {
+              "type": "string",
+              "description": "The ID of the comment to delete"
+            }
+          },
+          "required": [
+            "commentId"
+          ]
+        }
+      },
+      {
+        "name": "markdownReview_scroll_to_comment",
+        "displayName": "Scroll Preview to Comment",
+        "toolReferenceName": "scrollToReviewComment",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(eye)",
+        "modelDescription": "Scrolls the markdown review preview to show the block associated with a specific comment. Also reveals the source line in the editor. Use this to navigate to a specific comment's location.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "commentId": {
+              "type": "string",
+              "description": "The ID of the comment to scroll to"
+            }
+          },
+          "required": [
+            "commentId"
+          ]
+        }
+      },
+      {
+        "name": "markdownReview_capture_screenshot",
+        "displayName": "Capture Preview Screenshot",
+        "toolReferenceName": "captureReviewScreenshot",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(device-camera)",
+        "modelDescription": "Captures the rendered markdown review preview as a self-contained HTML file with all styles, tables, and formulas preserved. Saves to .review-screenshot.html next to the markdown file. Returns the file path. Use this when you need to see how tables, formulas, or formatting actually render.",
+        "inputSchema": {}
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -p ./",
@@ -46,7 +171,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.93.0",
     "@vscode/vsce": "^2.22.0",
     "esbuild": "^0.27.3",
     "typescript": "^5.3.0"
@@ -65,9 +190,3 @@
     "unified": "^11.0.5"
   }
 }
-
-
-
-
-
-

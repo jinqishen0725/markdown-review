@@ -966,11 +966,68 @@ img { max-width: 100%; }
                 }
             }
         }
+        if (msg.command === 'captureScreenshot') {
+            try {
+                // Capture the full rendered HTML including styles
+                var styles = Array.from(document.querySelectorAll('style')).map(function(s){return s.outerHTML;}).join('\\n');
+                var links = Array.from(document.querySelectorAll('link[rel=stylesheet]')).map(function(l){return l.outerHTML;}).join('\\n');
+                var contentEl = document.getElementById('content');
+                var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' + links + styles + '</head><body style="padding:20px;max-width:860px;margin:auto;">' + (contentEl ? contentEl.innerHTML : '') + '</body></html>';
+                vscode.postMessage({ command: 'screenshotResult', html: html });
+            } catch(err) {
+                vscode.postMessage({ command: 'screenshotResult', error: err.message || 'Unknown error' });
+            }
+        }
     });
 })();
 </script>
 </body>
 </html>`;
+    }
+
+    // ---------- public methods for Copilot tools ----------
+
+    /** Refresh the preview (reload comments + re-render) */
+    public refresh() {
+        this.commentsManager.reload();
+        this.updateContent();
+    }
+
+    /** Scroll the preview to a clean-text offset */
+    public scrollToOffset(cleanOffset: number) {
+        this.panel.webview.postMessage({ command: 'scrollToOffset', cleanOffset });
+    }
+
+    /** Delete a comment (remove anchor + JSON entry + re-render) */
+    public async deleteCommentFromTool(commentId: string) {
+        await this.removeAnchorViaApi(commentId);
+        this.commentsManager.deleteComment(commentId);
+        this.immediateRender();
+    }
+
+    /** Capture a screenshot of the preview as a self-contained HTML file */
+    public captureScreenshot(savePath: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Screenshot timed out')), 10000);
+            const disposable = this.panel.webview.onDidReceiveMessage((msg) => {
+                if (msg.command === 'screenshotResult') {
+                    clearTimeout(timeout);
+                    disposable.dispose();
+                    if (msg.error) {
+                        reject(new Error(msg.error));
+                        return;
+                    }
+                    try {
+                        const fs = require('fs');
+                        fs.writeFileSync(savePath, msg.html, 'utf-8');
+                        resolve();
+                    } catch (e: any) {
+                        reject(e);
+                    }
+                }
+            });
+            this.panel.webview.postMessage({ command: 'captureScreenshot' });
+        });
     }
 
     private dispose() {
