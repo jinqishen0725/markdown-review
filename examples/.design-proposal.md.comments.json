@@ -50,7 +50,7 @@
     {
       "id": "c1000000000003",
       "anchor": "<!--@c1000000000003-->",
-      "startOffset": 1786,
+      "startOffset": 2679,
       "endOffset": 2000,
       "blockType": "listItem",
       "blockPreview": "- Phase 1: Core OAuth 2.0 implementation (2 weeks)",

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { CommentsManager, Comment } from './comments';
+import { log, logError } from './logger';
 
 const { unified } = require('unified');
 const remarkParse = require('remark-parse').default || require('remark-parse');
@@ -151,7 +152,11 @@ export class PreviewPanel {
             'markdownReview',
             'Review: ' + path.basename(document.uri.fsPath),
             vscode.ViewColumn.Beside,
-            { enableScripts: true, retainContextWhenHidden: true },
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
+            },
         );
         const p = new PreviewPanel(panel, document, context.extensionUri);
         PreviewPanel.currentPanels.set(key, p);
@@ -407,9 +412,15 @@ export class PreviewPanel {
 
     // ---------- full webview HTML ----------
 
+    private getMermaidUri(): vscode.Uri {
+        const onDiskPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'mermaid.min.js');
+        return this.panel.webview.asWebviewUri(onDiskPath);
+    }
+
     private getHtml(body: string, blocks: Block[], comments: Comment[]): string {
         const blocksJson = JSON.stringify(blocks).replace(/</g, '\\u003c');
         const commentsJson = JSON.stringify(comments).replace(/</g, '\\u003c');
+        const mermaidUri = this.getMermaidUri();
 
         return /*html*/`<!DOCTYPE html>
 <html lang="en">
@@ -418,6 +429,7 @@ export class PreviewPanel {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown Review</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="${mermaidUri}"></script>
 <style>
 /* ---------- layout ---------- */
 body {
@@ -960,6 +972,21 @@ img { max-width: 100%; }
     highlightCommentedBlocks();
     attachBlockClickHandlers();
 
+    // ========== Mermaid rendering ==========
+    var mermaidSources = []; // stores { index, source } for SVG collection
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+    document.querySelectorAll('pre > code.language-mermaid').forEach(function(codeEl, i) {
+        var pre = codeEl.parentElement;
+        var source = codeEl.textContent;
+        mermaidSources.push({ index: i, source: source });
+        var container = document.createElement('div');
+        container.className = 'mermaid';
+        container.id = 'mermaid-' + i;
+        container.textContent = source;
+        pre.parentElement.replaceChild(container, pre);
+    });
+    mermaid.run({ querySelector: '.mermaid' });
+
     // ========== Preview → Source: double-click to jump ==========
     document.getElementById('content').addEventListener('dblclick', function(e) {
         // Find the closest element with data-start-offset
@@ -1009,6 +1036,18 @@ img { max-width: 100%; }
                 vscode.postMessage({ command: 'screenshotResult', error: err.message || 'Unknown error' });
             }
         }
+        if (msg.command === 'collectMermaidSvgs') {
+            var results = [];
+            mermaidSources.forEach(function(item) {
+                var el = document.getElementById('mermaid-' + item.index);
+                var svgEl = el ? el.querySelector('svg') : null;
+                results.push({
+                    source: item.source,
+                    svg: svgEl ? svgEl.outerHTML : null
+                });
+            });
+            vscode.postMessage({ command: 'mermaidSvgsResult', svgs: results });
+        }
     });
 })();
 </script>
@@ -1024,13 +1063,146 @@ img { max-width: 100%; }
         this.updateContent();
     }
 
+    /** Collect rendered Mermaid SVGs from the webview */
+    private collectMermaidSvgs(): Promise<Array<{ source: string; svg: string | null }>> {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve([]), 5000);
+            const disposable = this.panel.webview.onDidReceiveMessage((msg) => {
+                if (msg.command === 'mermaidSvgsResult') {
+                    clearTimeout(timeout);
+                    disposable.dispose();
+                    resolve(msg.svgs || []);
+                }
+            });
+            this.panel.webview.postMessage({ command: 'collectMermaidSvgs' });
+        });
+    }
+
+    /** Find Chrome path */
+    private findChrome(): string | undefined {
+        const fs = require('fs');
+        const chromePaths = [
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            process.env.CHROME_PATH || '',
+        ];
+        return chromePaths.find(p => p && fs.existsSync(p));
+    }
+
+    /**
+     * Render Mermaid source code to PNG files using Chrome headless.
+     * Each mermaid block gets its own temp HTML with CDN Mermaid, rendered by Chrome.
+     * Returns array of { source, pngPath } for replacement.
+     */
+    private async renderMermaidToPng(mermaidBlocks: Array<{ source: string }>, tempDir: string): Promise<Array<{ source: string; pngPath: string }>> {
+        const fs = require('fs');
+        const { execFileSync } = require('child_process');
+        const chromePath = this.findChrome();
+        if (!chromePath) {
+            logError('Chrome not found — cannot render Mermaid diagrams');
+            return [];
+        }
+
+        log(`Rendering ${mermaidBlocks.length} Mermaid diagram(s) to PNG`);
+        const results: Array<{ source: string; pngPath: string }> = [];
+        for (let i = 0; i < mermaidBlocks.length; i++) {
+            const { source } = mermaidBlocks[i];
+            const pngPath = path.join(tempDir, `mermaid-export-${i}.png`);
+            const tempHtmlPath = path.join(tempDir, `mermaid-export-${i}.html`);
+
+            // HTML that renders mermaid with same layout as PDF export (max-width:860px)
+            const tempHtml = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+html { margin: 0; padding: 0; background: white; }
+body { margin: 0; padding: 20px 40px; background: white; max-width: 860px; }
+</style>
+</head><body>
+<div id="diagram" class="mermaid">${source.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+<script>
+mermaid.initialize({ startOnLoad: false, theme: 'default' });
+mermaid.run({ querySelector: '.mermaid' }).then(function() {
+    // After render, shrink body to fit the SVG for tight screenshot
+    var svg = document.querySelector('#diagram svg');
+    if (svg) {
+        var bbox = svg.getBoundingClientRect();
+        document.body.style.width = Math.ceil(bbox.width + 80) + 'px';
+        document.body.style.height = Math.ceil(bbox.height + 40) + 'px';
+    }
+});
+</script>
+</body></html>`;
+
+            fs.writeFileSync(tempHtmlPath, tempHtml, 'utf-8');
+            log(`Diagram ${i}: Rendering with Chrome...`);
+            try {
+                // Use a large window so the diagram isn't clipped during render,
+                // but body is inline-block so Chrome screenshots only the content area
+                execFileSync(chromePath, [
+                    '--headless=new', '--disable-gpu',
+                    `--screenshot=${pngPath}`,
+                    '--window-size=1600,4000',
+                    '--force-device-scale-factor=2',
+                    '--virtual-time-budget=8000',
+                    `file:///${tempHtmlPath.replace(/\\/g, '/')}`
+                ], { timeout: 25000 });
+                const rawSize = fs.statSync(pngPath).size;
+                log(`Diagram ${i}: Raw PNG ${rawSize} bytes`);
+
+                // Trim whitespace using bundled pngjs trim script (no native deps)
+                log(`Diagram ${i}: Trimming whitespace...`);
+                const rawPngPath = pngPath.replace('.png', '-raw.png');
+                try {
+                    fs.renameSync(pngPath, rawPngPath);
+                    const trimScript = path.join(this.extensionUri.fsPath, 'media', 'trim-png-bundled.js');
+                    const trimResult = execFileSync('node', [trimScript, rawPngPath, pngPath], {
+                        timeout: 30000,
+                        encoding: 'utf-8',
+                    });
+                    log(`Diagram ${i}: Trim result: ${trimResult.trim()}`);
+                    try { fs.unlinkSync(rawPngPath); } catch {}
+                } catch (trimErr: any) {
+                    logError(`Diagram ${i}: Trim failed, using raw`, trimErr);
+                    try { fs.renameSync(rawPngPath, pngPath); } catch {}
+                }
+                results.push({ source, pngPath });
+            } catch (chromeErr: any) {
+                logError(`Diagram ${i}: Chrome failed`, chromeErr);
+            }
+            try { fs.unlinkSync(tempHtmlPath); } catch {}
+        }
+        log(`Rendered ${results.length}/${mermaidBlocks.length} diagrams`);
+        return results;
+    }
+
+    /** Extract mermaid source blocks from markdown text */
+    private extractMermaidBlocks(mdText: string): Array<{ source: string }> {
+        const blocks: Array<{ source: string }> = [];
+        const re = /```mermaid\s*\n([\s\S]*?)\n\s*```/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(mdText)) !== null) {
+            blocks.push({ source: m[1] });
+        }
+        return blocks;
+    }
+
+    /** Replace mermaid code blocks in markdown with image references */
+    private replaceMermaidInMarkdown(md: string, pngFiles: Array<{ source: string; pngPath: string }>): string {
+        for (const item of pngFiles) {
+            const escaped = item.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+            const re = new RegExp('```mermaid\\s*\\n\\s*' + escaped + '\\s*\\n\\s*```', 's');
+            md = md.replace(re, `![Diagram](${item.pngPath.replace(/\\/g, '/')})`);
+        }
+        return md;
+    }
+
     /** Export clean rendered HTML (no comments/anchors) and open in browser for PDF printing */
-    private exportAsHtml() {
+    private async exportAsHtml() {
+        log('PDF Export: Starting...');
         const text = this.document.getText();
-        // Strip all anchors to get clean markdown
         const cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
 
-        // Re-render with remark pipeline (same as renderMarkdown but without blocks/anchorMap)
         const processor = unified()
             .use(remarkParse)
             .use(remarkGfm)
@@ -1042,12 +1214,14 @@ img { max-width: 100%; }
 
         const html = String(processor.processSync(cleanText));
 
+        // PDF uses CDN Mermaid — Chrome headless renders it natively
         const fullHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>${path.basename(this.document.uri.fsPath, '.md')}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #24292e; max-width: 860px; margin: auto; padding: 20px 40px; }
 h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; }
@@ -1070,6 +1244,17 @@ img { max-width: 100%; }
 </head>
 <body>
 ${html}
+<script>
+mermaid.initialize({ startOnLoad: false, theme: 'default' });
+document.querySelectorAll('pre > code.language-mermaid').forEach(function(codeEl, i) {
+    var pre = codeEl.parentElement;
+    var container = document.createElement('div');
+    container.className = 'mermaid';
+    container.textContent = codeEl.textContent;
+    pre.parentElement.replaceChild(container, pre);
+});
+mermaid.run({ querySelector: '.mermaid' });
+</script>
 </body>
 </html>`;
 
@@ -1092,7 +1277,7 @@ ${html}
                 '--headless=new', '--disable-gpu',
                 `--print-to-pdf=${pdfPath}`,
                 '--no-pdf-header-footer',
-                '--virtual-time-budget=10000',
+                '--virtual-time-budget=15000',
                 htmlPath,
             ];
             execFile(chromePath, args, { timeout: 30000 }, (err: any) => {
@@ -1109,7 +1294,7 @@ ${html}
                 }
             });
         } else {
-            // No Chrome found: fallback to browser
+            // No Chrome found: fallback to browser (keep SVG files for browser rendering)
             vscode.env.openExternal(vscode.Uri.file(htmlPath));
             vscode.window.showInformationMessage(
                 `Preview opened in browser. Ctrl+P → uncheck "Headers and footers" → Save as PDF.`
@@ -1118,12 +1303,21 @@ ${html}
     }
 
     /** Export clean markdown to DOCX via Pandoc */
-    private exportAsDocx() {
+    private async exportAsDocx() {
+        log('DOCX Export: Starting...');
         const fs = require('fs');
         const { execFile } = require('child_process');
 
         const text = this.document.getText();
-        const cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
+        let cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
+
+        // Render Mermaid blocks to PNGs via Chrome headless and replace in markdown
+        const tempDir = path.dirname(this.document.uri.fsPath);
+        const mermaidBlocks = this.extractMermaidBlocks(cleanText);
+        log(`DOCX Export: Found ${mermaidBlocks.length} mermaid block(s)`);
+        const pngFiles = await this.renderMermaidToPng(mermaidBlocks, tempDir);
+        cleanText = this.replaceMermaidInMarkdown(cleanText, pngFiles);
+        log(`DOCX Export: Replaced ${pngFiles.length} diagram(s) in markdown`);
 
         // Write clean markdown to temp file
         const cleanMdPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_clean.md';
@@ -1159,8 +1353,9 @@ ${html}
         ];
 
         execFile(pandocPath, args, { timeout: 30000 }, (err: any) => {
-            // Clean up temp file
-            try { fs.unlinkSync(cleanMdPath); } catch {}
+            // Keep temp files for debugging
+            // try { fs.unlinkSync(cleanMdPath); } catch {}
+            // for (const pf of pngFiles) { try { fs.unlinkSync(pf.pngPath); } catch {} }
 
             if (err) {
                 vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);

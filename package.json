@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Review with AI Agent Tools",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "3.4.7",
+  "version": "3.6.5",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -209,6 +209,7 @@
     "html-to-docx": "^1.8.0",
     "katex": "^0.16.38",
     "markdown-it": "^14.0.0",
+    "pngjs": "^7.0.0",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "rehype-stringify": "^10.0.1",

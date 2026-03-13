@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { PreviewPanel } from './preview';
 import { registerTools } from './tools';
+import { disposeChannel } from './logger';
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -30,4 +31,6 @@ export function activate(context: vscode.ExtensionContext) {
     registerTools(context);
 }
 
-export function deactivate() {}
+export function deactivate() {
+    disposeChannel();
+}

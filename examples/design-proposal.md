@@ -16,6 +16,24 @@ This document proposes a new user authentication system for our web application.
 <!--@c1000000000002-->
 The authentication flow follows a standard OAuth 2.0 authorization code flow:
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client
+    participant AuthServer
+    participant API
+
+    User->>Client: Click "Sign In"
+    Client->>AuthServer: Redirect with code_challenge
+    AuthServer->>User: Show login form
+    User->>AuthServer: Enter credentials
+    AuthServer->>Client: Redirect with auth code
+    Client->>AuthServer: Exchange code + code_verifier
+    AuthServer->>Client: Access token + Refresh token
+    Client->>API: Request with access token
+    API->>Client: Protected resource
+```
+
 1. User clicks "Sign In" on the client application
 2. Client redirects to the authorization server
 3. User authenticates and consents
@@ -47,6 +65,20 @@ where $w_i$ is the weight of security signal $i$ and $s_i$ is the signal value. 
 > **Note:** The risk scoring system should be calibrated against historical login data before deployment. Initial thresholds should be set conservatively (high threshold = fewer blocks) and tightened over time.
 
 ## 3. Implementation Plan
+
+```mermaid
+gantt
+    title Implementation Timeline
+    dateFormat  YYYY-MM-DD
+    section Phase 1
+    Core OAuth 2.0     :a1, 2026-04-01, 3w
+    section Phase 2
+    SAML Integration   :a2, after a1, 1w
+    section Phase 3
+    Risk Scoring       :a3, after a2, 2w
+    section Phase 4
+    Monitoring         :a4, after a3, 1w
+```
 
 <!--@c1000000000003-->
 - Phase 1: Core OAuth 2.0 implementation (2 weeks)
