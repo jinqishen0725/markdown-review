@@ -4,7 +4,7 @@
     {
       "id": "c1000000000001",
       "anchor": "<!--@c1000000000001-->",
-      "startOffset": 108,
+      "startOffset": 143,
       "endOffset": 400,
       "blockType": "paragraph",
       "blockPreview": "This document proposes a new user authentication system for our web application.",
@@ -30,7 +30,7 @@
     {
       "id": "c1000000000002",
       "anchor": "<!--@c1000000000002-->",
-      "startOffset": 450,
+      "startOffset": 444,
       "endOffset": 800,
       "blockType": "paragraph",
       "blockPreview": "The authentication flow follows a standard OAuth 2.0 authorization code flow:",
@@ -50,7 +50,7 @@
     {
       "id": "c1000000000003",
       "anchor": "<!--@c1000000000003-->",
-      "startOffset": 1800,
+      "startOffset": 1786,
       "endOffset": 2000,
       "blockType": "listItem",
       "blockPreview": "- Phase 1: Core OAuth 2.0 implementation (2 weeks)",
