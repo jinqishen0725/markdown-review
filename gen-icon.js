@@ -1,54 +1,40 @@
-const fs = require('fs');
-const { execFileSync } = require('child_process');
+const sharp = require('sharp');
+const path = require('path');
 
-// Create SVG icon
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a73e8"/>
-      <stop offset="100%" style="stop-color:#0d47a1"/>
-    </linearGradient>
-  </defs>
-  <rect width="128" height="128" rx="20" fill="url(#bg)"/>
-  <rect x="30" y="18" width="52" height="68" rx="4" fill="#fff" opacity="0.95"/>
-  <rect x="38" y="30" width="28" height="3" rx="1.5" fill="#1a73e8" opacity="0.6"/>
-  <rect x="38" y="38" width="36" height="3" rx="1.5" fill="#1a73e8" opacity="0.4"/>
-  <rect x="38" y="46" width="32" height="3" rx="1.5" fill="#1a73e8" opacity="0.4"/>
-  <rect x="38" y="54" width="36" height="3" rx="1.5" fill="#1a73e8" opacity="0.4"/>
-  <rect x="38" y="62" width="24" height="3" rx="1.5" fill="#1a73e8" opacity="0.4"/>
-  <g transform="translate(62,58)">
-    <rect x="0" y="0" width="48" height="36" rx="8" fill="#ffc107"/>
-    <polygon points="8,36 16,46 20,36" fill="#ffc107"/>
-    <rect x="8" y="9" width="24" height="2.5" rx="1" fill="#fff" opacity="0.9"/>
-    <rect x="8" y="15" width="32" height="2.5" rx="1" fill="#fff" opacity="0.7"/>
-    <rect x="8" y="21" width="18" height="2.5" rx="1" fill="#fff" opacity="0.7"/>
-  </g>
-  <circle cx="98" cy="54" r="12" fill="#6a1b9a"/>
-  <text x="98" y="58" text-anchor="middle" fill="#fff" font-size="11" font-family="Arial" font-weight="bold">AI</text>
-</svg>`;
+// Super simple icon — just basic shapes, no text, no complex paths
+const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Blue rounded background -->
+  <rect width="256" height="256" rx="40" fill="#0078d4"/>
+  
+  <!-- White document shape -->
+  <rect x="40" y="30" width="120" height="160" rx="8" fill="#ffffff"/>
+  
+  <!-- Document lines -->
+  <rect x="56" y="56" width="60" height="6" rx="3" fill="#0078d4" opacity="0.5"/>
+  <rect x="56" y="72" width="88" height="6" rx="3" fill="#0078d4" opacity="0.35"/>
+  <rect x="56" y="88" width="72" height="6" rx="3" fill="#0078d4" opacity="0.35"/>
+  <rect x="56" y="104" width="88" height="6" rx="3" fill="#0078d4" opacity="0.35"/>
+  <rect x="56" y="120" width="56" height="6" rx="3" fill="#0078d4" opacity="0.35"/>
+  <rect x="56" y="136" width="80" height="6" rx="3" fill="#0078d4" opacity="0.35"/>
+  <rect x="56" y="152" width="48" height="6" rx="3" fill="#0078d4" opacity="0.35"/>
+  
+  <!-- Yellow comment bubble -->
+  <rect x="120" y="120" width="110" height="76" rx="16" fill="#ffc107"/>
+  <polygon points="134,196 146,218 160,196" fill="#ffc107"/>
+  
+  <!-- Dots in bubble (typing indicator) -->
+  <circle cx="152" cy="158" r="8" fill="#ffffff"/>
+  <circle cx="175" cy="158" r="8" fill="#ffffff"/>
+  <circle cx="198" cy="158" r="8" fill="#ffffff"/>
+  
+  <!-- Purple circle badge (AI) -->
+  <circle cx="218" cy="116" r="28" fill="#7c4dff"/>
+  <!-- Simple star/sparkle for AI (no text needed) -->
+  <polygon points="218,100 222,112 234,112 224,120 228,132 218,124 208,132 212,120 202,112 214,112" fill="#ffffff"/>
+</svg>`);
 
-// Write SVG to temp HTML for Chrome screenshot
-const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;padding:0;}</style></head><body>${svg}</body></html>`;
-const htmlPath = require('path').resolve(__dirname, 'icon-temp.html');
-const pngPath = require('path').resolve(__dirname, 'icon.png');
-
-fs.writeFileSync(htmlPath, html, 'utf-8');
-
-// Use Chrome headless to screenshot
-const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-try {
-    execFileSync(chromePath, [
-        '--headless=new', '--disable-gpu',
-        `--screenshot=${pngPath}`,
-        '--window-size=128,128',
-        `file:///${htmlPath.replace(/\\/g, '/')}`
-    ], { timeout: 15000, cwd: __dirname });
-    console.log('Icon generated:', pngPath);
-    console.log('Size:', fs.statSync(pngPath).size, 'bytes');
-} catch (e) {
-    console.error('Chrome failed:', e.message);
-}
-
-// Cleanup
-try { fs.unlinkSync(htmlPath); } catch {}
-try { fs.unlinkSync(require('path').resolve(__dirname, 'icon.svg.html')); } catch {}
+sharp(svg)
+    .png()
+    .toFile(path.join(__dirname, 'icon.png'))
+    .then(info => console.log('Icon created:', info))
+    .catch(err => console.error('Error:', err));
