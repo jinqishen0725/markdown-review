@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Review",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "3.2.1",
+  "version": "3.2.3",
   "publisher": "jinqishen",
   "engines": {
     "vscode": "^1.93.0"
@@ -35,8 +35,30 @@
           "command": "markdownReview.openPreview",
           "group": "navigation"
         }
+      ],
+      "editor/context": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdownReview.openPreview",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdownReview.openPreview",
+          "group": "navigation"
+        }
       ]
     },
+    "keybindings": [
+      {
+        "command": "markdownReview.openPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "resourceLangId == markdown"
+      }
+    ],
     "languageModelTools": [
       {
         "name": "markdownReview_list_comments",
