@@ -1,0 +1,71 @@
+{
+  "file": "design-proposal.md",
+  "comments": [
+    {
+      "id": "c1000000000001",
+      "anchor": "<!--@c1000000000001-->",
+      "startOffset": 108,
+      "endOffset": 400,
+      "blockType": "paragraph",
+      "blockPreview": "This document proposes a new user authentication system for our web application.",
+      "comment": "The overview mentions OAuth 2.0 and SAML, but should we also include support for OpenID Connect (OIDC) as a first-class citizen? Many modern identity providers prefer OIDC over raw OAuth 2.0.",
+      "role": "user",
+      "timestamp": "2026-03-12T10:00:00.000Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1000000000001",
+          "role": "agent",
+          "text": "Good point. OIDC is built on top of OAuth 2.0, so our OAuth 2.0 implementation will naturally support OIDC with minimal additions (primarily the ID token handling and UserInfo endpoint). I'd recommend adding OIDC as an explicit mention in the overview and ensuring our token management covers ID tokens — which it already does in Section 2.2. No architectural changes needed.",
+          "timestamp": "2026-03-12T10:01:00.000Z"
+        },
+        {
+          "id": "r1000000000002",
+          "role": "user",
+          "text": "Makes sense. Let's add OIDC to the overview and mark it as supported out of the box via our OAuth 2.0 implementation.",
+          "timestamp": "2026-03-12T10:02:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "c1000000000002",
+      "anchor": "<!--@c1000000000002-->",
+      "startOffset": 450,
+      "endOffset": 800,
+      "blockType": "paragraph",
+      "blockPreview": "The authentication flow follows a standard OAuth 2.0 authorization code flow:",
+      "comment": "The flow description is missing PKCE (Proof Key for Code Exchange). For public clients like SPAs, PKCE is mandatory per OAuth 2.1. Should we require PKCE for all flows?",
+      "role": "user",
+      "timestamp": "2026-03-12T10:05:00.000Z",
+      "resolved": true,
+      "replies": [
+        {
+          "id": "r1000000000003",
+          "role": "agent",
+          "text": "Absolutely — PKCE should be required for all authorization code flows, not just public clients. This is a best practice per OAuth 2.1 (draft) and prevents authorization code interception attacks even for confidential clients. I recommend adding a step between steps 1 and 2: 'Client generates code_verifier and code_challenge' and updating step 5 to include the code_verifier in the token exchange.",
+          "timestamp": "2026-03-12T10:06:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "c1000000000003",
+      "anchor": "<!--@c1000000000003-->",
+      "startOffset": 1800,
+      "endOffset": 2000,
+      "blockType": "listItem",
+      "blockPreview": "- Phase 1: Core OAuth 2.0 implementation (2 weeks)",
+      "comment": "The timeline seems aggressive for Phase 1. Two weeks for a full OAuth 2.0 + PKCE implementation including token management, session handling, and security headers? Suggest 3 weeks minimum.",
+      "role": "user",
+      "timestamp": "2026-03-12T10:10:00.000Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1000000000004",
+          "role": "agent",
+          "text": "I agree the timeline is tight. Here's a breakdown of what Phase 1 actually entails:\n- Authorization endpoint integration: 3 days\n- Token exchange + PKCE: 2 days\n- Token storage + refresh logic: 2 days\n- Session management: 2 days\n- Security headers + CSRF protection: 2 days\n- Integration testing: 3 days\n\nThat's 14 working days = ~3 weeks. Recommend adjusting Phase 1 to 3 weeks and total timeline to 7 weeks.",
+          "timestamp": "2026-03-12T10:11:00.000Z"
+        }
+      ]
+    }
+  ]
+}
