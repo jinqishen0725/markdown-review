@@ -2,8 +2,13 @@
   "name": "markdown-review",
   "displayName": "Markdown Review",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "3.2.3",
-  "publisher": "jinqishen",
+  "version": "3.4.0",
+  "publisher": "JinqiShen",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jinqishen0725/markdown-review"
+  },
   "engines": {
     "vscode": "^1.93.0"
   },
