@@ -39,7 +39,14 @@ export class CommentsManager {
     private data: CommentsFile;
 
     constructor(markdownFilePath: string) {
-        this.commentsPath = markdownFilePath + '.comments.json';
+        const dir = path.dirname(markdownFilePath);
+        const base = path.basename(markdownFilePath);
+        this.commentsPath = path.join(dir, '.' + base + '.comments.json');
+        // Migrate from old path if it exists
+        const oldPath = markdownFilePath + '.comments.json';
+        if (!fs.existsSync(this.commentsPath) && fs.existsSync(oldPath)) {
+            fs.renameSync(oldPath, this.commentsPath);
+        }
         this.data = this.load();
     }
 
