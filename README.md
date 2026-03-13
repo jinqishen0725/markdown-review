@@ -71,7 +71,7 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 > 2. **A sidecar comment file** (`.filename.md.comments.json`) — a dot-prefixed JSON file stored next to the markdown. It contains all comment data and is hidden on macOS/Linux. You can safely `.gitignore` it or commit it for shared reviews.
 
 ### Additional Features
-- **Keyboard shortcut**: `Ctrl+Shift+V` to open review preview
+- **Keyboard shortcut**: `Ctrl+Shift+R` to open review preview
 - **Right-click menu**: Available in both editor and file explorer
 - **Comment persistence**: Comments stored in a dot-prefixed JSON sidecar file (`.filename.md.comments.json`)
 - **KaTeX math rendering**: Full support for `$inline$` and `$$display$$` math
@@ -84,7 +84,7 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 
 1. Install the extension from VSIX
 2. Open any `.md` file
-3. Press `Ctrl+Shift+V` (or right-click → "Markdown Review: Open Preview with Comments")
+3. Press `Ctrl+Shift+R` (or right-click → "Markdown Review: Open Preview with Comments")
 4. Click the `+` buttons in the gutter to add comments
 5. In Copilot Agent Mode, enable the Markdown Review tools to let AI participate in the review
 
@@ -92,7 +92,7 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 
 - **Preview → Source**: **Double-click** any block in the preview to jump to that line in the editor
 - **Source → Preview**: Move your cursor in the editor — the preview scrolls to the matching block with a brief blue highlight
-- The keyboard shortcut `Ctrl+Shift+V` is customizable via VS Code's **Preferences: Open Keyboard Shortcuts** (`Ctrl+K Ctrl+S`)
+- The keyboard shortcut `Ctrl+Shift+R` is customizable via VS Code's **Preferences: Open Keyboard Shortcuts** (`Ctrl+K Ctrl+S`)
 
 ---
 

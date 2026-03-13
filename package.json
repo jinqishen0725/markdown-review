@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Review with AI Agent Tools",
   "description": "Markdown preview with interactive commenting for document review",
-  "version": "3.7.4",
+  "version": "3.7.5",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -72,8 +72,8 @@
     "keybindings": [
       {
         "command": "markdownReview.openPreview",
-        "key": "ctrl+shift+v",
-        "mac": "cmd+shift+v",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
         "when": "resourceLangId == markdown"
       }
     ],
