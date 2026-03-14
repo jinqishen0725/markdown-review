@@ -137,6 +137,14 @@ export class CommentsManager {
         }
     }
 
+    deleteReply(commentId: string, replyId: string): void {
+        const c = this.data.comments.find(x => x.id === commentId);
+        if (c && c.replies) {
+            c.replies = c.replies.filter(x => x.id !== replyId);
+            this.save();
+        }
+    }
+
     unresolveComment(id: string): void {
         const c = this.data.comments.find(x => x.id === id);
         if (c) {

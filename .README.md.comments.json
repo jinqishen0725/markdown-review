@@ -12,6 +12,270 @@
       "role": "user",
       "timestamp": "2026-03-14T04:49:31.697Z",
       "resolved": false
+    },
+    {
+      "id": "c1773464345556",
+      "anchor": "<!--@c1773464345556-->",
+      "startOffset": 1385,
+      "endOffset": 1436,
+      "blockType": "paragraph",
+      "blockPreview": "![Markdown Review Preview](examples/screenshot.png)",
+      "comment": "why this image is not rendered here?",
+      "role": "user",
+      "timestamp": "2026-03-14T04:59:05.556Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773464369654",
+          "role": "agent",
+          "text": "The image `![Markdown Review Preview](examples/screenshot.png)` uses a relative path. It renders correctly on GitHub and in the VS Code built-in preview because they resolve relative paths from the file's location. However, in the Markdown Review webview, images are loaded via webview URIs with a restricted `localResourceRoots` — only the `media/` folder is currently whitelisted. The `examples/` folder is not included, so the webview's Content Security Policy blocks it.\n\nTwo fixes:\n1. **Move the screenshot to `media/`** and update the path — simplest fix.\n2. **Add the workspace folder to `localResourceRoots`** in `preview.ts` so the webview can load any file from the project — more flexible but broader permissions.\n\nThis only affects the extension's own review preview; GitHub, VS Code preview, and other renderers show the image fine.",
+          "timestamp": "2026-03-14T04:59:29.654Z"
+        },
+        {
+          "id": "r1773465127789",
+          "role": "agent",
+          "text": "The Reply \"Ask Copilot\" button is now working — this response was triggered from it! To summarize the fix options for the image issue:\n\nThe quickest fix is option 2 (adding the workspace folder to `localResourceRoots`), since it avoids moving files around and also fixes rendering for any other relative image paths in reviewed documents. I can implement that change right now if you'd like — it's a one-line addition in `preview.ts` where the webview panel is created.",
+          "timestamp": "2026-03-14T05:12:07.789Z"
+        },
+        {
+          "id": "r1773465289244",
+          "role": "user",
+          "text": "Please still fix it for easier review",
+          "timestamp": "2026-03-14T05:14:49.244Z"
+        },
+        {
+          "id": "r1773465435686",
+          "role": "user",
+          "text": "second attempt on reply: Please still fix it for easier review",
+          "timestamp": "2026-03-14T05:17:15.686Z"
+        },
+        {
+          "id": "r1773465518868",
+          "role": "agent",
+          "text": "Fixed! I've made two changes to resolve the image rendering:\n\n1. Added the document's directory to `localResourceRoots` so the webview is allowed to load files relative to the markdown file\n2. Added `resolveImagePaths()` which rewrites relative `src` attributes in `<img>` tags to proper webview URIs\n\nReload the window (Ctrl+Shift+P → \"Developer: Reload Window\") and reopen the preview — the screenshot should now render correctly.",
+          "timestamp": "2026-03-14T05:18:38.868Z"
+        },
+        {
+          "id": "r1773465698637",
+          "role": "user",
+          "text": "This image is still not showing ...",
+          "timestamp": "2026-03-14T05:21:38.637Z"
+        },
+        {
+          "id": "r1773465698726",
+          "role": "user",
+          "text": "The image is still not showing",
+          "timestamp": "2026-03-14T05:21:38.726Z"
+        },
+        {
+          "id": "r1773465844651",
+          "role": "agent",
+          "text": "Found the root cause — the file `examples/screenshot.png` doesn't exist on disk! The `examples/` folder only contains `design-proposal.md` and its comments file. The image rendering code fix is correct (localResourceRoots + resolveImagePaths both work), but there's no actual screenshot to display. We need to take a screenshot of the extension and save it as `examples/screenshot.png`.",
+          "timestamp": "2026-03-14T05:24:04.651Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773464642073",
+      "anchor": "<!--@c1773464642073-->",
+      "startOffset": 531,
+      "endOffset": 545,
+      "blockType": "heading",
+      "blockPreview": "## Quick Start",
+      "comment": "this is another test",
+      "role": "user",
+      "timestamp": "2026-03-14T05:04:02.073Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773464653116",
+          "role": "agent",
+          "text": "Got it — this looks like a test comment on the Quick Start heading. The Ask Copilot button is working correctly! It routed this comment to the Copilot chat session, I was able to read it and reply. Feel free to resolve this test comment when you're done verifying.",
+          "timestamp": "2026-03-14T05:04:13.116Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773465777630",
+      "anchor": "<!--@c1773465777630-->",
+      "startOffset": 549,
+      "endOffset": 577,
+      "blockType": "heading",
+      "blockPreview": "### 1. Open a Review Preview",
+      "comment": "test add comment2",
+      "role": "user",
+      "timestamp": "2026-03-14T05:22:57.630Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773465788513",
+          "role": "user",
+          "text": "test reply2",
+          "timestamp": "2026-03-14T05:23:08.513Z"
+        },
+        {
+          "id": "r1773465889761",
+          "role": "user",
+          "text": "test reply 3",
+          "timestamp": "2026-03-14T05:24:49.761Z"
+        },
+        {
+          "id": "r1773465902286",
+          "role": "agent",
+          "text": "Looks like this is a test thread to verify the Reply Ask Copilot flow. I can see both your replies (\"test reply2\" and \"test reply 3\") were saved correctly and included in the thread context. The popover should also be staying open now after replies. Everything looks good — feel free to resolve this test comment.",
+          "timestamp": "2026-03-14T05:25:02.286Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773465909219",
+      "anchor": "<!--@c1773465909219-->",
+      "startOffset": 579,
+      "endOffset": 717,
+      "blockType": "paragraph",
+      "blockPreview": "Open any `.md` file and press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-",
+      "comment": "test add comment",
+      "role": "user",
+      "timestamp": "2026-03-14T05:25:09.219Z",
+      "resolved": false
+    },
+    {
+      "id": "c1773466096442",
+      "anchor": "<!--@c1773466096442-->",
+      "startOffset": 721,
+      "endOffset": 747,
+      "blockType": "heading",
+      "blockPreview": "### 2. Add Review Comments",
+      "comment": "add comment",
+      "role": "user",
+      "timestamp": "2026-03-14T05:28:16.442Z",
+      "resolved": false
+    },
+    {
+      "id": "c1773466115580",
+      "anchor": "<!--@c1773466115580-->",
+      "startOffset": 994,
+      "endOffset": 1199,
+      "blockType": "paragraph",
+      "blockPreview": "In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enabl",
+      "comment": "add comment",
+      "role": "user",
+      "timestamp": "2026-03-14T05:28:35.580Z",
+      "resolved": false
+    },
+    {
+      "id": "c1773466132046",
+      "anchor": "<!--@c1773466132046-->",
+      "startOffset": 964,
+      "endOffset": 992,
+      "blockType": "heading",
+      "blockPreview": "### 3. Enable AI Agent Tools",
+      "comment": "ask copilot test",
+      "role": "user",
+      "timestamp": "2026-03-14T05:28:52.046Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773466142893",
+          "role": "agent",
+          "text": "Test received! The \"Add Comment + Ask Copilot\" flow is working — the comment was created, and Copilot chat opened with the context. Did the popover also open automatically for this new comment? That was the fix we just deployed.",
+          "timestamp": "2026-03-14T05:29:02.893Z"
+        },
+        {
+          "id": "r1773466168584",
+          "role": "user",
+          "text": "test 2",
+          "timestamp": "2026-03-14T05:29:28.584Z"
+        },
+        {
+          "id": "r1773466178001",
+          "role": "agent",
+          "text": "Reply \"Ask Copilot\" flow confirmed working — your \"test 2\" reply was saved and I can see it in the thread. Both flows are now functional:\n1. Add Comment + Ask Copilot ✅\n2. Reply + Ask Copilot ✅\n\nIs the popover staying open during these actions now?",
+          "timestamp": "2026-03-14T05:29:38.001Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773466188240",
+      "anchor": "<!--@c1773466188240-->",
+      "startOffset": 1370,
+      "endOffset": 1381,
+      "blockType": "heading",
+      "blockPreview": "## Features",
+      "comment": "add comment",
+      "role": "user",
+      "timestamp": "2026-03-14T05:29:48.240Z",
+      "resolved": false
+    },
+    {
+      "id": "c1773466551259",
+      "anchor": "<!--@c1773466551259-->",
+      "startOffset": 5946,
+      "endOffset": 5969,
+      "blockType": "heading",
+      "blockPreview": "### Additional Features",
+      "comment": "test add comment",
+      "role": "user",
+      "timestamp": "2026-03-14T05:35:51.259Z",
+      "resolved": false
+    },
+    {
+      "id": "c1773466551263",
+      "anchor": "<!--@c1773466551263-->",
+      "startOffset": 6444,
+      "endOffset": 6462,
+      "blockType": "heading",
+      "blockPreview": "## Navigation Tips",
+      "comment": "test add comment",
+      "role": "user",
+      "timestamp": "2026-03-14T05:35:51.263Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773466562965",
+          "role": "user",
+          "text": "test reply",
+          "timestamp": "2026-03-14T05:36:02.965Z"
+        },
+        {
+          "id": "r1773466575335",
+          "role": "agent",
+          "text": "Test thread received — your reply \"test reply\" is saved. This response was triggered via Reply Ask Copilot. Is the popover staying open this time after this agent reply appears?",
+          "timestamp": "2026-03-14T05:36:15.335Z"
+        },
+        {
+          "id": "r1773467350186",
+          "role": "user",
+          "text": "tsest",
+          "timestamp": "2026-03-14T05:49:10.186Z"
+        },
+        {
+          "id": "r1773467370746",
+          "role": "agent",
+          "text": "Full path is now showing in the prompt — confirmed working. Your reply \"tsest\" was saved and the thread has 3 replies. How's the button sizing and popover behavior looking now?",
+          "timestamp": "2026-03-14T05:49:30.746Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773466584691",
+      "anchor": "<!--@c1773466584691-->",
+      "startOffset": 6838,
+      "endOffset": 6946,
+      "blockType": "paragraph",
+      "blockPreview": "See the [examples/](examples/) folder for a sample design proposal with threaded",
+      "comment": "test comment 2",
+      "role": "user",
+      "timestamp": "2026-03-14T05:36:24.691Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773466593209",
+          "role": "agent",
+          "text": "Test comment 2 received! This was triggered via Add Comment + Ask Copilot. Did the popover open automatically for this new comment and stay open after this reply?",
+          "timestamp": "2026-03-14T05:36:33.209Z"
+        }
+      ]
     }
   ]
 }

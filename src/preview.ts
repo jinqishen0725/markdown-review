@@ -155,7 +155,10 @@ export class PreviewPanel {
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,
-                localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
+                localResourceRoots: [
+                    vscode.Uri.joinPath(context.extensionUri, 'media'),
+                    vscode.Uri.file(path.dirname(document.uri.fsPath)),
+                ],
             },
         );
         const p = new PreviewPanel(panel, document, context.extensionUri);
@@ -176,13 +179,13 @@ export class PreviewPanel {
                 );
                 this.insertAnchorViaApi(c.id, message.startOffset).then(() => {
                     this.immediateRender();
+                    this.panel.webview.postMessage({ command: 'openPopover', commentId: c.id });
                 });
                 return;
             }
             case 'resolveComment':
                 this.commentsManager.resolveComment(message.id);
-                // Keep anchor in file — only remove on delete
-                this.immediateRender();
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
             case 'deleteComment':
                 this.removeAnchorViaApi(message.id).then(() => {
@@ -192,21 +195,26 @@ export class PreviewPanel {
                 return;
             case 'unresolveComment':
                 this.commentsManager.unresolveComment(message.id);
-                this.immediateRender();
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
             case 'replyComment': {
                 this.commentsManager.addReply(message.id, message.text);
-                this.immediateRender();
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
             }
             case 'editComment': {
                 this.commentsManager.editComment(message.id, message.text);
-                this.immediateRender();
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
             }
             case 'editReply': {
                 this.commentsManager.editReply(message.commentId, message.replyId, message.text);
-                this.immediateRender();
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.commentId) });
+                return;
+            }
+            case 'deleteReply': {
+                this.commentsManager.deleteReply(message.commentId, message.replyId);
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.commentId) });
                 return;
             }
             case 'refresh':
@@ -243,12 +251,18 @@ export class PreviewPanel {
                 );
                 this.insertAnchorViaApi(c.id, message.startOffset).then(() => {
                     this.immediateRender();
+                    // Open the popover for the new comment
+                    this.panel.webview.postMessage({ command: 'openPopover', commentId: c.id });
                     this.openCopilotForComment(c);
                 });
                 return;
             }
             case 'askCopilotThread': {
-                const comment = this.commentsManager.getAll().find((c: any) => c.id === message.id);
+                // Reply was already saved by the replyComment message; just reload data for the prompt
+                if (message.pendingReply) {
+                    this.commentsManager.reload();
+                }
+                const comment = this.commentsManager.getComments().find((c: any) => c.id === message.id);
                 if (comment) {
                     this.openCopilotForThread(comment);
                 }
@@ -261,7 +275,8 @@ export class PreviewPanel {
 
     private openCopilotForComment(comment: any) {
         const fileName = path.basename(this.document.uri.fsPath);
-        const prompt = `I'm reviewing "${fileName}". A new review comment was just added:\n\n` +
+        const filePath = this.document.uri.fsPath;
+        const prompt = `I'm reviewing "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
             `- Comment #${comment.id}: "${comment.comment}"\n` +
             `- On block: "${comment.blockPreview || '(unknown)'}"\n\n` +
             `Please use #readReviewComment to get the full context of comment "${comment.id}", ` +
@@ -271,12 +286,13 @@ export class PreviewPanel {
 
     private openCopilotForThread(comment: any) {
         const fileName = path.basename(this.document.uri.fsPath);
+        const filePath = this.document.uri.fsPath;
         let repliesText = '';
         if (comment.replies && comment.replies.length > 0) {
             repliesText = '\n- Existing replies:\n' +
                 comment.replies.map((r: any) => `  [${r.role || 'user'}] ${r.text}`).join('\n');
         }
-        const prompt = `I'm reviewing "${fileName}". Please respond to this comment thread:\n\n` +
+        const prompt = `I'm reviewing "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
             `- Comment #${comment.id}: "${comment.comment}"\n` +
             `- On block: "${comment.blockPreview || '(unknown)'}"\n` +
             `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
@@ -456,8 +472,20 @@ export class PreviewPanel {
         if (offsetsChanged) {
             this.commentsManager.persist();
         }
-        this.panel.webview.html = this.getHtml(html, blocks, comments);
+        this.panel.webview.html = this.getHtml(this.resolveImagePaths(html), blocks, comments);
         this.lastRenderTime = Date.now();
+    }
+
+    /** Rewrite relative image src paths to webview URIs */
+    private resolveImagePaths(html: string): string {
+        const docDir = path.dirname(this.document.uri.fsPath);
+        return html.replace(/<img\s([^>]*?)src="([^"]+)"/gi, (match, before, src) => {
+            // Skip absolute URLs and data URIs
+            if (/^(https?:|data:|vscode-resource:)/i.test(src)) { return match; }
+            const absPath = path.resolve(docDir, src);
+            const webviewUri = this.panel.webview.asWebviewUri(vscode.Uri.file(absPath));
+            return `<img ${before}src="${webviewUri}"`;
+        });
     }
 
     // ---------- full webview HTML ----------
@@ -546,14 +574,14 @@ img { max-width: 100%; }
 }
 #comment-popover .pop-text { white-space: pre-wrap; margin-bottom: 6px; }
 #comment-popover .pop-meta { font-size: 11px; color: #888; margin-bottom: 8px; }
-#comment-popover .pop-actions { display: flex; gap: 6px; }
+#comment-popover .pop-actions { display: flex; gap: 6px; margin-top: 8px; }
 #comment-popover button {
     padding: 3px 10px; border: 1px solid #555; background: #333;
     color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
 }
 #comment-popover button:hover { background: #444; }
 #comment-popover button.btn-resolve { border-color: #4caf50; }
-.btn-copilot { background: #7c3aed !important; color: #fff !important; border-color: #7c3aed !important; }
+.btn-copilot { background: #7c3aed !important; color: #fff !important; border-color: #7c3aed !important; padding: 3px 10px !important; font-size: 11px !important; line-height: normal !important; box-sizing: border-box !important; }
 .btn-copilot:hover { background: #6d28d9 !important; }
 
 /* ---------- comment dialog ---------- */
@@ -619,7 +647,7 @@ img { max-width: 100%; }
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .clist-item .item-comment { font-size: 13px; white-space: pre-wrap; margin-bottom: 4px; }
 .clist-item .item-meta { font-size: 11px; color: #888; }
-.clist-item .item-actions { margin-top: 6px; display: flex; gap: 6px; }
+.clist-item .item-actions { margin-top: 8px; display: flex; gap: 6px; }
 .clist-item button {
     padding: 2px 8px; border: 1px solid #555; background: #333;
     color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
@@ -643,10 +671,15 @@ img { max-width: 100%; }
     resize: none; box-sizing: border-box;
 }
 .pop-reply-input button {
-    margin-top: 4px; padding: 2px 8px; border: 1px solid #555; background: #333;
+    margin-top: 4px; padding: 3px 10px; border: 1px solid #555; background: #333;
     color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
 }
 .pop-reply-input button:hover { background: #444; }
+.reply-delete-btn {
+    font-size: 10px; padding: 0 4px; border: 1px solid #555; background: #333;
+    color: #ccc; border-radius: 2px; cursor: pointer; margin-left: 4px;
+}
+.reply-delete-btn:hover { background: #633; border-color: #c44; }
 .inline-edit-btn {
     font-size: 10px; padding: 0 4px; border: 1px solid #555; background: #333;
     color: #ccc; border-radius: 2px; cursor: pointer; margin-left: 4px;
@@ -800,7 +833,8 @@ img { max-width: 100%; }
             repliesHtml = '<div class="pop-replies">';
             comment.replies.forEach(function(r) {
                 repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
-                    ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button></div>' +
+                    ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button>' +
+                    ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">\u00d7</button></div>' +
                     '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
             });
             repliesHtml += '</div>';
@@ -879,7 +913,24 @@ img { max-width: 100%; }
         if (el) { el.classList.add('commented-block'); }
     };
     window.askCopilotThread = function(id) {
-        vscode.postMessage({ command: 'askCopilotThread', id: id });
+        // Check for typed reply in popover or sidebar textarea
+        var replyText = '';
+        var popInput = document.getElementById('reply-input');
+        if (popInput && popInput.value.trim()) {
+            replyText = popInput.value.trim();
+            popInput.value = '';
+        } else {
+            var listInput = document.getElementById('list-reply-' + id);
+            if (listInput && listInput.value.trim()) {
+                replyText = listInput.value.trim();
+                listInput.value = '';
+            }
+        }
+        // If user typed a reply, save it first, then ask Copilot
+        if (replyText) {
+            vscode.postMessage({ command: 'replyComment', id: id, text: replyText });
+        }
+        vscode.postMessage({ command: 'askCopilotThread', id: id, pendingReply: replyText });
     };
 
     // ========== export actions ==========
@@ -909,7 +960,11 @@ img { max-width: 100%; }
 
     // ========== comment actions ==========
     window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
-    window.deleteComment = function(id) { vscode.postMessage({ command: 'deleteComment', id: id }); };
+    window.deleteComment = function(id) {
+        if (confirm('Delete this comment and all its replies?')) {
+            vscode.postMessage({ command: 'deleteComment', id: id });
+        }
+    };
     window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
     window.submitReply = function(id) {
         var input = document.getElementById('reply-input');
@@ -961,6 +1016,11 @@ img { max-width: 100%; }
         if (!text) return;
         vscode.postMessage({ command: 'editReply', commentId: commentId, replyId: replyId, text: text });
     };
+    window.deleteReply = function(commentId, replyId) {
+        if (confirm('Delete this reply?')) {
+            vscode.postMessage({ command: 'deleteReply', commentId: commentId, replyId: replyId });
+        }
+    };
 
     // ========== comment list panel ==========
     window.togglePanel = function() {
@@ -986,7 +1046,8 @@ img { max-width: 100%; }
                 repliesHtml = '<div class="item-replies">';
                 c.replies.forEach(function(r) {
                     repliesHtml += '<div class="item-reply" id="list-reply-' + r.id + '"><div class="item-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
-                        ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button></div>' +
+                        ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button>' +
+                        ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">\u00d7</button></div>' +
                         '<div class="item-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
                 });
                 repliesHtml += '</div>';
@@ -1050,6 +1111,34 @@ img { max-width: 100%; }
                 attachBlockClickHandlers();
                 if (panelVisible) buildList();
                 document.getElementById('comment-popover').style.display = 'none';
+                break;
+            }
+            case 'commentUpdated': {
+                var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
+                if (idx >= 0) { comments[idx] = msg.comment; }
+                highlightCommentedBlocks();
+                attachBlockClickHandlers();
+                updateBadge();
+                if (panelVisible) buildList();
+                // Re-show popover if it was open for this comment
+                var pop = document.getElementById('comment-popover');
+                if (pop.style.display === 'block') {
+                    var updatedComment = comments.find(function(x) { return x.id === msg.comment.id; });
+                    if (updatedComment) {
+                        var content = document.getElementById('content');
+                        var anchorEl = content.querySelector('[data-start-offset="' + updatedComment.startOffset + '"]');
+                        if (anchorEl) { showPopover(updatedComment, anchorEl); }
+                    }
+                }
+                break;
+            }
+            case 'openPopover': {
+                var oc = comments.find(function(x) { return x.id === msg.commentId; });
+                if (oc) {
+                    var ocContent = document.getElementById('content');
+                    var ocAnchor = ocContent.querySelector('[data-start-offset="' + oc.startOffset + '"]');
+                    if (ocAnchor) { showPopover(oc, ocAnchor); }
+                }
                 break;
             }
         }
@@ -1155,6 +1244,15 @@ img { max-width: 100%; }
     public refresh() {
         this.commentsManager.reload();
         this.updateContent();
+    }
+
+    /** Send updated comment to webview without full re-render (keeps popover open) */
+    public refreshComment(commentId: string) {
+        this.commentsManager.reload();
+        const comment = this.commentsManager.getComments().find((c: any) => c.id === commentId);
+        if (comment) {
+            this.panel.webview.postMessage({ command: 'commentUpdated', comment });
+        }
     }
 
     /** Collect rendered Mermaid SVGs from the webview */

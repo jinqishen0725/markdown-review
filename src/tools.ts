@@ -134,16 +134,16 @@ export class ReplyToCommentTool implements vscode.LanguageModelTool<IReplyParams
                 new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found.`)
             ]);
         }
-        // Trigger preview refresh
-        this.refreshPreview();
+        // Trigger preview refresh without full re-render
+        this.refreshPreview(options.input.commentId);
         return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart(`Reply added to comment ${options.input.commentId}.`)
         ]);
     }
 
-    private refreshPreview() {
+    private refreshPreview(commentId: string) {
         for (const [, panel] of PreviewPanel.currentPanels) {
-            panel.refresh();
+            panel.refreshComment(commentId);
         }
     }
 }
@@ -164,15 +164,15 @@ export class ResolveCommentTool implements vscode.LanguageModelTool<IResolvePara
             ]);
         }
         mgr.resolveComment(options.input.commentId);
-        this.refreshPreview();
+        this.refreshPreview(options.input.commentId);
         return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} marked as resolved.`)
         ]);
     }
 
-    private refreshPreview() {
+    private refreshPreview(commentId: string) {
         for (const [, panel] of PreviewPanel.currentPanels) {
-            panel.refresh();
+            panel.refreshComment(commentId);
         }
     }
 }
