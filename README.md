@@ -185,6 +185,8 @@ node test/test-crossref.js
 
 | Version | Highlights |
 |---|---|
+| **4.0.0** | ✨ Ask Copilot buttons (Add Comment + Reply), popover persistence, data URI images, DOCX table borders, reply delete with confirmation dialogs |
+| **3.7.x** | Quick Start section, Ctrl+Shift+R keybinding, Mermaid diagrams, preview as new tab |
 | **3.2.x** | Context menus, keybinding, dot-prefixed comments file, DOCX export |
 | **3.1.x** | PDF export via Chrome headless with KaTeX support |
 | **3.0.x** | 7 Copilot tools for agent mode |
