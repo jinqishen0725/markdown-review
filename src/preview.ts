@@ -233,7 +233,57 @@ export class PreviewPanel {
                 });
                 return;
             }
+            case 'addCommentAndAsk': {
+                const c = this.commentsManager.addComment(
+                    message.startOffset,
+                    message.endOffset,
+                    message.blockType || '',
+                    message.blockPreview || '',
+                    message.comment,
+                );
+                this.insertAnchorViaApi(c.id, message.startOffset).then(() => {
+                    this.immediateRender();
+                    this.openCopilotForComment(c);
+                });
+                return;
+            }
+            case 'askCopilotThread': {
+                const comment = this.commentsManager.getAll().find((c: any) => c.id === message.id);
+                if (comment) {
+                    this.openCopilotForThread(comment);
+                }
+                return;
+            }
         }
+    }
+
+    // ---------- Ask Copilot helpers ----------
+
+    private openCopilotForComment(comment: any) {
+        const fileName = path.basename(this.document.uri.fsPath);
+        const prompt = `I'm reviewing "${fileName}". A new review comment was just added:\n\n` +
+            `- Comment #${comment.id}: "${comment.comment}"\n` +
+            `- On block: "${comment.blockPreview || '(unknown)'}"\n\n` +
+            `Please use #readReviewComment to get the full context of comment "${comment.id}", ` +
+            `then use #replyToReviewComment to post a helpful response addressing this comment.`;
+        vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+    }
+
+    private openCopilotForThread(comment: any) {
+        const fileName = path.basename(this.document.uri.fsPath);
+        let repliesText = '';
+        if (comment.replies && comment.replies.length > 0) {
+            repliesText = '\n- Existing replies:\n' +
+                comment.replies.map((r: any) => `  [${r.role || 'user'}] ${r.text}`).join('\n');
+        }
+        const prompt = `I'm reviewing "${fileName}". Please respond to this comment thread:\n\n` +
+            `- Comment #${comment.id}: "${comment.comment}"\n` +
+            `- On block: "${comment.blockPreview || '(unknown)'}"\n` +
+            `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
+            repliesText + '\n\n' +
+            `Please use #readReviewComment to get the full context of comment "${comment.id}", ` +
+            `then use #replyToReviewComment to post a helpful response continuing this thread.`;
+        vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
     }
 
     // ---------- anchor operations via VS Code API ----------
@@ -503,6 +553,8 @@ img { max-width: 100%; }
 }
 #comment-popover button:hover { background: #444; }
 #comment-popover button.btn-resolve { border-color: #4caf50; }
+.btn-copilot { background: #7c3aed !important; color: #fff !important; border-color: #7c3aed !important; }
+.btn-copilot:hover { background: #6d28d9 !important; }
 
 /* ---------- comment dialog ---------- */
 #dialog-overlay {
@@ -647,6 +699,7 @@ img { max-width: 100%; }
     <div class="dlg-actions">
         <button class="btn-cancel" onclick="hideDialog()">Cancel</button>
         <button class="btn-primary" onclick="submitComment()">Add Comment</button>
+        <button class="btn-primary btn-copilot" onclick="submitCommentAndAsk()">&#x2728; Ask Copilot</button>
     </div>
 </div>
 
@@ -759,7 +812,8 @@ img { max-width: 100%; }
             (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
             repliesHtml +
             '<div class="pop-reply-input"><textarea id="reply-input" placeholder="Reply..." rows="2"></textarea>' +
-            '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button></div>' +
+            '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button>' +
+            '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
             '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button></div>';
         var rect = anchorEl.getBoundingClientRect();
@@ -806,6 +860,27 @@ img { max-width: 100%; }
     document.getElementById('dlg-input').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { submitComment(); }
     });
+
+    // ========== Ask Copilot ==========
+    window.submitCommentAndAsk = function() {
+        var text = document.getElementById('dlg-input').value.trim();
+        if (!text || !pendingBlock) return;
+        vscode.postMessage({
+            command: 'addCommentAndAsk',
+            startOffset: pendingBlock.startOffset,
+            endOffset: pendingBlock.endOffset,
+            blockType: pendingBlock.blockType,
+            blockPreview: pendingBlock.blockPreview,
+            comment: text
+        });
+        hideDialog();
+        var content = document.getElementById('content');
+        var el = content.querySelector('[data-start-offset="' + pendingBlock.startOffset + '"]');
+        if (el) { el.classList.add('commented-block'); }
+    };
+    window.askCopilotThread = function(id) {
+        vscode.postMessage({ command: 'askCopilotThread', id: id });
+    };
 
     // ========== export actions ==========
     window.jumpToSource = function() {
@@ -925,7 +1000,8 @@ img { max-width: 100%; }
                 repliesHtml +
                 '<div class="item-reply-input" onclick="event.stopPropagation()">' +
                 '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
-                '<button onclick="event.stopPropagation();var inp=document.getElementById(\\'list-reply-' + c.id + '\\');var t=inp.value.trim();if(t){vscode.postMessage({command:\\'replyComment\\',id:\\'' + c.id + '\\',text:t});}" style="margin-top:4px;">Reply</button></div>' +
+                '<button onclick="event.stopPropagation();var inp=document.getElementById(\\'list-reply-' + c.id + '\\');var t=inp.value.trim();if(t){vscode.postMessage({command:\\'replyComment\\',id:\\'' + c.id + '\\',text:t});}" style="margin-top:4px;">Reply</button>' +
+                '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
                 '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button></div>';
             div.addEventListener('click', function() {

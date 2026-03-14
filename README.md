@@ -2,6 +2,7 @@
 
 **The most agent-friendly markdown review extension for VS Code.**
 
+<!--@c1773463771697-->
 Markdown Review brings Quip/Google Docs-style inline commenting to your markdown files — directly inside VS Code. Add comments, reply in threads, resolve discussions, and let AI agents participate in the review via 7 built-in Copilot tools. Perfect for document reviews, design proposals, and technical specifications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -39,6 +40,7 @@ The agent will list comments, read context, post replies, and resolve items — 
 - **Comment highlighting** — Commented blocks are highlighted with a yellow border
 - **Popover details** — Click a highlighted block to see the comment, replies, and actions
 - **Sidebar comment list** — Click the comment badge to see all comments in a panel
+- **✨ Ask Copilot** — One-click button next to "Add Comment" and "Reply" to send the comment/thread to Copilot Agent Mode for an AI response
 
 ### Threaded Replies with Roles
 - Reply to any comment from the popover or sidebar
@@ -74,6 +76,12 @@ Agent: [calls #listReviewComments] → sees 3 open comments
        [calls #replyToReviewComment] → posts agent replies
        [calls #resolveReviewComment] → resolves addressed items
 ```
+
+**✨ Ask Copilot buttons** — You can also trigger Copilot directly from the review UI:
+- **Add Comment dialog** → Click **"✨ Ask Copilot"** instead of "Add Comment" to post your comment AND immediately open Copilot chat with the block context so the agent can respond
+- **Reply area** (popover & sidebar) → Click **"✨ Ask Copilot"** to send the entire comment thread to Copilot for an AI reply
+
+The agent receives the comment text, block context, and all existing replies, then uses the review tools to read full context and post its response.
 
 ### Anchor System
 Comments are anchored to specific blocks in the markdown source using invisible HTML comments (`<!--@cXXX-->`). Anchors:
