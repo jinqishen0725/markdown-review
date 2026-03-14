@@ -1,7 +1,7 @@
 {
   "name": "markdown-review",
-  "displayName": "Markdown Review with AI Agent Tools",
-  "description": "Markdown preview with interactive commenting for document review",
+  "displayName": "Markdown Reader with Copilot",
+  "description": "Markdown reader and reviewer with inline commenting, AI agent tools, and one-click Copilot integration",
   "version": "4.0.0",
   "publisher": "JinqiShen",
   "icon": "icon.png",

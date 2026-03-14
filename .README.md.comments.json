@@ -4,7 +4,7 @@
     {
       "id": "c1773463771697",
       "anchor": "<!--@c1773463771697-->",
-      "startOffset": 91,
+      "startOffset": 115,
       "endOffset": 409,
       "blockType": "paragraph",
       "blockPreview": "Markdown Review brings Quip/Google Docs-style inline commenting to your markdown",
@@ -16,7 +16,7 @@
     {
       "id": "c1773464642073",
       "anchor": "<!--@c1773464642073-->",
-      "startOffset": 531,
+      "startOffset": 614,
       "endOffset": 545,
       "blockType": "heading",
       "blockPreview": "## Quick Start",
@@ -29,7 +29,7 @@
     {
       "id": "c1773466096442",
       "anchor": "<!--@c1773466096442-->",
-      "startOffset": 721,
+      "startOffset": 804,
       "endOffset": 747,
       "blockType": "heading",
       "blockPreview": "### 2. Add Review Comments",
@@ -41,7 +41,7 @@
     {
       "id": "c1773466115580",
       "anchor": "<!--@c1773466115580-->",
-      "startOffset": 1194,
+      "startOffset": 1277,
       "endOffset": 1199,
       "blockType": "paragraph",
       "blockPreview": "In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enabl",
@@ -53,7 +53,7 @@
     {
       "id": "c1773466132046",
       "anchor": "<!--@c1773466132046-->",
-      "startOffset": 1164,
+      "startOffset": 1247,
       "endOffset": 992,
       "blockType": "heading",
       "blockPreview": "### 3. Enable AI Agent Tools",
@@ -85,7 +85,7 @@
     {
       "id": "c1773466551259",
       "anchor": "<!--@c1773466551259-->",
-      "startOffset": 6146,
+      "startOffset": 6229,
       "endOffset": 5969,
       "blockType": "heading",
       "blockPreview": "### Additional Features",
@@ -135,7 +135,7 @@
     {
       "id": "c1773466584691",
       "anchor": "<!--@c1773466584691-->",
-      "startOffset": 7038,
+      "startOffset": 7121,
       "endOffset": 6946,
       "blockType": "paragraph",
       "blockPreview": "See the [examples/](examples/) folder for a sample design proposal with threaded",
@@ -175,7 +175,7 @@
     {
       "id": "c1773501026014",
       "anchor": "<!--@c1773501026014-->",
-      "startOffset": 1585,
+      "startOffset": 1668,
       "endOffset": 1436,
       "blockType": "paragraph",
       "blockPreview": "![Markdown Review Preview](examples/screenshot.png)",
@@ -207,7 +207,7 @@
     {
       "id": "c1773502588022",
       "anchor": "<!--@c1773502588022-->",
-      "startOffset": 549,
+      "startOffset": 632,
       "endOffset": 577,
       "blockType": "heading",
       "blockPreview": "### 1. Open a Review Preview",

@@ -1,10 +1,10 @@
 <!--@c1773468091035-->
-# Markdown Review
+# Markdown Reader with Copilot
 
-**The most agent-friendly markdown review extension for VS Code.**
+**The most agent-friendly markdown reader and review extension for VS Code.**
 
 <!--@c1773463771697-->
-Markdown Review brings Quip/Google Docs-style inline commenting to your markdown files — directly inside VS Code. Add comments, reply in threads, resolve discussions, and let AI agents participate in the review via 7 built-in Copilot tools. Perfect for document reviews, design proposals, and technical specifications.
+Markdown Reader with Copilot brings Quip/Google Docs-style inline commenting to your markdown files — directly inside VS Code. Read, preview, comment, reply in threads, resolve discussions, and let AI agents participate in the review via 7 built-in Copilot tools and one-click ✨ Ask Copilot buttons. Perfect for document reviews, design proposals, and technical specifications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
