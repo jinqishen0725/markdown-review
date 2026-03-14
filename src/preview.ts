@@ -490,15 +490,24 @@ export class PreviewPanel {
         this.lastRenderTime = Date.now();
     }
 
-    /** Rewrite relative image src paths to webview URIs */
+    /** Rewrite relative image src paths to data URIs or webview URIs */
     private resolveImagePaths(html: string): string {
         const docDir = path.dirname(this.document.uri.fsPath);
+        const fs = require('fs');
         return html.replace(/<img\s([^>]*?)src="([^"]+)"/gi, (match, before, src) => {
             // Skip absolute URLs and data URIs
             if (/^(https?:|data:|vscode-resource:)/i.test(src)) { return match; }
             const absPath = path.resolve(docDir, src);
-            const webviewUri = this.panel.webview.asWebviewUri(vscode.Uri.file(absPath));
-            return `<img ${before}src="${webviewUri}"`;
+            if (!fs.existsSync(absPath)) { return match; }
+            // Use data URI for guaranteed rendering (no CSP/localResourceRoots issues)
+            const ext = path.extname(absPath).toLowerCase();
+            const mimeMap: Record<string, string> = {
+                '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.bmp': 'image/bmp',
+            };
+            const mime = mimeMap[ext] || 'application/octet-stream';
+            const base64 = fs.readFileSync(absPath).toString('base64');
+            return `<img ${before}src="data:${mime};base64,${base64}"`;
         });
     }
 
@@ -514,6 +523,7 @@ export class PreviewPanel {
         const commentsJson = JSON.stringify(comments).replace(/</g, '\\u003c');
         const mermaidUri = this.getMermaidUri();
 
+        const cspSource = this.panel.webview.cspSource;
         return /*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>

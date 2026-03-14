@@ -1,3 +1,4 @@
+<!--@c1773468091035-->
 # Markdown Review
 
 **The most agent-friendly markdown review extension for VS Code.**
@@ -9,15 +10,20 @@ Markdown Review brings Quip/Google Docs-style inline commenting to your markdown
 
 ---
 
+<!--@c1773464642073-->
 ## Quick Start
 
+<!--@c1773502588022-->
 ### 1. Open a Review Preview
 Open any `.md` file and press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-click → **"Markdown Review: Open Preview with Comments"**.
 
+<!--@c1773466096442-->
 ### 2. Add Review Comments
-In the preview, click the **`+`** button in the gutter next to any block (heading, paragraph, table, formula, list, blockquote) to add a comment. Reply to comments, edit them, or mark them resolved — all inline.
+In the preview, click the **`+`** button in the gutter next to any block (heading, paragraph, table, formula, list, blockquote) to add a comment. Reply to comments, edit them, or mark them resolved — all inline. You can also click **✨ Ask Copilot** instead of "Add Comment" to post your comment and immediately get an AI response, or click **✨ Ask Copilot** next to "Reply" to send the entire thread to Copilot.
 
+<!--@c1773466132046-->
 ### 3. Enable AI Agent Tools
+<!--@c1773466115580-->
 In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enable the 7 Markdown Review tools (they start with `#listReviewComments`, `#readReviewComment`, etc.). Now you can ask the agent:
 > *"Review this document and respond to all open comments"*
 
@@ -27,6 +33,7 @@ The agent will list comments, read context, post replies, and resolve items — 
 
 ## Features
 
+<!--@c1773501026014-->
 ![Markdown Review Preview](examples/screenshot.png)
 
 ### Rich Rendering
@@ -94,6 +101,7 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 > 1. **Anchors** (`<!--@cXXX-->`) inserted into the markdown file — these are standard HTML comments and are **completely invisible** to all markdown compilers, renderers, and viewers (GitHub, Pandoc, VS Code preview, Jekyll, Hugo, etc.). Your markdown compiles and renders identically with or without them.
 > 2. **A sidecar comment file** (`.filename.md.comments.json`) — a dot-prefixed JSON file stored next to the markdown. It contains all comment data and is hidden on macOS/Linux. You can safely `.gitignore` it or commit it for shared reviews.
 
+<!--@c1773466551259-->
 ### Additional Features
 - **Keyboard shortcut**: `Ctrl+Shift+R` to open review preview
 - **Right-click menu**: Available in both editor and file explorer
@@ -114,6 +122,7 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 
 ## Example
 
+<!--@c1773466584691-->
 See the [examples/](examples/) folder for a sample design proposal with threaded comments and agent replies.
 
 The example includes:

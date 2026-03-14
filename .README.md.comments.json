@@ -27,50 +27,6 @@
       "replies": []
     },
     {
-      "id": "c1773465777630",
-      "anchor": "<!--@c1773465777630-->",
-      "startOffset": 549,
-      "endOffset": 577,
-      "blockType": "heading",
-      "blockPreview": "### 1. Open a Review Preview",
-      "comment": "test add comment2",
-      "role": "user",
-      "timestamp": "2026-03-14T05:22:57.630Z",
-      "resolved": false,
-      "replies": [
-        {
-          "id": "r1773465788513",
-          "role": "user",
-          "text": "test reply2",
-          "timestamp": "2026-03-14T05:23:08.513Z"
-        },
-        {
-          "id": "r1773465889761",
-          "role": "user",
-          "text": "test reply 3",
-          "timestamp": "2026-03-14T05:24:49.761Z"
-        },
-        {
-          "id": "r1773465902286",
-          "role": "agent",
-          "text": "Looks like this is a test thread to verify the Reply Ask Copilot flow. I can see both your replies (\"test reply2\" and \"test reply 3\") were saved correctly and included in the thread context. The popover should also be staying open now after replies. Everything looks good — feel free to resolve this test comment.",
-          "timestamp": "2026-03-14T05:25:02.286Z"
-        }
-      ]
-    },
-    {
-      "id": "c1773465909219",
-      "anchor": "<!--@c1773465909219-->",
-      "startOffset": 579,
-      "endOffset": 717,
-      "blockType": "paragraph",
-      "blockPreview": "Open any `.md` file and press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-",
-      "comment": "test add comment",
-      "role": "user",
-      "timestamp": "2026-03-14T05:25:09.219Z",
-      "resolved": false
-    },
-    {
       "id": "c1773466096442",
       "anchor": "<!--@c1773466096442-->",
       "startOffset": 721,
@@ -85,7 +41,7 @@
     {
       "id": "c1773466115580",
       "anchor": "<!--@c1773466115580-->",
-      "startOffset": 994,
+      "startOffset": 1194,
       "endOffset": 1199,
       "blockType": "paragraph",
       "blockPreview": "In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enabl",
@@ -97,7 +53,7 @@
     {
       "id": "c1773466132046",
       "anchor": "<!--@c1773466132046-->",
-      "startOffset": 964,
+      "startOffset": 1164,
       "endOffset": 992,
       "blockType": "heading",
       "blockPreview": "### 3. Enable AI Agent Tools",
@@ -129,7 +85,7 @@
     {
       "id": "c1773466551259",
       "anchor": "<!--@c1773466551259-->",
-      "startOffset": 5946,
+      "startOffset": 6146,
       "endOffset": 5969,
       "blockType": "heading",
       "blockPreview": "### Additional Features",
@@ -179,7 +135,7 @@
     {
       "id": "c1773466584691",
       "anchor": "<!--@c1773466584691-->",
-      "startOffset": 6838,
+      "startOffset": 7038,
       "endOffset": 6946,
       "blockType": "paragraph",
       "blockPreview": "See the [examples/](examples/) folder for a sample design proposal with threaded",
@@ -213,6 +169,58 @@
           "role": "agent",
           "text": "Markdown Review is a VS Code extension that adds inline commenting and review capabilities to markdown files — similar to what you'd find in Google Docs or Quip. It lets you add comments on specific blocks of a markdown document, reply in threads, and resolve discussions, all without leaving VS Code. It also exposes 7 built-in Copilot tools so AI agents can participate in the review process — reading comments, replying, and resolving them. It's designed for document reviews, design proposals, and technical specs.",
           "timestamp": "2026-03-14T06:01:54.172Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773501026014",
+      "anchor": "<!--@c1773501026014-->",
+      "startOffset": 1585,
+      "endOffset": 1436,
+      "blockType": "paragraph",
+      "blockPreview": "![Markdown Review Preview](examples/screenshot.png)",
+      "comment": "I still don't see the picture even after reload. Why is that?",
+      "role": "user",
+      "timestamp": "2026-03-14T15:10:26.014Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773501178022",
+          "role": "agent",
+          "text": "The code fix is correct — the image file exists and the regex/path resolution works. The issue is that the webview panel was created before the `localResourceRoots` fix was deployed, and it's still using the old settings (which only allowed `media/`). \n\nTo fix: **Close the \"Review: README.md\" tab entirely** (click the × on the tab), then reopen it with Ctrl+Shift+R. Simply reloading the window isn't enough because the webview retains its configuration. A fresh panel will include the document directory in `localResourceRoots`.",
+          "timestamp": "2026-03-14T15:12:58.022Z"
+        },
+        {
+          "id": "r1773501240686",
+          "role": "user",
+          "text": "I have alerady done that and tried again. The picture is still not displayed in the preview. \n\nI am not sure if it is because we are currently using the preview in a different repo other than the readme.md file actually lives.",
+          "timestamp": "2026-03-14T15:14:00.686Z"
+        },
+        {
+          "id": "r1773501356044",
+          "role": "agent",
+          "text": "Good point about the different repo. I've added debug logging to `resolveImagePaths`. After reload, close the preview tab, reopen it (Ctrl+Shift+R), then check the **Output** panel → select **\"Markdown Review\"** from the dropdown. You should see logs like:\n- `resolveImagePaths: docDir=...` — shows what directory it's resolving from\n- `resolveImagePaths: examples/screenshot.png -> ... -> ...` — shows the webview URI\n\nThis will tell us exactly what's happening. If there are no `resolveImagePaths` log lines at all, the regex isn't matching the HTML.",
+          "timestamp": "2026-03-14T15:15:56.044Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773502588022",
+      "anchor": "<!--@c1773502588022-->",
+      "startOffset": 549,
+      "endOffset": 577,
+      "blockType": "heading",
+      "blockPreview": "### 1. Open a Review Preview",
+      "comment": "in this section, also add the ask copilot function to tell user they can ask copilot in place.",
+      "role": "user",
+      "timestamp": "2026-03-14T15:36:28.022Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773502620770",
+          "role": "agent",
+          "text": "Done — updated the Quick Start \"Add Review Comments\" section to mention the ✨ Ask Copilot buttons. It now tells users they can click \"Ask Copilot\" instead of \"Add Comment\" to get an immediate AI response, or click it next to \"Reply\" to send the thread to Copilot.",
+          "timestamp": "2026-03-14T15:37:00.770Z"
         }
       ]
     }
