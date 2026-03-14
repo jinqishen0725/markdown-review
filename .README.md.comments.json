@@ -14,68 +14,6 @@
       "resolved": false
     },
     {
-      "id": "c1773464345556",
-      "anchor": "<!--@c1773464345556-->",
-      "startOffset": 1385,
-      "endOffset": 1436,
-      "blockType": "paragraph",
-      "blockPreview": "![Markdown Review Preview](examples/screenshot.png)",
-      "comment": "why this image is not rendered here?",
-      "role": "user",
-      "timestamp": "2026-03-14T04:59:05.556Z",
-      "resolved": false,
-      "replies": [
-        {
-          "id": "r1773464369654",
-          "role": "agent",
-          "text": "The image `![Markdown Review Preview](examples/screenshot.png)` uses a relative path. It renders correctly on GitHub and in the VS Code built-in preview because they resolve relative paths from the file's location. However, in the Markdown Review webview, images are loaded via webview URIs with a restricted `localResourceRoots` — only the `media/` folder is currently whitelisted. The `examples/` folder is not included, so the webview's Content Security Policy blocks it.\n\nTwo fixes:\n1. **Move the screenshot to `media/`** and update the path — simplest fix.\n2. **Add the workspace folder to `localResourceRoots`** in `preview.ts` so the webview can load any file from the project — more flexible but broader permissions.\n\nThis only affects the extension's own review preview; GitHub, VS Code preview, and other renderers show the image fine.",
-          "timestamp": "2026-03-14T04:59:29.654Z"
-        },
-        {
-          "id": "r1773465127789",
-          "role": "agent",
-          "text": "The Reply \"Ask Copilot\" button is now working — this response was triggered from it! To summarize the fix options for the image issue:\n\nThe quickest fix is option 2 (adding the workspace folder to `localResourceRoots`), since it avoids moving files around and also fixes rendering for any other relative image paths in reviewed documents. I can implement that change right now if you'd like — it's a one-line addition in `preview.ts` where the webview panel is created.",
-          "timestamp": "2026-03-14T05:12:07.789Z"
-        },
-        {
-          "id": "r1773465289244",
-          "role": "user",
-          "text": "Please still fix it for easier review",
-          "timestamp": "2026-03-14T05:14:49.244Z"
-        },
-        {
-          "id": "r1773465435686",
-          "role": "user",
-          "text": "second attempt on reply: Please still fix it for easier review",
-          "timestamp": "2026-03-14T05:17:15.686Z"
-        },
-        {
-          "id": "r1773465518868",
-          "role": "agent",
-          "text": "Fixed! I've made two changes to resolve the image rendering:\n\n1. Added the document's directory to `localResourceRoots` so the webview is allowed to load files relative to the markdown file\n2. Added `resolveImagePaths()` which rewrites relative `src` attributes in `<img>` tags to proper webview URIs\n\nReload the window (Ctrl+Shift+P → \"Developer: Reload Window\") and reopen the preview — the screenshot should now render correctly.",
-          "timestamp": "2026-03-14T05:18:38.868Z"
-        },
-        {
-          "id": "r1773465698637",
-          "role": "user",
-          "text": "This image is still not showing ...",
-          "timestamp": "2026-03-14T05:21:38.637Z"
-        },
-        {
-          "id": "r1773465698726",
-          "role": "user",
-          "text": "The image is still not showing",
-          "timestamp": "2026-03-14T05:21:38.726Z"
-        },
-        {
-          "id": "r1773465844651",
-          "role": "agent",
-          "text": "Found the root cause — the file `examples/screenshot.png` doesn't exist on disk! The `examples/` folder only contains `design-proposal.md` and its comments file. The image rendering code fix is correct (localResourceRoots + resolveImagePaths both work), but there's no actual screenshot to display. We need to take a screenshot of the extension and save it as `examples/screenshot.png`.",
-          "timestamp": "2026-03-14T05:24:04.651Z"
-        }
-      ]
-    },
-    {
       "id": "c1773464642073",
       "anchor": "<!--@c1773464642073-->",
       "startOffset": 531,
@@ -86,14 +24,7 @@
       "role": "user",
       "timestamp": "2026-03-14T05:04:02.073Z",
       "resolved": false,
-      "replies": [
-        {
-          "id": "r1773464653116",
-          "role": "agent",
-          "text": "Got it — this looks like a test comment on the Quick Start heading. The Ask Copilot button is working correctly! It routed this comment to the Copilot chat session, I was able to read it and reply. Feel free to resolve this test comment when you're done verifying.",
-          "timestamp": "2026-03-14T05:04:13.116Z"
-        }
-      ]
+      "replies": []
     },
     {
       "id": "c1773465777630",
@@ -196,18 +127,6 @@
       ]
     },
     {
-      "id": "c1773466188240",
-      "anchor": "<!--@c1773466188240-->",
-      "startOffset": 1370,
-      "endOffset": 1381,
-      "blockType": "heading",
-      "blockPreview": "## Features",
-      "comment": "add comment",
-      "role": "user",
-      "timestamp": "2026-03-14T05:29:48.240Z",
-      "resolved": false
-    },
-    {
       "id": "c1773466551259",
       "anchor": "<!--@c1773466551259-->",
       "startOffset": 5946,
@@ -274,6 +193,26 @@
           "role": "agent",
           "text": "Test comment 2 received! This was triggered via Add Comment + Ask Copilot. Did the popover open automatically for this new comment and stay open after this reply?",
           "timestamp": "2026-03-14T05:36:33.209Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773468091035",
+      "anchor": "<!--@c1773468091035-->",
+      "startOffset": 0,
+      "endOffset": 17,
+      "blockType": "heading",
+      "blockPreview": "# Markdown Review",
+      "comment": "what is this extension about?",
+      "role": "user",
+      "timestamp": "2026-03-14T06:01:31.035Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773468114172",
+          "role": "agent",
+          "text": "Markdown Review is a VS Code extension that adds inline commenting and review capabilities to markdown files — similar to what you'd find in Google Docs or Quip. It lets you add comments on specific blocks of a markdown document, reply in threads, and resolve discussions, all without leaving VS Code. It also exposes 7 built-in Copilot tools so AI agents can participate in the review process — reading comments, replying, and resolving them. It's designed for document reviews, design proposals, and technical specs.",
+          "timestamp": "2026-03-14T06:01:54.172Z"
         }
       ]
     }

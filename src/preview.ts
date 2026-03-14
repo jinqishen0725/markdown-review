@@ -167,7 +167,7 @@ export class PreviewPanel {
 
     // ---------- message handling ----------
 
-    private handleMessage(message: any) {
+    private async handleMessage(message: any) {
         switch (message.command) {
             case 'addComment': {
                 const c = this.commentsManager.addComment(
@@ -187,12 +187,19 @@ export class PreviewPanel {
                 this.commentsManager.resolveComment(message.id);
                 this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
-            case 'deleteComment':
-                this.removeAnchorViaApi(message.id).then(() => {
+            case 'deleteComment': {
+                const delAnswer = await vscode.window.showWarningMessage(
+                    'Delete this comment and all its replies?',
+                    { modal: true },
+                    'Delete'
+                );
+                if (delAnswer === 'Delete') {
+                    await this.removeAnchorViaApi(message.id);
                     this.commentsManager.deleteComment(message.id);
                     this.immediateRender();
-                });
+                }
                 return;
+            }
             case 'unresolveComment':
                 this.commentsManager.unresolveComment(message.id);
                 this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
@@ -213,8 +220,15 @@ export class PreviewPanel {
                 return;
             }
             case 'deleteReply': {
-                this.commentsManager.deleteReply(message.commentId, message.replyId);
-                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.commentId) });
+                const delReplyAnswer = await vscode.window.showWarningMessage(
+                    'Delete this reply?',
+                    { modal: true },
+                    'Delete'
+                );
+                if (delReplyAnswer === 'Delete') {
+                    this.commentsManager.deleteReply(message.commentId, message.replyId);
+                    this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.commentId) });
+                }
                 return;
             }
             case 'refresh':
@@ -961,9 +975,7 @@ img { max-width: 100%; }
     // ========== comment actions ==========
     window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
     window.deleteComment = function(id) {
-        if (confirm('Delete this comment and all its replies?')) {
-            vscode.postMessage({ command: 'deleteComment', id: id });
-        }
+        vscode.postMessage({ command: 'deleteComment', id: id });
     };
     window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
     window.submitReply = function(id) {
@@ -1017,9 +1029,7 @@ img { max-width: 100%; }
         vscode.postMessage({ command: 'editReply', commentId: commentId, replyId: replyId, text: text });
     };
     window.deleteReply = function(commentId, replyId) {
-        if (confirm('Delete this reply?')) {
-            vscode.postMessage({ command: 'deleteReply', commentId: commentId, replyId: replyId });
-        }
+        vscode.postMessage({ command: 'deleteReply', commentId: commentId, replyId: replyId });
     };
 
     // ========== comment list panel ==========
@@ -1538,12 +1548,16 @@ mermaid.run({ querySelector: '.mermaid' });
             return;
         }
 
+        const refDocPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'reference.docx').fsPath;
         const args = [
             cleanMdPath,
             '-o', docxPath,
             '--from=markdown+tex_math_dollars',
             '--to=docx',
         ];
+        if (fs.existsSync(refDocPath)) {
+            args.push('--reference-doc=' + refDocPath);
+        }
 
         execFile(pandocPath, args, { timeout: 30000 }, (err: any) => {
             // Clean up temp files
