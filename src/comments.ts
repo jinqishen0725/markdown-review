@@ -37,6 +37,7 @@ export interface CommentsFile {
 export class CommentsManager {
     private commentsPath: string;
     private data: CommentsFile;
+    public lastSaveTime: number = 0;
 
     constructor(markdownFilePath: string) {
         const dir = path.dirname(markdownFilePath);
@@ -48,6 +49,10 @@ export class CommentsManager {
             fs.renameSync(oldPath, this.commentsPath);
         }
         this.data = this.load();
+    }
+
+    getCommentsPath(): string {
+        return this.commentsPath;
     }
 
     reload(): void {
@@ -68,6 +73,7 @@ export class CommentsManager {
 
     private save(): void {
         fs.writeFileSync(this.commentsPath, JSON.stringify(this.data, null, 2), 'utf-8');
+        this.lastSaveTime = Date.now();
     }
 
     /** Public save for when offsets are updated externally */

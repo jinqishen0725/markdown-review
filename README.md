@@ -1,29 +1,22 @@
-<!--@c1773468091035-->
 # Markdown Reader with Copilot
 
 **The most agent-friendly markdown reader and review extension for VS Code.**
 
-<!--@c1773463771697-->
 Markdown Reader with Copilot brings Quip/Google Docs-style inline commenting to your markdown files — directly inside VS Code. Read, preview, comment, reply in threads, resolve discussions, and let AI agents participate in the review via 7 built-in Copilot tools and one-click ✨ Ask Copilot buttons. Perfect for document reviews, design proposals, and technical specifications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-<!--@c1773464642073-->
 ## Quick Start
 
-<!--@c1773502588022-->
 ### 1. Open a Review Preview
 Open any `.md` file and press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-click → **"Markdown Review: Open Preview with Comments"**.
 
-<!--@c1773466096442-->
 ### 2. Add Review Comments
 In the preview, click the **`+`** button in the gutter next to any block (heading, paragraph, table, formula, list, blockquote) to add a comment. Reply to comments, edit them, or mark them resolved — all inline. You can also click **✨ Ask Copilot** instead of "Add Comment" to post your comment and immediately get an AI response, or click **✨ Ask Copilot** next to "Reply" to send the entire thread to Copilot.
 
-<!--@c1773466132046-->
 ### 3. Enable AI Agent Tools
-<!--@c1773466115580-->
 In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enable the 7 Markdown Review tools (they start with `#listReviewComments`, `#readReviewComment`, etc.). Now you can ask the agent:
 > *"Review this document and respond to all open comments"*
 
@@ -33,7 +26,6 @@ The agent will list comments, read context, post replies, and resolve items — 
 
 ## Features
 
-<!--@c1773501026014-->
 ![Markdown Review Preview](examples/screenshot.png)
 
 ### Rich Rendering
@@ -122,7 +114,6 @@ Comments are anchored to specific blocks in the markdown source using invisible 
 
 ## Example
 
-<!--@c1773466584691-->
 See the [examples/](examples/) folder for a sample design proposal with threaded comments and agent replies.
 
 The example includes:

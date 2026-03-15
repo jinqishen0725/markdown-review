@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 import { PreviewPanel } from './preview';
 import { registerTools } from './tools';
 import { disposeChannel, log } from './logger';
@@ -70,29 +72,66 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function registerMcpInCursor(context: vscode.ExtensionContext) {
+    const mcpServerPath = path.join(context.extensionPath, 'out', 'mcp-server.js');
+    log('MCP server path: ' + mcpServerPath);
+
+    // Method 1: Try vscode.cursor.mcp.registerServer API
     try {
-        const mcpServerPath = path.join(context.extensionPath, 'out', 'mcp-server.js');
         const cursorApi = (vscode as any).cursor;
         if (cursorApi && cursorApi.mcp && cursorApi.mcp.registerServer) {
             cursorApi.mcp.registerServer({
                 name: 'markdown-review',
-                server: {
-                    command: 'node',
-                    args: [mcpServerPath],
-                },
+                server: { command: 'node', args: [mcpServerPath] },
             });
             log('MCP server registered via vscode.cursor.mcp.registerServer');
-        } else {
-            // Fallback: try registering Copilot tools anyway (some Cursor versions may support it)
-            log('vscode.cursor.mcp not available, falling back to Copilot tools registration');
-            try {
-                registerTools(context);
-            } catch (e) {
-                log('Copilot tools registration failed in Cursor: ' + e);
-            }
         }
     } catch (e) {
-        log('MCP registration error: ' + e);
+        log('cursor.mcp.registerServer error: ' + e);
+    }
+
+    // Method 2: Write ~/.cursor/mcp.json for reliable registration
+    try {
+        const cursorDir = path.join(os.homedir(), '.cursor');
+        const mcpJsonPath = path.join(cursorDir, 'mcp.json');
+        if (!fs.existsSync(cursorDir)) {
+            fs.mkdirSync(cursorDir, { recursive: true });
+        }
+        let config: any = { mcpServers: {} };
+        if (fs.existsSync(mcpJsonPath)) {
+            try {
+                config = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+                if (!config.mcpServers) { config.mcpServers = {}; }
+            } catch { config = { mcpServers: {} }; }
+        }
+        // Only write if not already configured or path changed
+        const existing = config.mcpServers['markdown-review'];
+        if (!existing || (existing.args && existing.args[0] !== mcpServerPath)) {
+            config.mcpServers['markdown-review'] = {
+                command: 'node',
+                args: [mcpServerPath],
+            };
+            fs.writeFileSync(mcpJsonPath, JSON.stringify(config, null, 2), 'utf-8');
+            log('Wrote MCP config to ' + mcpJsonPath);
+            vscode.window.showInformationMessage(
+                'Markdown Review MCP tools installed. Reload Cursor and switch to Agent mode to use them.',
+                'Reload Now'
+            ).then(choice => {
+                if (choice === 'Reload Now') {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        } else {
+            log('MCP config already up-to-date in ' + mcpJsonPath);
+        }
+    } catch (e) {
+        log('Failed to write mcp.json: ' + e);
+    }
+
+    // Also try registering Copilot tools as fallback
+    try {
+        registerTools(context);
+    } catch (e) {
+        log('Copilot tools registration skipped in Cursor: ' + e);
     }
 }
 

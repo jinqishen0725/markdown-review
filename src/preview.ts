@@ -83,6 +83,8 @@ export class PreviewPanel {
     private disposables: vscode.Disposable[] = [];
     private lastRenderTime: number = 0;
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private commentsWatcher: ReturnType<typeof import('fs').watch> | null = null;
+    private commentsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -123,6 +125,9 @@ export class PreviewPanel {
         );
 
         this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+
+        // Watch .comments.json for external changes (e.g., MCP server replies)
+        this.setupCommentsFileWatcher();
 
         // Source → Preview: scroll preview to match editor cursor
         vscode.window.onDidChangeTextEditorSelection(
@@ -293,17 +298,16 @@ export class PreviewPanel {
 
     private async sendToChat(prompt: string) {
         if (this.isCursor()) {
-            // Cursor: open composer, copy prompt to clipboard
             await vscode.env.clipboard.writeText(prompt);
             const commands = await vscode.commands.getCommands(true);
             if (commands.includes('composer.focusComposer')) {
                 await vscode.commands.executeCommand('composer.focusComposer');
-                vscode.window.showInformationMessage('Review prompt copied — paste it in Cursor Agent (Ctrl+V)');
-            } else {
-                vscode.window.showInformationMessage('Review prompt copied to clipboard. Open Cursor Agent (Ctrl+I) and paste.');
             }
+            vscode.window.showInformationMessage(
+                'Review prompt copied to clipboard — paste in Cursor Agent (Ctrl+V) and press Enter',
+                { modal: true }
+            );
         } else {
-            // VS Code: open Copilot chat with prompt
             vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
         }
     }
@@ -1652,8 +1656,63 @@ mermaid.run({ querySelector: '.mermaid' });
 
     private dispose() {
         PreviewPanel.currentPanels.delete(this.document.uri.fsPath);
+        if (this.commentsWatcher) {
+            this.commentsWatcher.close();
+            this.commentsWatcher = null;
+        }
+        if (this.commentsDebounceTimer) {
+            clearTimeout(this.commentsDebounceTimer);
+        }
         this.panel.dispose();
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
+    }
+
+    /** Watch .comments.json for external changes and update webview */
+    private setupCommentsFileWatcher() {
+        const fs = require('fs');
+        const commentsPath = this.commentsManager.getCommentsPath();
+        try {
+            this.commentsWatcher = fs.watch(commentsPath, () => {
+                // Ignore changes from our own writes (within 1s)
+                if (Date.now() - this.commentsManager.lastSaveTime < 1000) {
+                    return;
+                }
+                // Debounce external changes (500ms)
+                if (this.commentsDebounceTimer) { clearTimeout(this.commentsDebounceTimer); }
+                this.commentsDebounceTimer = setTimeout(() => {
+                    this.commentsDebounceTimer = null;
+                    // Reload and diff
+                    const oldComments = this.commentsManager.getComments().map(c => JSON.stringify(c));
+                    this.commentsManager.reload();
+                    const newComments = this.commentsManager.getComments();
+                    // Send updates for changed/new comments
+                    for (const c of newComments) {
+                        const oldJson = oldComments.find(o => o.includes(c.id));
+                        if (!oldJson || oldJson !== JSON.stringify(c)) {
+                            this.panel.webview.postMessage({ command: 'commentUpdated', comment: c });
+                        }
+                    }
+                    // Handle deleted comments — full re-render
+                    if (newComments.length < oldComments.length) {
+                        this.updateContent();
+                    }
+                }, 500);
+            });
+        } catch {
+            // File may not exist yet — watch the directory instead
+            const dir = path.dirname(commentsPath);
+            const basename = path.basename(commentsPath);
+            this.commentsWatcher = fs.watch(dir, (eventType: string, filename: string) => {
+                if (filename !== basename) { return; }
+                if (Date.now() - this.commentsManager.lastSaveTime < 1000) { return; }
+                if (this.commentsDebounceTimer) { clearTimeout(this.commentsDebounceTimer); }
+                this.commentsDebounceTimer = setTimeout(() => {
+                    this.commentsDebounceTimer = null;
+                    this.commentsManager.reload();
+                    this.updateContent();
+                }, 500);
+            });
+        }
     }
 }

@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Reader with Copilot",
   "description": "Markdown reader and reviewer with inline commenting, AI agent tools, and one-click Copilot integration",
-  "version": "4.1.0",
+  "version": "4.1.3",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
