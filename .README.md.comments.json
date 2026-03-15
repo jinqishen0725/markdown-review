@@ -36,7 +36,7 @@
       "comment": "add comment",
       "role": "user",
       "timestamp": "2026-03-14T05:28:16.442Z",
-      "resolved": false
+      "resolved": true
     },
     {
       "id": "c1773466115580",
@@ -81,18 +81,6 @@
           "timestamp": "2026-03-14T05:29:38.001Z"
         }
       ]
-    },
-    {
-      "id": "c1773466551259",
-      "anchor": "<!--@c1773466551259-->",
-      "startOffset": 6229,
-      "endOffset": 5969,
-      "blockType": "heading",
-      "blockPreview": "### Additional Features",
-      "comment": "test add comment",
-      "role": "user",
-      "timestamp": "2026-03-14T05:35:51.259Z",
-      "resolved": false
     },
     {
       "id": "c1773466551263",
@@ -221,6 +209,26 @@
           "role": "agent",
           "text": "Done — updated the Quick Start \"Add Review Comments\" section to mention the ✨ Ask Copilot buttons. It now tells users they can click \"Ask Copilot\" instead of \"Add Comment\" to get an immediate AI response, or click it next to \"Reply\" to send the thread to Copilot.",
           "timestamp": "2026-03-14T15:37:00.770Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773544567262",
+      "anchor": "<!--@c1773544567262-->",
+      "startOffset": 832,
+      "endOffset": 1243,
+      "blockType": "paragraph",
+      "blockPreview": "In the preview, click the **`+`** button in the gutter next to any block (headin",
+      "comment": "test comment",
+      "role": "user",
+      "timestamp": "2026-03-15T03:16:07.262Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773544582987",
+          "role": "agent",
+          "text": "VS Code regression test passed! The Add Comment + Ask Copilot flow is working correctly — comment was created, Copilot chat opened with the prompt, agent read the comment and posted this reply. All good, no regression.",
+          "timestamp": "2026-03-15T03:16:22.987Z"
         }
       ]
     }

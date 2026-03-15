@@ -1587,12 +1587,14 @@ mermaid.run({ querySelector: '.mermaid' });
             '-o', docxPath,
             '--from=markdown+tex_math_dollars',
             '--to=docx',
+            '--resource-path=' + path.dirname(this.document.uri.fsPath),
         ];
         if (fs.existsSync(refDocPath)) {
             args.push('--reference-doc=' + refDocPath);
         }
 
-        execFile(pandocPath, args, { timeout: 30000 }, (err: any) => {
+        const docDir = path.dirname(this.document.uri.fsPath);
+        execFile(pandocPath, args, { timeout: 30000, cwd: docDir }, (err: any) => {
             // Clean up temp files
             try { fs.unlinkSync(cleanMdPath); } catch {}
             for (const pf of pngFiles) { try { fs.unlinkSync(pf.pngPath); } catch {} }

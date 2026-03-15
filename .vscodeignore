@@ -4,5 +4,8 @@ tsconfig.json
 **/*.ts
 **/*.map
 *_export.docx
+*_export.pdf
 ~$*
 .README.md.comments.json
+.review-screenshot.html
+*_clean.md
