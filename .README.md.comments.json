@@ -1,4 +1,37 @@
 {
   "file": ".README.md",
-  "comments": []
+  "comments": [
+    {
+      "id": "c1773552062764",
+      "anchor": "<!--@c1773552062764-->",
+      "startOffset": 654,
+      "endOffset": 682,
+      "blockType": "heading",
+      "blockPreview": "### 1. Open a Review Preview",
+      "comment": "test 1",
+      "role": "user",
+      "timestamp": "2026-03-15T05:21:02.764Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1773552066746",
+          "role": "user",
+          "text": "test2",
+          "timestamp": "2026-03-15T05:21:06.746Z"
+        }
+      ]
+    },
+    {
+      "id": "c1773552169188",
+      "anchor": "<!--@c1773552169188-->",
+      "startOffset": 854,
+      "endOffset": 1265,
+      "blockType": "paragraph",
+      "blockPreview": "In the preview, click the **`+`** button in the gutter next to any block (headin",
+      "comment": "test2",
+      "role": "user",
+      "timestamp": "2026-03-15T05:22:49.188Z",
+      "resolved": false
+    }
+  ]
 }

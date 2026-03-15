@@ -240,6 +240,46 @@ export class PreviewPanel {
                 this.commentsManager.reload();
                 this.updateContent();
                 return;
+            case 'resolveAll': {
+                const openCount = this.commentsManager.getComments().filter((c: any) => !c.resolved).length;
+                if (openCount === 0) {
+                    vscode.window.showInformationMessage('No open comments to resolve.');
+                    return;
+                }
+                const resolveAnswer = await vscode.window.showWarningMessage(
+                    `Resolve all ${openCount} open comment(s)?`,
+                    { modal: true },
+                    'Resolve All'
+                );
+                if (resolveAnswer === 'Resolve All') {
+                    for (const c of this.commentsManager.getComments()) {
+                        if (!c.resolved) { c.resolved = true; }
+                    }
+                    this.commentsManager.persist();
+                    this.immediateRender();
+                }
+                return;
+            }
+            case 'deleteAllResolved': {
+                const resolvedComments = this.commentsManager.getComments().filter((c: any) => c.resolved);
+                if (resolvedComments.length === 0) {
+                    vscode.window.showInformationMessage('No resolved comments to delete.');
+                    return;
+                }
+                const deleteAnswer = await vscode.window.showWarningMessage(
+                    `Delete all ${resolvedComments.length} resolved comment(s) and their anchors?`,
+                    { modal: true },
+                    'Delete All Resolved'
+                );
+                if (deleteAnswer === 'Delete All Resolved') {
+                    for (const c of resolvedComments) {
+                        await this.removeAnchorViaApi(c.id);
+                        this.commentsManager.deleteComment(c.id);
+                    }
+                    this.immediateRender();
+                }
+                return;
+            }
             case 'exportPdf': {
                 this.exportAsHtml();
                 return;
@@ -689,6 +729,31 @@ img { max-width: 100%; }
 #comment-list-panel .panel-close {
     background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer;
 }
+.panel-toolbar {
+    padding: 8px 16px; border-bottom: 1px solid #333;
+    position: sticky; top: 48px; background: var(--vscode-editorWidget-background, #1e1e1e); z-index: 1;
+}
+.panel-toolbar input {
+    width: 100%; padding: 4px 8px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c);
+    color: var(--vscode-input-foreground, #ccc); border-radius: 3px; font-size: 12px; box-sizing: border-box;
+}
+.panel-filters {
+    display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap;
+}
+.panel-filters button {
+    padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc;
+    border-radius: 3px; cursor: pointer; font-size: 10px;
+}
+.panel-filters button:hover { background: #444; }
+.panel-filters button.active { background: #0078d4; border-color: #0078d4; color: #fff; }
+.panel-bulk {
+    display: flex; gap: 4px; margin-top: 6px;
+}
+.panel-bulk button {
+    padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc;
+    border-radius: 3px; cursor: pointer; font-size: 10px;
+}
+.panel-bulk button:hover { background: #444; }
 .clist-item {
     padding: 12px 16px; border-bottom: 1px solid #333; cursor: pointer;
 }
@@ -771,6 +836,20 @@ img { max-width: 100%; }
     <div class="panel-hdr">
         <h3>&#x1F4AC; Review Comments</h3>
         <button class="panel-close" onclick="togglePanel()">&times;</button>
+    </div>
+    <div class="panel-toolbar">
+        <input type="text" id="comment-search" placeholder="Search comments..." oninput="buildList()">
+        <div class="panel-filters">
+            <button id="filter-all" class="active" onclick="setFilter('all')">All</button>
+            <button id="filter-open" onclick="setFilter('open')">Open</button>
+            <button id="filter-resolved" onclick="setFilter('resolved')">Resolved</button>
+            <button id="filter-user" onclick="setFilter('user')">User</button>
+            <button id="filter-agent" onclick="setFilter('agent')">Agent</button>
+        </div>
+        <div class="panel-bulk">
+            <button onclick="resolveAll()">Resolve All</button>
+            <button onclick="deleteAllResolved()">Delete Resolved</button>
+        </div>
     </div>
     <div id="comment-list-body"></div>
 </div>
@@ -1070,6 +1149,19 @@ img { max-width: 100%; }
     };
 
     // ========== comment list panel ==========
+    var currentFilter = 'all';
+    window.setFilter = function(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.panel-filters button').forEach(function(btn) { btn.classList.remove('active'); });
+        document.getElementById('filter-' + filter).classList.add('active');
+        buildList();
+    };
+    window.resolveAll = function() {
+        vscode.postMessage({ command: 'resolveAll' });
+    };
+    window.deleteAllResolved = function() {
+        vscode.postMessage({ command: 'deleteAllResolved' });
+    };
     window.togglePanel = function() {
         panelVisible = !panelVisible;
         document.getElementById('comment-list-panel').style.display = panelVisible ? 'block' : 'none';
@@ -1078,11 +1170,28 @@ img { max-width: 100%; }
     function buildList() {
         var container = document.getElementById('comment-list-body');
         container.innerHTML = '';
-        if (comments.length === 0) {
-            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">No comments yet</div>';
+        var searchInput = document.getElementById('comment-search');
+        var searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        var filtered = comments.filter(function(c) {
+            // Status filter
+            if (currentFilter === 'open' && c.resolved) return false;
+            if (currentFilter === 'resolved' && !c.resolved) return false;
+            if (currentFilter === 'user' && c.role === 'agent') return false;
+            if (currentFilter === 'agent' && (c.role || 'user') !== 'agent') return false;
+            // Search filter
+            if (searchText) {
+                var haystack = (c.comment + ' ' + (c.blockPreview || '') + ' ' +
+                    (c.replies || []).map(function(r) { return r.text; }).join(' ')).toLowerCase();
+                if (haystack.indexOf(searchText) < 0) return false;
+            }
+            return true;
+        });
+        if (filtered.length === 0) {
+            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">' +
+                (comments.length === 0 ? 'No comments yet' : 'No matching comments') + '</div>';
             return;
         }
-        comments.forEach(function(c) {
+        filtered.forEach(function(c) {
             var div = document.createElement('div');
             div.className = 'clist-item' + (c.resolved ? ' resolved' : '');
             var resolveBtn = c.resolved
@@ -1120,6 +1229,7 @@ img { max-width: 100%; }
             container.appendChild(div);
         });
     }
+    window.buildList = buildList;
 
     // ========== optimistic UI from extension host ==========
     window.addEventListener('message', function(event) {
