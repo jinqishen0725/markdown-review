@@ -1,8 +1,8 @@
 # Markdown Reader with Copilot
 
-**The most agent-friendly markdown reader and review extension for VS Code.**
+**The most agent-friendly markdown reader and review extension for VS Code and Cursor.**
 
-Markdown Reader with Copilot brings Quip/Google Docs-style inline commenting to your markdown files — directly inside VS Code. Read, preview, comment, reply in threads, resolve discussions, and let AI agents participate in the review via 7 built-in Copilot tools and one-click ✨ Ask Copilot buttons. Perfect for document reviews, design proposals, and technical specifications.
+Markdown Reader with Copilot brings Quip/Google Docs-style inline commenting to your markdown files — directly inside VS Code and Cursor. Read, preview, comment, reply in threads, resolve discussions, and let AI agents participate in the review via 7 built-in Copilot tools and one-click ✨ Ask Copilot buttons. Perfect for document reviews, design proposals, and technical specifications.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,6 +21,8 @@ In **Copilot Agent Mode** (the chat panel), click the **Tools** button and enabl
 > *"Review this document and respond to all open comments"*
 
 The agent will list comments, read context, post replies, and resolve items — all autonomously.
+
+> 💡 **Cursor IDE** is also supported — see [Cursor Support](#cursor-support) for setup details.
 
 ---
 
@@ -123,9 +125,26 @@ The example includes:
 
 ---
 
+## Cursor Support
+
+This extension works in **Cursor IDE** with full preview and commenting support. AI features are delivered via an embedded MCP server that registers automatically on install.
+
+### What works natively in Cursor
+- **Preview rendering** — all markdown, KaTeX math, Mermaid diagrams, images
+- **Inline commenting** — add, edit, delete, reply, resolve comments
+- **Cross-reference jumping** — preview ↔ source navigation
+- **PDF / DOCX export** — same as VS Code
+- **7 AI tools via MCP** — the extension auto-registers an MCP server (`markdown-review`) in `~/.cursor/mcp.json`. After install, go to **Cursor Settings → Features → MCP Servers** and verify it’s toggled ON. Switch chat to **Agent** mode to use the tools.
+- **Live updates** — when the agent replies via MCP, the preview updates automatically
+
+### What uses clipboard (Cursor limitation)
+- **✨ Ask Copilot button** — Cursor does not expose an API to inject text into the Composer. When you click ✨ Ask Copilot, the prompt is copied to your clipboard and the Composer panel opens. Paste with `Ctrl+V` and press Enter. A modal notification confirms the prompt was copied.
+
+---
+
 ## Requirements
 
-- **VS Code** 1.93.0 or later
+- **VS Code** 1.93.0 or later, or **Cursor** (latest recommended)
 - **Chrome** (optional) — for PDF export via headless mode
 - **Pandoc** (optional) — for DOCX export with native Word equations ([install](https://pandoc.org/installing.html))
 
@@ -141,10 +160,11 @@ No configuration needed. The extension activates automatically for markdown file
 
 ```
 src/
-  extension.ts   — Command registration and tool registration
+  extension.ts   — Command registration, editor detection, tool/MCP registration
   preview.ts     — Webview panel with remark/rehype rendering pipeline
   comments.ts    — CommentsManager for JSON sidecar CRUD
-  tools.ts       — 7 Copilot tool implementations
+  tools.ts       — 7 Copilot tool implementations (VS Code)
+  mcp-server.ts  — MCP server exposing the same 7 tools (Cursor & other MCP clients)
 ```
 
 **Rendering pipeline:** Markdown → remark-parse → remark-gfm → remark-math → remark-rehype → rehype-raw → rehype-katex → rehype-stringify → HTML
@@ -176,6 +196,7 @@ node test/test-crossref.js
 
 | Version | Highlights |
 |---|---|
+| **4.1.x** | Cursor IDE support via MCP server, comments file watcher for live updates, DOCX image fix, modal notifications |
 | **4.0.0** | ✨ Ask Copilot buttons (Add Comment + Reply), popover persistence, data URI images, DOCX table borders, reply delete with confirmation dialogs |
 | **3.7.x** | Quick Start section, Ctrl+Shift+R keybinding, Mermaid diagrams, preview as new tab |
 | **3.2.x** | Context menus, keybinding, dot-prefixed comments file, DOCX export |
