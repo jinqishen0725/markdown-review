@@ -1,25 +1,4 @@
 {
   "file": ".README.md",
-  "comments": [
-    {
-      "id": "c1773550098263",
-      "anchor": "<!--@c1773550098263-->",
-      "startOffset": 614,
-      "endOffset": 628,
-      "blockType": "heading",
-      "blockPreview": "## Quick Start",
-      "comment": "test agent response",
-      "role": "user",
-      "timestamp": "2026-03-15T04:48:18.263Z",
-      "resolved": false,
-      "replies": [
-        {
-          "id": "r1773550108919",
-          "role": "agent",
-          "text": "Got it — the agent is responding. This **Quick Start** section walks you through: (1) opening the review preview with **Ctrl+Shift+R**, (2) adding comments via the **+** gutter button, and (3) enabling the Markdown Review tools in Copilot Agent Mode so you can ask the agent to review the doc and respond to comments. If you want to try something specific in this section, say what you'd like to change or add.",
-          "timestamp": "2026-03-15T04:48:28.919Z"
-        }
-      ]
-    }
-  ]
+  "comments": []
 }
