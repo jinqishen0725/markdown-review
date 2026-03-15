@@ -287,20 +287,43 @@ export class PreviewPanel {
 
     // ---------- Ask Copilot helpers ----------
 
+    private isCursor(): boolean {
+        return vscode.env.appName?.toLowerCase().includes('cursor') || false;
+    }
+
+    private async sendToChat(prompt: string) {
+        if (this.isCursor()) {
+            // Cursor: open composer, copy prompt to clipboard
+            await vscode.env.clipboard.writeText(prompt);
+            const commands = await vscode.commands.getCommands(true);
+            if (commands.includes('composer.focusComposer')) {
+                await vscode.commands.executeCommand('composer.focusComposer');
+                vscode.window.showInformationMessage('Review prompt copied — paste it in Cursor Agent (Ctrl+V)');
+            } else {
+                vscode.window.showInformationMessage('Review prompt copied to clipboard. Open Cursor Agent (Ctrl+I) and paste.');
+            }
+        } else {
+            // VS Code: open Copilot chat with prompt
+            vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+        }
+    }
+
     private openCopilotForComment(comment: any) {
         const fileName = path.basename(this.document.uri.fsPath);
         const filePath = this.document.uri.fsPath;
+        const toolPrefix = this.isCursor() ? '' : '#';
         const prompt = `I'm reviewing "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
             `- Comment #${comment.id}: "${comment.comment}"\n` +
             `- On block: "${comment.blockPreview || '(unknown)'}"\n\n` +
-            `Please use #readReviewComment to get the full context of comment "${comment.id}", ` +
-            `then use #replyToReviewComment to post a helpful response addressing this comment.`;
-        vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+            `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
+            `then use ${toolPrefix}replyToReviewComment to post a helpful response addressing this comment.`;
+        this.sendToChat(prompt);
     }
 
     private openCopilotForThread(comment: any) {
         const fileName = path.basename(this.document.uri.fsPath);
         const filePath = this.document.uri.fsPath;
+        const toolPrefix = this.isCursor() ? '' : '#';
         let repliesText = '';
         if (comment.replies && comment.replies.length > 0) {
             repliesText = '\n- Existing replies:\n' +
@@ -311,9 +334,9 @@ export class PreviewPanel {
             `- On block: "${comment.blockPreview || '(unknown)'}"\n` +
             `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
             repliesText + '\n\n' +
-            `Please use #readReviewComment to get the full context of comment "${comment.id}", ` +
-            `then use #replyToReviewComment to post a helpful response continuing this thread.`;
-        vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+            `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
+            `then use ${toolPrefix}replyToReviewComment to post a helpful response continuing this thread.`;
+        this.sendToChat(prompt);
     }
 
     // ---------- anchor operations via VS Code API ----------

@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Reader with Copilot",
   "description": "Markdown reader and reviewer with inline commenting, AI agent tools, and one-click Copilot integration",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -218,6 +218,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@traptitech/markdown-it-katex": "^3.6.0",
     "html-to-docx": "^1.8.0",
     "katex": "^0.16.38",
