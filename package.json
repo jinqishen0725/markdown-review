@@ -13,7 +13,27 @@
     "vscode": "^1.93.0"
   },
   "categories": [
+    "Programming Languages",
+    "Visualization",
+    "AI",
     "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "review",
+    "copilot",
+    "preview",
+    "comments",
+    "mermaid",
+    "katex",
+    "latex",
+    "pdf",
+    "docx",
+    "mcp",
+    "cursor",
+    "agent",
+    "inline-comments",
+    "document-review"
   ],
   "activationEvents": [
     "onCommand:markdownReview.openPreview",
