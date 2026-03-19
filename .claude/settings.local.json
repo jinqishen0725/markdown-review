@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__diff-review__listDiffComments",
+      "mcp__diff-review__replyToDiffComment",
+      "mcp__diff-review__resolveDiffComment",
+      "mcp__diff-review__deleteDiffComment"
+    ]
+  }
+}

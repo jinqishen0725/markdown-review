@@ -10,10 +10,12 @@ Markdown Reader with Copilot brings Quip/Google Docs-style inline commenting to 
 
 ## Quick Start
 
+<!--@c1773552062764-->
 ### 1. Open a Review Preview
 Open any `.md` file and press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-click → **"Markdown Review: Open Preview with Comments"**.
 
 ### 2. Add Review Comments
+<!--@c1773552169188-->
 In the preview, click the **`+`** button in the gutter next to any block (heading, paragraph, table, formula, list, blockquote) to add a comment. Reply to comments, edit them, or mark them resolved — all inline. You can also click **✨ Ask Copilot** instead of "Add Comment" to post your comment and immediately get an AI response, or click **✨ Ask Copilot** next to "Reply" to send the entire thread to Copilot.
 
 ### 3. Enable AI Agent Tools

@@ -327,6 +327,36 @@ export class PreviewPanel {
                 }
                 return;
             }
+            case 'sendAllToCopilot': {
+                const allComments = this.commentsManager.getComments().filter((c: any) => !c.resolved);
+                if (allComments.length === 0) {
+                    vscode.window.showInformationMessage('No open comments to send.');
+                    return;
+                }
+                const prompt = this.buildBatchPrompt(allComments);
+                this.sendToChat(prompt);
+                return;
+            }
+            case 'copyAllToClipboard': {
+                const allOpen = this.commentsManager.getComments().filter((c: any) => !c.resolved);
+                if (allOpen.length === 0) {
+                    vscode.window.showInformationMessage('No open comments to copy.');
+                    return;
+                }
+                const batchPrompt = this.buildBatchPrompt(allOpen);
+                vscode.env.clipboard.writeText(batchPrompt);
+                vscode.window.showInformationMessage(`${allOpen.length} comment(s) copied to clipboard.`);
+                return;
+            }
+            case 'copyComment': {
+                const cmt = this.commentsManager.getComments().find((c: any) => c.id === message.id);
+                if (cmt) {
+                    const singlePrompt = this.buildBatchPrompt([cmt]);
+                    vscode.env.clipboard.writeText(singlePrompt);
+                    vscode.window.showInformationMessage('Comment copied to clipboard.');
+                }
+                return;
+            }
         }
     }
 
@@ -381,6 +411,22 @@ export class PreviewPanel {
             `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
             `then use ${toolPrefix}replyToReviewComment to post a helpful response continuing this thread.`;
         this.sendToChat(prompt);
+    }
+
+    private buildBatchPrompt(comments: any[]): string {
+        const fileName = path.basename(this.document.uri.fsPath);
+        const filePath = this.document.uri.fsPath;
+        const parts: string[] = [];
+        parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
+        for (const c of comments) {
+            let entry = `- Comment #${c.id} [${c.resolved ? 'RESOLVED' : 'OPEN'}]: "${c.comment}"\n  Block: "${c.blockPreview || '(unknown)'}"`;
+            if (c.replies && c.replies.length > 0) {
+                entry += '\n  Replies:\n' + c.replies.map((r: any) => `    [${r.role || 'user'}] ${r.text}`).join('\n');
+            }
+            parts.push(entry);
+        }
+        parts.push(`\nPlease review and respond to each open comment above.`);
+        return parts.join('\n');
     }
 
     // ---------- anchor operations via VS Code API ----------
@@ -847,6 +893,8 @@ img { max-width: 100%; }
             <button id="filter-agent" onclick="setFilter('agent')">Agent</button>
         </div>
         <div class="panel-bulk">
+            <button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>
+            <button onclick="copyAllToClipboard()">&#x1F4CB; Copy All</button>
             <button onclick="resolveAll()">Resolve All</button>
             <button onclick="deleteAllResolved()">Delete Resolved</button>
         </div>
@@ -979,6 +1027,7 @@ img { max-width: 100%; }
             '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button>' +
             '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
+            '<button onclick="copyComment(\\'' + comment.id + '\\')">&#x1F4CB; Copy</button>' +
             '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button></div>';
         var rect = anchorEl.getBoundingClientRect();
         pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
@@ -1162,6 +1211,15 @@ img { max-width: 100%; }
     window.deleteAllResolved = function() {
         vscode.postMessage({ command: 'deleteAllResolved' });
     };
+    window.sendAllToCopilot = function() {
+        vscode.postMessage({ command: 'sendAllToCopilot' });
+    };
+    window.copyAllToClipboard = function() {
+        vscode.postMessage({ command: 'copyAllToClipboard' });
+    };
+    window.copyComment = function(id) {
+        vscode.postMessage({ command: 'copyComment', id: id });
+    };
     window.togglePanel = function() {
         panelVisible = !panelVisible;
         document.getElementById('comment-list-panel').style.display = panelVisible ? 'block' : 'none';
@@ -1220,6 +1278,7 @@ img { max-width: 100%; }
                 '<button onclick="event.stopPropagation();var inp=document.getElementById(\\'list-reply-' + c.id + '\\');var t=inp.value.trim();if(t){vscode.postMessage({command:\\'replyComment\\',id:\\'' + c.id + '\\',text:t});}" style="margin-top:4px;">Reply</button>' +
                 '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
+                '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
                 '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button></div>';
             div.addEventListener('click', function() {
                 var content = document.getElementById('content');
