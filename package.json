@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Reader with Copilot",
   "description": "Markdown reader and reviewer with inline commenting, AI agent tools, and one-click Copilot integration",
-  "version": "4.3.1",
+  "version": "4.3.2",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -104,7 +104,7 @@
         "toolReferenceName": "listReviewComments",
         "canBeReferencedInPrompt": true,
         "icon": "$(comment)",
-        "modelDescription": "Lists all review comments on a markdown document. Returns each comment's ID, text, status (resolved/unresolved), block type, surrounding context, reply count, and role. Use this to get an overview of the review discussion. Pass filePath to specify which file to operate on when multiple markdown files are open.",
+        "modelDescription": "Lists all review comments on a markdown document. Returns each comment's ID, text, status (resolved/unresolved), block type, surrounding context, reply count, and role. IMPORTANT: Always pass the filePath parameter when you know which file the comments are on, especially when multiple markdown files are open. Without filePath, the tool uses the currently active editor tab which may not be the intended file.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -121,7 +121,7 @@
         "toolReferenceName": "readReviewComment",
         "canBeReferencedInPrompt": true,
         "icon": "$(comment-discussion)",
-        "modelDescription": "Reads a specific review comment by ID, including its full text, all replies, and the surrounding markdown context (5 lines before and after the anchored block). Use this to understand the full context of a review discussion. Pass filePath to specify which file when multiple markdown files are open.",
+        "modelDescription": "Reads a specific review comment by ID, including its full text, all replies, and the surrounding markdown context (5 lines before and after the anchored block). IMPORTANT: Always pass the filePath parameter when you know which file the comment is on. Without filePath, the tool may look in the wrong file and return 'not found'.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -145,7 +145,7 @@
         "toolReferenceName": "replyToReviewComment",
         "canBeReferencedInPrompt": true,
         "icon": "$(reply)",
-        "modelDescription": "Replies to an existing review comment. The reply is added with role 'agent'. Use this to respond to user review comments on the markdown document. Pass filePath to specify which file when multiple markdown files are open.",
+        "modelDescription": "Replies to an existing review comment. The reply is added with role 'agent'. IMPORTANT: Always pass the filePath parameter when you know which file the comment is on. Without filePath, the tool may fail to find the comment if a different file is active in the editor.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -174,7 +174,7 @@
         "toolReferenceName": "resolveReviewComment",
         "canBeReferencedInPrompt": true,
         "icon": "$(check)",
-        "modelDescription": "Marks a review comment as resolved. Use this when a review comment has been addressed. Pass filePath to specify which file when multiple markdown files are open.",
+        "modelDescription": "Marks a review comment as resolved. IMPORTANT: Always pass the filePath parameter when you know which file the comment is on. Without filePath, the tool may fail to find the comment if a different file is active in the editor.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -198,7 +198,7 @@
         "toolReferenceName": "deleteReviewComment",
         "canBeReferencedInPrompt": true,
         "icon": "$(trash)",
-        "modelDescription": "Deletes a review comment and removes its anchor from the markdown file. Use this to remove a comment that is no longer needed. Pass filePath to specify which file when multiple markdown files are open.",
+        "modelDescription": "Deletes a review comment and removes its anchor from the markdown file. IMPORTANT: Always pass the filePath parameter when you know which file the comment is on. Without filePath, the tool may fail to find the comment if a different file is active.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -222,7 +222,7 @@
         "toolReferenceName": "scrollToReviewComment",
         "canBeReferencedInPrompt": true,
         "icon": "$(eye)",
-        "modelDescription": "Scrolls the markdown review preview to show the block associated with a specific comment. Also reveals the source line in the editor. Use this to navigate to a specific comment's location. Pass filePath to specify which file when multiple markdown files are open.",
+        "modelDescription": "Scrolls the markdown review preview to show the block associated with a specific comment. Also reveals the source line in the editor. IMPORTANT: Always pass the filePath parameter when you know which file the comment is on.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -246,7 +246,7 @@
         "toolReferenceName": "captureReviewScreenshot",
         "canBeReferencedInPrompt": true,
         "icon": "$(device-camera)",
-        "modelDescription": "Captures the rendered markdown review preview as a self-contained HTML file with all styles, tables, and formulas preserved. Saves to .review-screenshot.html next to the markdown file. Returns the file path. Use this when you need to see how tables, formulas, or formatting actually render. Pass filePath to specify which file when multiple markdown files are open.",
+        "modelDescription": "Captures the rendered markdown review preview as a self-contained HTML file. Saves to .review-screenshot.html next to the markdown file. IMPORTANT: Always pass the filePath parameter when you know which file to capture.",
         "inputSchema": {
           "type": "object",
           "properties": {

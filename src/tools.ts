@@ -67,14 +67,14 @@ export class ListCommentsTool implements vscode.LanguageModelTool<IListParams> {
         const resolved = getCommentsManagerFor(options.input?.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Open a markdown file first, or pass a filePath parameter.')
+                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter set to the absolute path of the markdown file.')
             ]);
         }
         const { mgr, mdPath } = resolved;
         const comments = mgr.getComments();
         if (comments.length === 0) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`No review comments on ${path.basename(mdPath)}.`)
+                new vscode.LanguageModelTextPart(`No review comments found on ${path.basename(mdPath)} (${mdPath}). If you expected comments on a different file, retry with the correct filePath parameter.`)
             ]);
         }
         const fileName = path.basename(mdPath);
@@ -101,14 +101,14 @@ export class ReadCommentTool implements vscode.LanguageModelTool<IReadCommentPar
         const resolved = getCommentsManagerFor(options.input.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found.')
+                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
             ]);
         }
         const { mgr, mdPath } = resolved;
         const comment = mgr.getComments().find(c => c.id === options.input.commentId);
         if (!comment) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found.`)
+                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found in ${path.basename(mdPath)}. This may be the wrong file — retry with the filePath parameter set to the correct markdown file path.`)
             ]);
         }
         const context = getMarkdownContext(mdPath, comment.startOffset);
@@ -144,14 +144,14 @@ export class ReplyToCommentTool implements vscode.LanguageModelTool<IReplyParams
         const resolved = getCommentsManagerFor(options.input.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found.')
+                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
             ]);
         }
         const { mgr } = resolved;
         const reply = mgr.addReply(options.input.commentId, options.input.text, 'agent');
         if (!reply) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found.`)
+                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found. The active file may not be the one containing this comment — retry with the filePath parameter set to the correct markdown file path.`)
             ]);
         }
         // Trigger preview refresh without full re-render
@@ -180,7 +180,7 @@ export class ResolveCommentTool implements vscode.LanguageModelTool<IResolvePara
         const resolved = getCommentsManagerFor(options.input.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found.')
+                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
             ]);
         }
         const { mgr } = resolved;
@@ -210,7 +210,7 @@ export class DeleteCommentTool implements vscode.LanguageModelTool<IDeleteParams
         const mdPath = resolveMarkdownPath(options.input.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No active markdown document found.')
+                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
             ]);
         }
         // Use the PreviewPanel if available (it handles anchor removal via VS Code API)
@@ -240,14 +240,14 @@ export class ScrollToCommentTool implements vscode.LanguageModelTool<IScrollPara
         const mdPath = resolveMarkdownPath(options.input.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No active markdown document found.')
+                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
             ]);
         }
         const mgr = new CommentsManager(mdPath);
         const comment = mgr.getComments().find(c => c.id === options.input.commentId);
         if (!comment) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found.`)
+                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found in ${path.basename(mdPath)}. This may be the wrong file — retry with the filePath parameter.`)
             ]);
         }
         const panel = PreviewPanel.currentPanels.get(mdPath);
