@@ -706,7 +706,7 @@ img { max-width: 100%; }
     color: var(--vscode-editorWidget-foreground, #ccc);
     border: 1px solid var(--vscode-editorWidget-border, #454545);
     border-radius: 6px; padding: 12px 16px;
-    min-width: 250px; max-width: 400px;
+    min-width: 250px; max-width: 400px; max-height: 60vh; overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0,0,0,.4); z-index: 1000; font-size: 13px;
 }
 #comment-popover .pop-text { white-space: pre-wrap; margin-bottom: 6px; }
@@ -770,14 +770,15 @@ img { max-width: 100%; }
     position: sticky; top: 0; padding: 12px 16px;
     background: var(--vscode-editorWidget-background, #1e1e1e);
     border-bottom: 1px solid #454545; display: flex; justify-content: space-between; align-items: center;
+    z-index: 10;
 }
 #comment-list-panel .panel-hdr h3 { margin: 0; font-size: 14px; border: none; }
 #comment-list-panel .panel-close {
-    background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer;
+    background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;
 }
 .panel-toolbar {
     padding: 8px 16px; border-bottom: 1px solid #333;
-    position: sticky; top: 48px; background: var(--vscode-editorWidget-background, #1e1e1e); z-index: 1;
+    position: sticky; top: 48px; background: var(--vscode-editorWidget-background, #1e1e1e); z-index: 9;
 }
 .panel-toolbar input {
     width: 100%; padding: 4px 8px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c);
@@ -817,7 +818,7 @@ img { max-width: 100%; }
 .clist-item button:hover { background: #444; }
 
 /* ---------- reply styles ---------- */
-.pop-replies, .item-replies { margin: 8px 0; padding-left: 12px; border-left: 2px solid #555; }
+.pop-replies, .item-replies { margin: 8px 0; padding-left: 12px; border-left: 2px solid #555; max-height: 40vh; overflow-y: auto; }
 .pop-reply, .item-reply { margin-bottom: 6px; }
 .pop-reply-text, .item-reply-text { font-size: 12px; white-space: pre-wrap; }
 .pop-reply-meta, .item-reply-meta { font-size: 10px; color: #888; }
