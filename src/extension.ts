@@ -21,6 +21,26 @@ export function activate(context: vscode.ExtensionContext) {
             PreviewPanel.createOrShow(context, editor.document);
         }),
 
+        vscode.commands.registerCommand('markdownReview.openWordPreview', async (uri?: vscode.Uri) => {
+            let docxPath: string | undefined;
+            if (uri) {
+                docxPath = uri.fsPath;
+            } else {
+                const files = await vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectMany: false,
+                    filters: { 'Word Documents': ['docx'] },
+                });
+                if (files && files.length > 0) docxPath = files[0].fsPath;
+            }
+            if (!docxPath) return;
+            if (!docxPath.toLowerCase().endsWith('.docx')) {
+                vscode.window.showWarningMessage('Only .docx files are supported.');
+                return;
+            }
+            PreviewPanel.createOrShowDocx(context, docxPath);
+        }),
+
         vscode.commands.registerCommand('markdownReview.exportComments', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) { return; }

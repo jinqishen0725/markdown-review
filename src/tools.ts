@@ -6,27 +6,24 @@ import { PreviewPanel } from './preview';
 
 // ---------- helpers ----------
 
-function resolveMarkdownPath(explicitPath?: string): string | undefined {
+function resolveDocumentPath(explicitPath?: string): string | undefined {
     // 1. Use explicit path if provided
     if (explicitPath) {
-        // Handle both absolute paths and workspace-relative paths
         if (path.isAbsolute(explicitPath)) {
             if (fs.existsSync(explicitPath)) return explicitPath;
         }
-        // Try resolving relative to workspace folders
         for (const folder of vscode.workspace.workspaceFolders || []) {
             const abs = path.join(folder.uri.fsPath, explicitPath);
             if (fs.existsSync(abs)) return abs;
         }
-        // If it looks like a path, return it even if not found (let caller handle error)
-        if (explicitPath.endsWith('.md')) return explicitPath;
+        if (explicitPath.endsWith('.md') || explicitPath.endsWith('.docx')) return explicitPath;
     }
-    // 2. Active text editor
+    // 2. Active text editor (markdown only — .docx isn't a TextDocument)
     const editor = vscode.window.activeTextEditor;
     if (editor && editor.document.languageId === 'markdown') {
         return editor.document.uri.fsPath;
     }
-    // 3. Any open preview panel
+    // 3. Any open preview panel (supports both .md and .docx)
     for (const [key] of PreviewPanel.currentPanels) {
         return key;
     }
@@ -34,7 +31,7 @@ function resolveMarkdownPath(explicitPath?: string): string | undefined {
 }
 
 function getCommentsManagerFor(filePath?: string): { mgr: CommentsManager; mdPath: string } | undefined {
-    const mdPath = resolveMarkdownPath(filePath);
+    const mdPath = resolveDocumentPath(filePath);
     if (!mdPath) return undefined;
     return { mgr: new CommentsManager(mdPath), mdPath };
 }
@@ -207,7 +204,7 @@ export class DeleteCommentTool implements vscode.LanguageModelTool<IDeleteParams
         options: vscode.LanguageModelToolInvocationOptions<IDeleteParams>,
         _token: vscode.CancellationToken
     ): Promise<vscode.LanguageModelToolResult> {
-        const mdPath = resolveMarkdownPath(options.input.filePath);
+        const mdPath = resolveDocumentPath(options.input.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
@@ -237,7 +234,7 @@ export class ScrollToCommentTool implements vscode.LanguageModelTool<IScrollPara
         options: vscode.LanguageModelToolInvocationOptions<IScrollParams>,
         _token: vscode.CancellationToken
     ): Promise<vscode.LanguageModelToolResult> {
-        const mdPath = resolveMarkdownPath(options.input.filePath);
+        const mdPath = resolveDocumentPath(options.input.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
@@ -277,7 +274,7 @@ export class CaptureScreenshotTool implements vscode.LanguageModelTool<ICaptureP
         options: vscode.LanguageModelToolInvocationOptions<ICaptureParams>,
         _token: vscode.CancellationToken
     ): Promise<vscode.LanguageModelToolResult> {
-        const mdPath = resolveMarkdownPath(options.input?.filePath);
+        const mdPath = resolveDocumentPath(options.input?.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart('No active markdown document found.')

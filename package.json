@@ -38,6 +38,7 @@
   "activationEvents": [
     "onCommand:markdownReview.openPreview",
     "onCommand:markdownReview.exportComments",
+    "onCommand:markdownReview.openWordPreview",
     "onLanguage:markdown"
   ],
   "main": "./out/extension.js",
@@ -47,6 +48,11 @@
         "command": "markdownReview.openPreview",
         "title": "Markdown Review: Open Preview with Comments",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "markdownReview.openWordPreview",
+        "title": "Markdown Review: Open Word Document Preview",
+        "icon": "$(file-text)"
       },
       {
         "command": "markdownReview.exportComments",
@@ -85,6 +91,11 @@
         {
           "when": "resourceLangId == markdown",
           "command": "markdownReview.openPreview",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceExtname == .docx",
+          "command": "markdownReview.openWordPreview",
           "group": "navigation"
         }
       ]
@@ -276,7 +287,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@traptitech/markdown-it-katex": "^3.6.0",
+    "@xmldom/xmldom": "^0.9.9",
     "html-to-docx": "^1.8.0",
+    "jszip": "^3.10.1",
     "katex": "^0.16.38",
     "markdown-it": "^14.0.0",
     "pngjs": "^7.0.0",

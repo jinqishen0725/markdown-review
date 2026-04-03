@@ -22,6 +22,8 @@ export interface Comment {
     timestamp: string;
     resolved: boolean;
     replies?: Reply[];
+    elementId?: string;    // Word paraId — used for .docx files instead of offsets
+    contentHash?: string;  // SHA of paragraph text — for drift detection
 }
 
 export interface CommentsFile {
@@ -105,6 +107,33 @@ export class CommentsManager {
             role: 'user',
             timestamp: new Date().toISOString(),
             resolved: false,
+        };
+        this.data.comments.push(newComment);
+        this.save();
+        return newComment;
+    }
+
+    addDocxComment(
+        elementId: string,
+        blockType: string,
+        blockPreview: string,
+        comment: string,
+        contentHash?: string
+    ): Comment {
+        const id = 'c' + Date.now();
+        const newComment: Comment = {
+            id,
+            anchor: '',
+            startOffset: 0,
+            endOffset: 0,
+            blockType,
+            blockPreview,
+            comment,
+            role: 'user',
+            timestamp: new Date().toISOString(),
+            resolved: false,
+            elementId,
+            contentHash,
         };
         this.data.comments.push(newComment);
         this.save();

@@ -20,6 +20,7 @@ interface Block {
     endOffset: number;
     startLine: number;
     preview: string;
+    eid?: string;  // Word element ID (paraId) — used instead of offsets for .docx
 }
 
 const BLOCK_TYPES = new Set([
@@ -85,6 +86,11 @@ export class PreviewPanel {
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     private commentsWatcher: ReturnType<typeof import('fs').watch> | null = null;
     private commentsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Word-specific fields
+    public isDocx: boolean = false;
+    private docxPath: string = '';
+    private docxModel: any = null; // DocumentModel from docx-parser
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -170,11 +176,56 @@ export class PreviewPanel {
         PreviewPanel.currentPanels.set(key, p);
     }
 
+    public static async createOrShowDocx(context: vscode.ExtensionContext, docxPath: string) {
+        const key = docxPath;
+        const existing = PreviewPanel.currentPanels.get(key);
+        if (existing) {
+            existing.panel.reveal(vscode.ViewColumn.Active);
+            existing.updateContent();
+            return;
+        }
+
+        // Create a dummy TextDocument by opening a blank untitled file (we won't use its content)
+        // The actual content comes from the .docx parser
+        const dummyDoc = await vscode.workspace.openTextDocument({ content: '', language: 'plaintext' });
+
+        const panel = vscode.window.createWebviewPanel(
+            'markdownReview',
+            '📄 ' + path.basename(docxPath),
+            vscode.ViewColumn.Active,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [
+                    vscode.Uri.joinPath(context.extensionUri, 'media'),
+                    vscode.Uri.file(path.dirname(docxPath)),
+                ],
+            },
+        );
+        const p = new PreviewPanel(panel, dummyDoc, context.extensionUri);
+        p.isDocx = true;
+        p.docxPath = docxPath;
+        p.commentsManager = new CommentsManager(docxPath);
+        await p.updateDocxContent();
+        PreviewPanel.currentPanels.set(key, p);
+    }
+
     // ---------- message handling ----------
 
     private async handleMessage(message: any) {
         switch (message.command) {
             case 'addComment': {
+                if (this.isDocx && message.eid) {
+                    const c = this.commentsManager.addDocxComment(
+                        message.eid,
+                        message.blockType || '',
+                        message.blockPreview || '',
+                        message.comment,
+                    );
+                    this.updateDocxContent();
+                    this.panel.webview.postMessage({ command: 'openPopover', commentId: c.id });
+                    return;
+                }
                 const c = this.commentsManager.addComment(
                     message.startOffset,
                     message.endOffset,
@@ -199,9 +250,15 @@ export class PreviewPanel {
                     'Delete'
                 );
                 if (delAnswer === 'Delete') {
-                    await this.removeAnchorViaApi(message.id);
+                    if (!this.isDocx) {
+                        await this.removeAnchorViaApi(message.id);
+                    }
                     this.commentsManager.deleteComment(message.id);
-                    this.immediateRender();
+                    if (this.isDocx) {
+                        this.updateDocxContent();
+                    } else {
+                        this.immediateRender();
+                    }
                 }
                 return;
             }
@@ -301,19 +358,31 @@ export class PreviewPanel {
                 return;
             }
             case 'addCommentAndAsk': {
-                const c = this.commentsManager.addComment(
-                    message.startOffset,
-                    message.endOffset,
-                    message.blockType || '',
-                    message.blockPreview || '',
-                    message.comment,
-                );
-                this.insertAnchorViaApi(c.id, message.startOffset).then(() => {
-                    this.immediateRender();
-                    // Open the popover for the new comment
-                    this.panel.webview.postMessage({ command: 'openPopover', commentId: c.id });
-                    this.openCopilotForComment(c);
-                });
+                let ca: Comment;
+                if (this.isDocx && message.eid) {
+                    ca = this.commentsManager.addDocxComment(
+                        message.eid,
+                        message.blockType || '',
+                        message.blockPreview || '',
+                        message.comment,
+                    );
+                    this.updateDocxContent();
+                    this.panel.webview.postMessage({ command: 'openPopover', commentId: ca.id });
+                    this.openCopilotForComment(ca);
+                } else {
+                    ca = this.commentsManager.addComment(
+                        message.startOffset,
+                        message.endOffset,
+                        message.blockType || '',
+                        message.blockPreview || '',
+                        message.comment,
+                    );
+                    this.insertAnchorViaApi(ca.id, message.startOffset).then(() => {
+                        this.immediateRender();
+                        this.panel.webview.postMessage({ command: 'openPopover', commentId: ca.id });
+                        this.openCopilotForComment(ca);
+                    });
+                }
                 return;
             }
             case 'askCopilotThread': {
@@ -383,42 +452,75 @@ export class PreviewPanel {
     }
 
     private openCopilotForComment(comment: any) {
-        const fileName = path.basename(this.document.uri.fsPath);
-        const filePath = this.document.uri.fsPath;
+        const filePath = this.isDocx ? this.docxPath : this.document.uri.fsPath;
+        const fileName = path.basename(filePath);
         const toolPrefix = this.isCursor() ? '' : '#';
-        const prompt = `I'm reviewing "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
-            `- Comment #${comment.id}: "${comment.comment}"\n` +
-            `- On block: "${comment.blockPreview || '(unknown)'}"\n\n` +
-            `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
-            `then use ${toolPrefix}replyToReviewComment to post a helpful response addressing this comment.`;
+
+        let prompt: string;
+        if (this.isDocx) {
+            prompt = `I'm reviewing a Word document "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
+                `- Comment #${comment.id}: "${comment.comment}"\n` +
+                `- On element: "${comment.blockPreview || '(unknown)'}"\n\n` +
+                `IMPORTANT: This is a Word (.docx) document. The underlying format is XML. ` +
+                `Do NOT try to edit the file directly — use the review tools to interact with the document.\n\n` +
+                `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to get the full context, ` +
+                `then use ${toolPrefix}replyToReviewComment to post a helpful response addressing this comment.`;
+        } else {
+            prompt = `I'm reviewing "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
+                `- Comment #${comment.id}: "${comment.comment}"\n` +
+                `- On block: "${comment.blockPreview || '(unknown)'}"\n\n` +
+                `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
+                `then use ${toolPrefix}replyToReviewComment to post a helpful response addressing this comment.`;
+        }
         this.sendToChat(prompt);
     }
 
     private openCopilotForThread(comment: any) {
-        const fileName = path.basename(this.document.uri.fsPath);
-        const filePath = this.document.uri.fsPath;
+        const filePath = this.isDocx ? this.docxPath : this.document.uri.fsPath;
+        const fileName = path.basename(filePath);
         const toolPrefix = this.isCursor() ? '' : '#';
         let repliesText = '';
         if (comment.replies && comment.replies.length > 0) {
             repliesText = '\n- Existing replies:\n' +
                 comment.replies.map((r: any) => `  [${r.role || 'user'}] ${r.text}`).join('\n');
         }
-        const prompt = `I'm reviewing "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
-            `- Comment #${comment.id}: "${comment.comment}"\n` +
-            `- On block: "${comment.blockPreview || '(unknown)'}"\n` +
-            `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
-            repliesText + '\n\n' +
-            `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
-            `then use ${toolPrefix}replyToReviewComment to post a helpful response continuing this thread.`;
+
+        let prompt: string;
+        if (this.isDocx) {
+            prompt = `I'm reviewing a Word document "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
+                `- Comment #${comment.id}: "${comment.comment}"\n` +
+                `- On element: "${comment.blockPreview || '(unknown)'}"\n` +
+                `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
+                repliesText + '\n\n' +
+                `IMPORTANT: This is a Word (.docx) document stored as XML. ` +
+                `Do NOT try to edit the .docx file directly. Use the review tools to read content and post responses.\n\n` +
+                `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to get the full context, ` +
+                `then use ${toolPrefix}replyToReviewComment to post a helpful response continuing this thread.`;
+        } else {
+            prompt = `I'm reviewing "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
+                `- Comment #${comment.id}: "${comment.comment}"\n` +
+                `- On block: "${comment.blockPreview || '(unknown)'}"\n` +
+                `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
+                repliesText + '\n\n' +
+                `Please use ${toolPrefix}readReviewComment to get the full context of comment "${comment.id}", ` +
+                `then use ${toolPrefix}replyToReviewComment to post a helpful response continuing this thread.`;
+        }
         this.sendToChat(prompt);
     }
 
     private buildBatchPrompt(comments: any[]): string {
-        const fileName = path.basename(this.document.uri.fsPath);
-        const filePath = this.document.uri.fsPath;
+        const filePath = this.isDocx ? this.docxPath : this.document.uri.fsPath;
+        const fileName = path.basename(filePath);
         const toolPrefix = this.isCursor() ? '' : '#';
         const parts: string[] = [];
-        parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
+
+        if (this.isDocx) {
+            parts.push(`Review comments on Word document "${fileName}" (${filePath}):`);
+            parts.push(`NOTE: This is a .docx file (XML-based). Do NOT edit the file directly. Use the review tools to read elements and post responses.\n`);
+        } else {
+            parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
+        }
+
         for (const c of comments) {
             let entry = `- Comment #${c.id} [${c.resolved ? 'RESOLVED' : 'OPEN'}]: "${c.comment}"\n  Block: "${c.blockPreview || '(unknown)'}"`;
             if (c.replies && c.replies.length > 0) {
@@ -605,6 +707,65 @@ export class PreviewPanel {
         }
         this.panel.webview.html = this.getHtml(this.resolveImagePaths(html), blocks, comments);
         this.lastRenderTime = Date.now();
+    }
+
+    private async updateDocxContent() {
+        if (!this.isDocx || !this.docxPath) return;
+        try {
+            const { parseDocx } = require('./docx-parser');
+            this.docxModel = await parseDocx(this.docxPath);
+
+            // Build blocks from parsed elements
+            const blocks: Block[] = this.docxModel.elements.map((el: any) => ({
+                type: el.type,
+                startOffset: 0,
+                endOffset: 0,
+                startLine: 0,
+                preview: el.content.substring(0, 80),
+                eid: el.id,
+            }));
+
+            // Build HTML body from elements
+            let bodyHtml = '';
+            for (const el of this.docxModel.elements) {
+                const commentClass = el.commentIds.length > 0 ? ' commented-block' : '';
+                const eidAttr = `data-eid="${el.id}"`;
+                switch (el.type) {
+                    case 'heading': {
+                        const lvl = Math.min(el.level || 1, 6);
+                        bodyHtml += `<h${lvl} ${eidAttr} class="${commentClass}">${el.htmlContent}</h${lvl}>\n`;
+                        break;
+                    }
+                    case 'table':
+                        bodyHtml += `<div ${eidAttr} class="table-wrapper${commentClass}">${el.htmlContent}</div>\n`;
+                        break;
+                    case 'list-item': {
+                        const indent = (el.level || 0) * 24 + 24;
+                        bodyHtml += `<div ${eidAttr} class="list-item${commentClass}" style="padding-left:${indent}px">• ${el.htmlContent}</div>\n`;
+                        break;
+                    }
+                    case 'code-block':
+                        bodyHtml += `<pre ${eidAttr} class="code-block${commentClass}"><code>${el.htmlContent}</code></pre>\n`;
+                        break;
+                    default:
+                        if (!el.content.trim() && !el.htmlContent.trim()) {
+                            bodyHtml += `<p ${eidAttr} class="empty-para">&nbsp;</p>\n`;
+                        } else {
+                            bodyHtml += `<p ${eidAttr} class="${commentClass}">${el.htmlContent}</p>\n`;
+                        }
+                }
+            }
+
+            // Merge review comments from sidecar
+            const comments = this.commentsManager.getComments();
+
+            this.panel.webview.html = this.getHtml(bodyHtml, blocks, comments);
+            this.lastRenderTime = Date.now();
+            log(`Docx preview rendered: ${this.docxModel.elements.length} elements, ${this.docxModel.comments.length} Word comments`);
+        } catch (e: any) {
+            logError('Failed to render docx', e);
+            this.panel.webview.html = `<html><body><h1>Error loading document</h1><pre>${e.message}\n${e.stack}</pre></body></html>`;
+        }
     }
 
     /** Rewrite relative image src paths to data URIs or webview URIs */
@@ -924,8 +1085,23 @@ img { max-width: 100%; }
     var vscode = acquireVsCodeApi();
     var blocks = ${blocksJson};
     var comments = ${commentsJson};
-    var pendingBlock = null;   // {startOffset, endOffset, blockType, blockPreview}
+    var docMode = '${this.isDocx ? 'docx' : 'markdown'}';
+    var pendingBlock = null;   // {startOffset, endOffset, blockType, blockPreview, eid}
     var panelVisible = false;
+
+    // ========== element finder (supports both offset and eid modes) ==========
+    function findElement(block) {
+        if (block.eid) {
+            return document.querySelector('[data-eid="' + block.eid + '"]');
+        }
+        return document.querySelector('[data-start-offset="' + block.startOffset + '"]');
+    }
+    function findCommentElement(c) {
+        if (c.elementId) {
+            return document.querySelector('[data-eid="' + c.elementId + '"]');
+        }
+        return document.querySelector('[data-start-offset="' + c.startOffset + '"]');
+    }
 
     // ========== gutter "+" buttons ==========
     function placeGutterButtons() {
@@ -933,7 +1109,7 @@ img { max-width: 100%; }
         var content = document.getElementById('content');
         gutter.innerHTML = '';
         blocks.forEach(function(block) {
-            var el = content.querySelector('[data-start-offset="' + block.startOffset + '"]');
+            var el = findElement(block);
             if (!el) return;
             var rect = el.getBoundingClientRect();
             var btn = document.createElement('button');
@@ -947,7 +1123,8 @@ img { max-width: 100%; }
                     startOffset: block.startOffset,
                     endOffset: block.endOffset,
                     blockType: block.type,
-                    blockPreview: block.preview
+                    blockPreview: block.preview,
+                    eid: block.eid || null
                 };
                 showDialog(block.preview);
             });
@@ -973,7 +1150,7 @@ img { max-width: 100%; }
         var content = document.getElementById('content');
         comments.forEach(function(c) {
             if (c.resolved) return;
-            var el = content.querySelector('[data-start-offset="' + c.startOffset + '"]');
+            var el = findCommentElement(c);
             if (!el) return;
             el.classList.add('commented-block');
             el.setAttribute('data-comment-id', c.id);
@@ -1067,12 +1244,12 @@ img { max-width: 100%; }
             endOffset: pendingBlock.endOffset,
             blockType: pendingBlock.blockType,
             blockPreview: pendingBlock.blockPreview,
-            comment: text
+            comment: text,
+            eid: pendingBlock.eid || null
         });
         hideDialog();
         // optimistic UI: highlight immediately
-        var content = document.getElementById('content');
-        var el = content.querySelector('[data-start-offset="' + pendingBlock.startOffset + '"]');
+        var el = findElement(pendingBlock);
         if (el) { el.classList.add('commented-block'); }
     };
     document.getElementById('dlg-input').addEventListener('keydown', function(e) {
@@ -1089,11 +1266,11 @@ img { max-width: 100%; }
             endOffset: pendingBlock.endOffset,
             blockType: pendingBlock.blockType,
             blockPreview: pendingBlock.blockPreview,
-            comment: text
+            comment: text,
+            eid: pendingBlock.eid || null
         });
         hideDialog();
-        var content = document.getElementById('content');
-        var el = content.querySelector('[data-start-offset="' + pendingBlock.startOffset + '"]');
+        var el = findElement(pendingBlock);
         if (el) { el.classList.add('commented-block'); }
     };
     window.askCopilotThread = function(id) {
@@ -1125,7 +1302,7 @@ img { max-width: 100%; }
         var bestDist = Infinity;
         var content = document.getElementById('content');
         blocks.forEach(function(b) {
-            var el = content.querySelector('[data-start-offset="' + b.startOffset + '"]');
+            var el = findElement(b);
             if (!el) return;
             var rect = el.getBoundingClientRect();
             var dist = Math.abs(rect.top);
@@ -1286,8 +1463,7 @@ img { max-width: 100%; }
                 '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
                 '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button></div>';
             div.addEventListener('click', function() {
-                var content = document.getElementById('content');
-                var el = content.querySelector('[data-start-offset="' + c.startOffset + '"]');
+                var el = findCommentElement(c);
                 if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
             });
             container.appendChild(div);
@@ -1346,8 +1522,7 @@ img { max-width: 100%; }
                 if (pop.style.display === 'block') {
                     var updatedComment = comments.find(function(x) { return x.id === msg.comment.id; });
                     if (updatedComment) {
-                        var content = document.getElementById('content');
-                        var anchorEl = content.querySelector('[data-start-offset="' + updatedComment.startOffset + '"]');
+                        var anchorEl = findCommentElement(updatedComment);
                         if (anchorEl) { showPopover(updatedComment, anchorEl); }
                     }
                 }
@@ -1356,8 +1531,7 @@ img { max-width: 100%; }
             case 'openPopover': {
                 var oc = comments.find(function(x) { return x.id === msg.commentId; });
                 if (oc) {
-                    var ocContent = document.getElementById('content');
-                    var ocAnchor = ocContent.querySelector('[data-start-offset="' + oc.startOffset + '"]');
+                    var ocAnchor = findCommentElement(oc);
                     if (ocAnchor) { showPopover(oc, ocAnchor); }
                 }
                 break;
@@ -1418,8 +1592,7 @@ img { max-width: 100%; }
                 if (dist < bestDist) { bestDist = dist; best = b; }
             });
             if (best) {
-                var content = document.getElementById('content');
-                var el = content.querySelector('[data-start-offset=\"' + best.startOffset + '\"]');
+                var el = findElement(best);
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     // Brief highlight flash

@@ -1,0 +1,57 @@
+{
+  "file": ".WORD_INTEGRATION_PLAN.md",
+  "comments": [
+    {
+      "id": "c1775256960095",
+      "anchor": "<!--@c1775256960095-->",
+      "startOffset": 906,
+      "endOffset": 990,
+      "blockType": "paragraph",
+      "blockPreview": "**No in-document anchors** — comments reference element IDs in the sidecar JSON ",
+      "comment": "what are stored in the json? How do we make sure if there are changes in the doc, the comment can still be mapped to the correct place?",
+      "role": "user",
+      "timestamp": "2026-04-03T22:56:00.095Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1775257143098",
+          "role": "agent",
+          "text": "Great question — this is the most important design decision for Word support. Here's the plan:\n\n**What's stored in the JSON:**\n```json\n{\n  \"id\": \"c1775256960095\",\n  \"elementId\": \"p42\",\n  \"contentHash\": \"a1b2c3d4\",\n  \"blockType\": \"paragraph\",\n  \"blockPreview\": \"The system uses a React SPA with AAD...\",\n  \"comment\": \"Consider adding error handling here\",\n  \"role\": \"user\",\n  \"timestamp\": \"2026-04-03T...\",\n  \"resolved\": false,\n  \"replies\": []\n}\n```\n\nThe key fields for mapping are `elementId` (structural position) + `contentHash` (content fingerprint) + `blockPreview` (human-readable fallback).\n\n**How we ensure correct mapping after doc changes:**\n\nThree-tier resilience strategy:\n\n1. **Primary: Element index matching** — `p42` means \"42nd paragraph in document.xml\". If the doc hasn't been restructured, this maps directly. Fast, O(1).\n\n2. **Secondary: Content hash matching** — If the element at index 42 has different content (paragraphs were inserted/deleted above), we compute a hash of each paragraph's text and find the one matching `contentHash`. This handles insertions/deletions elsewhere in the doc. O(n) scan but reliable.\n\n3. **Tertiary: Fuzzy preview matching** — If the paragraph text itself was edited (so hash doesn't match), we use `blockPreview` to find the closest match via substring/edit-distance comparison. This handles minor text edits to the commented paragraph.\n\n**When reconciliation happens:**\n- Every time the .docx is opened for preview, we re-parse and reconcile all comment mappings\n- If any comment's elementId shifted, we update the sidecar JSON with the new mapping\n- If a comment can't be matched at all (paragraph was deleted), we flag it as \"orphaned\" in the sidebar\n\nThis is similar to how git handles merge conflicts — most of the time structural position works, content hash catches drift, and fuzzy matching catches edits.",
+          "timestamp": "2026-04-03T22:59:03.098Z"
+        }
+      ]
+    },
+    {
+      "id": "c1775257105079",
+      "anchor": "<!--@c1775257105079-->",
+      "startOffset": 6042,
+      "endOffset": 4426,
+      "blockType": "listItem",
+      "blockPreview": "- Comments have: `id`, `elementId` (e.g., \"p42\"), `blockType`, `blockPreview`",
+      "comment": "how will you handle the existing comments in the word? Will they be handled differently from the word added during the self review? How do you handle them when you convert the doc back to docx?",
+      "role": "user",
+      "timestamp": "2026-04-03T22:58:25.079Z",
+      "resolved": false,
+      "replies": [
+        {
+          "id": "r1775257199746",
+          "role": "agent",
+          "text": "Great question — there are actually **two separate comment systems** that need to coexist. Here's the design:\n\n## Two Layers of Comments\n\n### Layer 1: Word Native Comments (from comments.xml inside the .docx)\n- **Source**: Parsed from `word/comments.xml` when we unzip the .docx\n- **Display**: Shown in the sidebar with a distinct style (e.g., blue left border, Word icon, author name from the original doc)\n- **Behavior**: **Read-only in Phase 1** — you can see them but not modify them from VS Code\n- **Phase 2 (write-back)**: When we implement the re-zip flow, we could optionally:\n  - Write new replies back into `comments.xml` as new `<w:comment>` entries (with your name as author)\n  - This would make them visible to other Word users when they open the .docx\n  - Comment range markers (`commentRangeStart/End`) in `document.xml` stay untouched\n\n### Layer 2: Review Comments (sidecar .comments.json)\n- **Source**: The same sidecar JSON system as markdown-review\n- **Display**: Shown in sidebar with yellow left border (same as current markdown comments)\n- **Behavior**: Full CRUD — add, reply, edit, resolve, delete, Ask Copilot\n- **Storage**: `.filename.docx.comments.json` next to the .docx file\n- **The .docx file is NEVER modified** for these — they're external annotations\n\n## How They Appear in the UI\n\n```\nSidebar:\n┌─────────────────────────────┐\n│ 💬 Review Comments          │\n│ ┌─────────────────────────┐ │\n│ │ 🟡 [You] \"Add error     │ │  ← Review comment (sidecar)\n│ │    handling here\"        │ │\n│ │    [Reply] [Resolve]     │ │\n│ └─────────────────────────┘ │\n│                             │\n│ 📎 Word Comments            │\n│ ┌─────────────────────────┐ │\n│ │ 🔵 [Alice] \"Is this     │ │  ← Word native comment (read-only)\n│ │    global?\"              │ │\n│ │    Mar 15, 2026          │ │\n│ └─────────────────────────┘ │\n└─────────────────────────────┘\n```\n\n## When Converting Back to .docx\n\n- **Word native comments**: Untouched. They stay exactly as they were in `comments.xml`. We never modify `commentRangeStart/End` markers in `document.xml`.\n- **Review comments**: Two options (user chooses):\n  1. **Keep as sidecar only** (default) — the .docx has no trace of review comments. They live in the `.comments.json` file for VS Code use.\n  2. **Inject into Word** (Phase 2 opt-in) — convert review comments into Word native comments: add entries to `comments.xml`, add `commentRangeStart/End` markers around the target paragraph in `document.xml`. This makes them visible to Word users.\n\nThis separation ensures we never accidentally damage existing Word comments while giving full review functionality in VS Code.",
+          "timestamp": "2026-04-03T22:59:59.746Z"
+        },
+        {
+          "id": "r1775257406875",
+          "role": "user",
+          "text": "FOr `Review Comments (sidecar .comments.json)`, how do you ensure they can be anchored and positioned correctly with files updated? Are we still doing extra anchor in the doc or some other ways?",
+          "timestamp": "2026-04-03T23:03:26.875Z"
+        },
+        {
+          "id": "r1775257461526",
+          "role": "agent",
+          "text": "No extra anchors in the .docx — that's the key difference from markdown. Here's exactly how positioning works:\n\n## Anchoring Strategy for Word Review Comments\n\n**No in-document modification.** The .docx file stays completely untouched. Instead, we store enough information in the sidecar JSON to re-locate the target paragraph each time the doc is opened.\n\n### What's stored per comment in the JSON:\n\n```json\n{\n  \"elementId\": \"p42\",              // structural index (42nd paragraph)\n  \"contentHash\": \"sha256:a1b2c3\",  // hash of the paragraph's plain text\n  \"blockPreview\": \"The system uses a React SPA with AAD authentication...\",\n  \"blockType\": \"paragraph\",\n  \"neighborContext\": {             // surrounding paragraphs for extra resilience\n    \"before\": \"2.1 Architecture\",\n    \"after\": \"The frontend is built with...\"\n  }\n}\n```\n\n### Reconciliation on each open (3-tier matching):\n\n**Tier 1 — Index match (fast, O(1))**\nWhen we re-parse the .docx, check if paragraph #42 still has the same `contentHash`. If yes → exact match, done.\n\n**Tier 2 — Hash scan (handles insertions/deletions)**\nIf paragraph #42 has different content (someone added paragraphs above), scan all paragraphs for matching `contentHash`. This catches the case where the commented paragraph moved but its text is unchanged. Update `elementId` in the JSON to the new index.\n\n**Tier 3 — Fuzzy match (handles text edits)**\nIf the text was also edited (hash doesn't match anywhere), use `blockPreview` + `neighborContext` to find the best candidate:\n- Substring match on `blockPreview`\n- Check if `neighborContext.before` and `neighborContext.after` match the surrounding paragraphs\n- This handles the case: \"someone edited the paragraph I commented on AND moved it\"\n\n**Tier 4 — Orphaned**\nIf nothing matches → mark the comment as \"orphaned\" in the sidebar with a warning icon. The user can manually re-anchor it or delete it.\n\n### Why this works better than anchors for Word:\n\n1. **Anchors modify the source file** — for markdown that's fine (HTML comments are invisible), but for .docx it would require unzipping, modifying XML, and rezipping every time a comment is added. That risks corrupting the document.\n\n2. **Content hashing is reliable** — Word paragraphs tend to be stable units. People rarely split a paragraph into two or merge two into one. So the hash match rate should be >95% in practice.\n\n3. **The reconciliation runs once on open** — it's not continuous. When you open the doc for review, we parse + reconcile + update the JSON with any shifted indices. Subsequent operations use the corrected indices directly.",
+          "timestamp": "2026-04-03T23:04:21.526Z"
+        }
+      ]
+    }
+  ]
+}
