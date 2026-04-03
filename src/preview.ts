@@ -416,6 +416,7 @@ export class PreviewPanel {
     private buildBatchPrompt(comments: any[]): string {
         const fileName = path.basename(this.document.uri.fsPath);
         const filePath = this.document.uri.fsPath;
+        const toolPrefix = this.isCursor() ? '' : '#';
         const parts: string[] = [];
         parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
         for (const c of comments) {
@@ -425,7 +426,10 @@ export class PreviewPanel {
             }
             parts.push(entry);
         }
-        parts.push(`\nPlease review and respond to each open comment above.`);
+        parts.push(`\nPlease review and respond to each open comment above. For each comment:\n` +
+            `1. Use ${toolPrefix}readReviewComment (with commentId and filePath="${filePath}") to get the full context\n` +
+            `2. Use ${toolPrefix}replyToReviewComment (with commentId, text, and filePath="${filePath}") to post your response\n` +
+            `3. Use ${toolPrefix}resolveReviewComment (with commentId and filePath="${filePath}") to mark it resolved after addressing it`);
         return parts.join('\n');
     }
 
