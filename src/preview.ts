@@ -501,6 +501,9 @@ export class PreviewPanel {
                 `1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs\n` +
                 `2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")\n` +
                 `3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments from other reviewers\n\n` +
+                `To edit this element: use ${toolPrefix}readElementXml(elementId="${comment.elementId || 'unknown'}") to see its XML, ` +
+                `then ${toolPrefix}writeElementXml to replace it, then ${toolPrefix}saveDocument to save.\n` +
+                `In the XML, find the <w:p> tag with w14:paraId="${comment.elementId || 'unknown'}" — that's the target element.\n\n` +
                 `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to get the full context, ` +
                 `then address the comment by making the requested change and using ${toolPrefix}replyToReviewComment to explain what you changed.`;
         } else {
@@ -540,6 +543,9 @@ export class PreviewPanel {
                 `1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs\n` +
                 `2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")\n` +
                 `3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments\n\n` +
+                `To edit this element: use ${toolPrefix}readElementXml(elementId="${comment.elementId || 'unknown'}") to see its XML, ` +
+                `then ${toolPrefix}writeElementXml to replace it, then ${toolPrefix}saveDocument to save.\n` +
+                `In the XML, find the <w:p> tag with w14:paraId="${comment.elementId || 'unknown'}" — that's the target element.\n\n` +
                 `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to understand the comment, ` +
                 `then make the requested changes and use ${toolPrefix}replyToReviewComment to explain what you did.`;
         } else {

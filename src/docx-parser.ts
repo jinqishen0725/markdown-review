@@ -129,6 +129,7 @@ function parseBody(
     const elements: DocElement[] = [];
     let elementCount = 0;
     const activeCommentIds = new Set<string>();
+    const W14 = 'http://schemas.microsoft.com/office/word/2010/wordml';
 
     for (let i = 0; i < body.childNodes.length; i++) {
         const node = body.childNodes[i];
@@ -137,7 +138,11 @@ function parseBody(
 
         if (tag === 'p') {
             elementCount++;
-            const el = parseParagraph(node, `p${elementCount}`, rels, media, activeCommentIds, commentAnchors);
+            // Use w14:paraId if available, otherwise fall back to sequential index
+            const paraId = node.getAttributeNS?.(W14, 'paraId') 
+                || node.getAttribute?.('w14:paraId') 
+                || `p${elementCount}`;
+            const el = parseParagraph(node, paraId, rels, media, activeCommentIds, commentAnchors);
             if (el) elements.push(el);
         } else if (tag === 'tbl') {
             elementCount++;
