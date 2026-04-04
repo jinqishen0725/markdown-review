@@ -491,7 +491,7 @@ export class PreviewPanel {
             const xmlInfo = this.docxModel?.documentXmlPath ? `\nThe extracted document.xml is at: ${this.docxModel.documentXmlPath}` : '';
             prompt = `I'm reviewing a Word document "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
-                `- On element: "${comment.blockPreview || '(unknown)'}"\n\n` +
+                `- On element (paraId=${comment.elementId || 'unknown'}): "${comment.blockPreview || '(unknown)'}"\n\n` +
                 `This is a Word (.docx) document stored as XML. You have these tools available:\n` +
                 `- ${toolPrefix}readElementXml — read the raw XML of a specific element to understand its structure\n` +
                 `- ${toolPrefix}writeElementXml — replace an element's XML to make changes (for single-element edits)\n` +
@@ -528,7 +528,7 @@ export class PreviewPanel {
             const xmlInfo = this.docxModel?.documentXmlPath ? `\nThe extracted document.xml is at: ${this.docxModel.documentXmlPath}` : '';
             prompt = `I'm reviewing a Word document "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
-                `- On element: "${comment.blockPreview || '(unknown)'}"\n` +
+                `- On element (paraId=${comment.elementId || 'unknown'}): "${comment.blockPreview || '(unknown)'}"\n` +
                 `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
                 repliesText + '\n\n' +
                 `This is a Word (.docx) document stored as XML. You have these tools:\n` +
@@ -577,7 +577,8 @@ export class PreviewPanel {
         }
 
         for (const c of comments) {
-            let entry = `- Comment #${c.id} [${c.resolved ? 'RESOLVED' : 'OPEN'}]: "${c.comment}"\n  Block: "${c.blockPreview || '(unknown)'}"`;
+            const eidInfo = c.elementId ? ` (paraId=${c.elementId})` : '';
+            let entry = `- Comment #${c.id} [${c.resolved ? 'RESOLVED' : 'OPEN'}]${eidInfo}: "${c.comment}"\n  Block: "${c.blockPreview || '(unknown)'}"`;
             if (c.replies && c.replies.length > 0) {
                 entry += '\n  Replies:\n' + c.replies.map((r: any) => `    [${r.role || 'user'}] ${r.text}`).join('\n');
             }
