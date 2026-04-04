@@ -91,6 +91,8 @@ export class PreviewPanel {
     public isDocx: boolean = false;
     private docxPath: string = '';
     private docxModel: any = null; // DocumentModel from docx-parser
+    private docxXmlWatcher: ReturnType<typeof import('fs').watch> | null = null;
+    private docxXmlDebounce: ReturnType<typeof setTimeout> | null = null;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -869,6 +871,9 @@ export class PreviewPanel {
             this.panel.webview.html = this.getHtml(bodyHtml, blocks, comments);
             this.lastRenderTime = Date.now();
             log(`Docx preview rendered: ${this.docxModel.elements.length} elements, ${this.docxModel.comments.length} Word comments`);
+
+            // Watch the extracted document.xml for direct agent edits
+            this.setupDocxXmlWatcher();
         } catch (e: any) {
             logError('Failed to render docx', e);
             this.panel.webview.html = `<html><body><h1>Error loading document</h1><pre>${e.message}\n${e.stack}</pre></body></html>`;
@@ -2126,9 +2131,43 @@ mermaid.run({ querySelector: '.mermaid' });
         if (this.commentsDebounceTimer) {
             clearTimeout(this.commentsDebounceTimer);
         }
+        if (this.docxXmlWatcher) {
+            this.docxXmlWatcher.close();
+            this.docxXmlWatcher = null;
+        }
+        if (this.docxXmlDebounce) {
+            clearTimeout(this.docxXmlDebounce);
+        }
         this.panel.dispose();
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
+    }
+
+    /** Watch extracted document.xml for direct agent edits and refresh preview */
+    private setupDocxXmlWatcher() {
+        if (!this.isDocx || !this.docxModel?.documentXmlPath) return;
+        // Close existing watcher if any (avoid duplicate watchers on re-render)
+        if (this.docxXmlWatcher) {
+            this.docxXmlWatcher.close();
+            this.docxXmlWatcher = null;
+        }
+        const fsModule = require('fs');
+        const xmlPath = this.docxModel.documentXmlPath;
+        try {
+            this.docxXmlWatcher = fsModule.watch(xmlPath, () => {
+                // Debounce — agent may write multiple times quickly
+                if (this.docxXmlDebounce) clearTimeout(this.docxXmlDebounce);
+                this.docxXmlDebounce = setTimeout(() => {
+                    this.docxXmlDebounce = null;
+                    // Skip if we just rendered (avoid loop with writeElementXml)
+                    if (Date.now() - this.lastRenderTime < 1000) return;
+                    log(`[Docx] document.xml changed externally — re-parsing and refreshing preview`);
+                    this.updateDocxContent();
+                }, 1500);
+            });
+        } catch {
+            // File may not exist yet — that's OK
+        }
     }
 
     /** Watch .comments.json for external changes and update webview */

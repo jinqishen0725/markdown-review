@@ -66,18 +66,17 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
         if (eid) c.elementId = eid;
     }
 
-    // Extract document.xml to temp dir for direct agent editing
-    const os = require('os');
-    const crypto = require('crypto');
-    const hash = crypto.createHash('md5').update(filePath).digest('hex').substring(0, 8);
-    const tempDir = path.join(os.tmpdir(), `docx-review-${hash}`);
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-    const docXmlPath = path.join(tempDir, 'document.xml');
+    // Extract document.xml to a folder next to the original .docx for direct agent editing
+    const docDir = path.dirname(filePath);
+    const docBase = path.basename(filePath, path.extname(filePath));
+    const extractDir = path.join(docDir, `.${docBase}_xml`);
+    if (!fs.existsSync(extractDir)) fs.mkdirSync(extractDir, { recursive: true });
+    const docXmlPath = path.join(extractDir, 'document.xml');
     fs.writeFileSync(docXmlPath, docXmlStr, 'utf-8');
 
     // Also extract comments.xml if it exists
     if (commentsXmlStr) {
-        fs.writeFileSync(path.join(tempDir, 'comments.xml'), commentsXmlStr, 'utf-8');
+        fs.writeFileSync(path.join(extractDir, 'comments.xml'), commentsXmlStr, 'utf-8');
     }
 
     return {
@@ -88,7 +87,7 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
         relationships,
         media,
         rawZip: zip,
-        tempDir,
+        tempDir: extractDir,
         documentXmlPath: docXmlPath,
     };
 }
