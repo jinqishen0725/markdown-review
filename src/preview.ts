@@ -93,6 +93,7 @@ export class PreviewPanel {
     private docxModel: any = null; // DocumentModel from docx-parser
     private docxXmlWatcher: ReturnType<typeof import('fs').watch> | null = null;
     private docxXmlDebounce: ReturnType<typeof setTimeout> | null = null;
+    private docxXmlExtractTime: number = 0; // timestamp when XML was first extracted
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -783,8 +784,30 @@ export class PreviewPanel {
     private async updateDocxContent() {
         if (!this.isDocx || !this.docxPath) return;
         try {
-            const { parseDocx } = require('./docx-parser');
-            this.docxModel = await parseDocx(this.docxPath);
+            const { parseDocx, reparseFromExtractedXml } = require('./docx-parser');
+
+            if (!this.docxModel) {
+                // First load — parse from the original .docx
+                this.docxModel = await parseDocx(this.docxPath);
+                this.docxXmlExtractTime = Date.now();
+
+                // Warn if agent edits were overwritten because .docx was newer
+                if (this.docxModel.xmlWasOverwritten) {
+                    vscode.window.showWarningMessage(
+                        'The .docx file was modified since last review. The extracted XML has been refreshed — any previous agent edits to document.xml were overwritten.',
+                        'Open XML File'
+                    ).then(choice => {
+                        if (choice === 'Open XML File' && this.docxModel?.documentXmlPath) {
+                            vscode.workspace.openTextDocument(this.docxModel.documentXmlPath).then(doc => {
+                                vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+                            });
+                        }
+                    });
+                }
+            } else if (this.docxModel.documentXmlPath) {
+                // Subsequent loads — re-parse from the extracted (possibly edited) document.xml
+                this.docxModel = await reparseFromExtractedXml(this.docxModel);
+            }
 
             // Build blocks from parsed elements
             const blocks: Block[] = this.docxModel.elements.map((el: any) => ({
@@ -2121,6 +2144,48 @@ mermaid.run({ querySelector: '.mermaid' });
     }
 
     private dispose() {
+        // Check for unsaved XML edits before closing (Word mode only)
+        if (this.isDocx && this.docxModel?.documentXmlPath) {
+            try {
+                const fsModule = require('fs');
+                if (fsModule.existsSync(this.docxModel.documentXmlPath)) {
+                    const xmlMtime = fsModule.statSync(this.docxModel.documentXmlPath).mtimeMs;
+                    if (xmlMtime > this.docxXmlExtractTime) {
+                        // XML was modified after extraction — warn about unsaved edits
+                        vscode.window.showWarningMessage(
+                            'The extracted document.xml has been modified. If you haven\'t saved, your edits may be lost when this preview is reopened.',
+                            'Save Document Now',
+                            'Open XML File'
+                        ).then(async choice => {
+                            if (choice === 'Save Document Now') {
+                                try {
+                                    const { saveDocx } = require('./docx-parser');
+                                    const ext = path.extname(this.docxPath);
+                                    const defaultPath = this.docxPath.slice(0, -ext.length) + '_reviewed' + ext;
+                                    const saveUri = await vscode.window.showSaveDialog({
+                                        defaultUri: vscode.Uri.file(defaultPath),
+                                        filters: { 'Word Documents': ['docx'] },
+                                    });
+                                    if (saveUri) {
+                                        await saveDocx(this.docxModel, saveUri.fsPath);
+                                        vscode.window.showInformationMessage(`Saved to: ${path.basename(saveUri.fsPath)}`);
+                                    }
+                                } catch (e: any) {
+                                    vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
+                                }
+                            } else if (choice === 'Open XML File') {
+                                vscode.workspace.openTextDocument(this.docxModel.documentXmlPath).then(doc => {
+                                    vscode.window.showTextDocument(doc);
+                                });
+                            }
+                        });
+                    }
+                }
+            } catch {
+                // Don't block dispose on errors
+            }
+        }
+
         // Remove from currentPanels using the correct key
         const key = this.isDocx ? this.docxPath : this.document.uri.fsPath;
         PreviewPanel.currentPanels.delete(key);

@@ -73,13 +73,28 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
     if (!fs.existsSync(extractDir)) fs.mkdirSync(extractDir, { recursive: true });
     const docXmlPath = path.join(extractDir, 'document.xml');
 
-    // Pretty-print the XML so agents can read and edit individual elements on separate lines
-    // This adds newlines between tags but preserves content inside <w:t> elements
-    const formattedXml = formatXml(docXmlStr);
-    fs.writeFileSync(docXmlPath, formattedXml, 'utf-8');
+    // Check if extracted XML already exists (may contain agent edits)
+    let xmlWasOverwritten = false;
+    if (fs.existsSync(docXmlPath)) {
+        // Compare .docx modification time vs extracted XML modification time
+        const docxMtime = fs.statSync(filePath).mtimeMs;
+        const xmlMtime = fs.statSync(docXmlPath).mtimeMs;
+        if (docxMtime > xmlMtime) {
+            // .docx is newer — the original doc was edited externally (e.g., in Word)
+            // Re-extract and overwrite
+            const formattedXml = formatXml(docXmlStr);
+            fs.writeFileSync(docXmlPath, formattedXml, 'utf-8');
+            xmlWasOverwritten = true;
+        }
+        // else: extracted XML is newer or same — preserve it (may have agent edits)
+    } else {
+        // First extraction — write formatted XML
+        const formattedXml = formatXml(docXmlStr);
+        fs.writeFileSync(docXmlPath, formattedXml, 'utf-8');
+    }
 
     // Also extract comments.xml if it exists
-    if (commentsXmlStr) {
+    if (commentsXmlStr && !fs.existsSync(path.join(extractDir, 'comments.xml'))) {
         fs.writeFileSync(path.join(extractDir, 'comments.xml'), formatXml(commentsXmlStr), 'utf-8');
     }
 
@@ -93,6 +108,7 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
         rawZip: zip,
         tempDir: extractDir,
         documentXmlPath: docXmlPath,
+        xmlWasOverwritten,
     };
 }
 
@@ -441,6 +457,38 @@ function getDirectChildren(parent: any, ns: string, localName: string): any[] {
         if (c.nodeType === 1 && c.localName === localName && c.namespaceURI === ns) result.push(c);
     }
     return result;
+}
+
+// ---------- Re-parse from extracted XML ----------
+
+/**
+ * Re-parse the document model from the extracted (possibly agent-edited) document.xml.
+ * Preserves the ZIP, relationships, media, and comments from the original parse.
+ * Only re-parses the body elements from the extracted XML file.
+ */
+export async function reparseFromExtractedXml(model: DocumentModel): Promise<DocumentModel> {
+    if (!model.documentXmlPath || !fs.existsSync(model.documentXmlPath)) {
+        throw new Error('Extracted document.xml not found for re-parse.');
+    }
+
+    const docXmlStr = fs.readFileSync(model.documentXmlPath, 'utf-8');
+    const docXml = new DOMParser().parseFromString(docXmlStr, 'text/xml');
+    const body = docXml.getElementsByTagNameNS(W, 'body')[0];
+    if (!body) throw new Error('No w:body found in extracted document.xml');
+
+    const commentAnchors = new Map<string, string>();
+    const elements = parseBody(body, model.relationships, model.media, model.comments, commentAnchors);
+
+    // Re-assign elementIds to comments
+    for (const c of model.comments) {
+        const eid = commentAnchors.get(c.id);
+        if (eid) c.elementId = eid;
+    }
+
+    return {
+        ...model,
+        elements,
+    };
 }
 
 // ---------- Save / Export ----------

@@ -36,6 +36,7 @@ export interface DocumentModel {
     rawZip: any; // JSZip instance for write-back
     tempDir?: string; // temp directory with extracted XML files for direct editing
     documentXmlPath?: string; // path to extracted document.xml for direct agent editing
+    xmlWasOverwritten?: boolean; // true if extracted XML was overwritten because .docx was newer
 }
 
 export interface ReviewComment {
