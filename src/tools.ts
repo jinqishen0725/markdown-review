@@ -346,8 +346,11 @@ export class ReadElementXmlTool implements vscode.LanguageModelTool<IReadElement
             `Plain text: "${element.content}"\n\n` +
             `Raw XML:\n\`\`\`xml\n${match ? match[0] : '(XML not found — element may be a table or non-paragraph)'}\n\`\`\`\n\n` +
             `Document XML file location: ${docXmlPath}\n` +
-            `You can edit this file directly for complex changes. ` +
-            `WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> elements — those are existing Word comments from other reviewers.`;
+            `You can edit this file directly for complex changes.\n\n` +
+            `XML EDITING RULES:\n` +
+            `1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs\n` +
+            `2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")\n` +
+            `3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments from other reviewers`;
 
         return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart(result)
@@ -406,8 +409,20 @@ export class WriteElementXmlTool implements vscode.LanguageModelTool<IWriteEleme
             ]);
         }
 
-        const oldText = model.elements.find((e: any) => e.id === options.input.elementId)?.content || '';
-        docXml = docXml.replace(match[0], options.input.newXml);
+        // Ensure replacement XML preserves the original paraId
+        let newXml = options.input.newXml;
+        const eid = options.input.elementId;
+        if (!newXml.includes(`w14:paraId="${eid}"`)) {
+            // Try to inject paraId into the <w:p> tag
+            if (newXml.startsWith('<w:p ')) {
+                newXml = newXml.replace('<w:p ', `<w:p w14:paraId="${eid}" w14:textId="77777777" `);
+            } else if (newXml.startsWith('<w:p>')) {
+                newXml = newXml.replace('<w:p>', `<w:p w14:paraId="${eid}" w14:textId="77777777">`);
+            }
+        }
+
+        const oldText = model.elements.find((e: any) => e.id === eid)?.content || '';
+        docXml = docXml.replace(match[0], newXml);
         fs.writeFileSync(docXmlPath, docXml, 'utf-8');
 
         // Refresh the preview

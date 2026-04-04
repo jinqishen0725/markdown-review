@@ -96,6 +96,7 @@ export class PreviewPanel {
         panel: vscode.WebviewPanel,
         document: vscode.TextDocument,
         extensionUri: vscode.Uri,
+        skipInitialRender: boolean = false,
     ) {
         this.panel = panel;
         this.document = document;
@@ -103,7 +104,11 @@ export class PreviewPanel {
         this.commentsManager = new CommentsManager(document.uri.fsPath);
 
         this.panel.webview.options = { enableScripts: true };
-        this.updateContent();
+
+        // Skip initial render for docx — caller will call updateDocxContent() after setting isDocx
+        if (!skipInitialRender) {
+            this.updateContent();
+        }
 
         this.panel.webview.onDidReceiveMessage(
             (msg) => this.handleMessage(msg),
@@ -111,13 +116,13 @@ export class PreviewPanel {
             this.disposables,
         );
 
-        // Debounced re-render on any text change (1s delay)
+        // Debounced re-render on any text change (1s delay) — skip for docx mode
         vscode.workspace.onDidChangeTextDocument(
             (e) => {
+                if (this.isDocx) return; // docx doesn't use TextDocument
                 if (e.document.uri.fsPath === this.document.uri.fsPath) {
                     if (this.debounceTimer) { clearTimeout(this.debounceTimer); }
                     this.debounceTimer = setTimeout(() => {
-                        // Skip if a render happened very recently (e.g., from comment operation)
                         if (Date.now() - this.lastRenderTime > 800) {
                             this.commentsManager.reload();
                             this.updateContent();
@@ -135,13 +140,13 @@ export class PreviewPanel {
         // Watch .comments.json for external changes (e.g., MCP server replies)
         this.setupCommentsFileWatcher();
 
-        // Source → Preview: scroll preview to match editor cursor
+        // Source → Preview: scroll preview to match editor cursor — skip for docx
         vscode.window.onDidChangeTextEditorSelection(
             (e) => {
+                if (this.isDocx) return;
                 if (e.textEditor.document.uri.fsPath !== this.document.uri.fsPath) { return; }
                 if (e.kind === vscode.TextEditorSelectionChangeKind.Command) { return; }
                 const cursorOffset = this.document.offsetAt(e.selections[0].active);
-                // Convert doc offset to clean offset
                 const text = this.document.getText();
                 const cleanOff = this.docOffsetToCleanOffset(text, cursorOffset);
                 this.panel.webview.postMessage({ command: 'scrollToOffset', cleanOffset: cleanOff });
@@ -202,7 +207,7 @@ export class PreviewPanel {
                 ],
             },
         );
-        const p = new PreviewPanel(panel, dummyDoc, context.extensionUri);
+        const p = new PreviewPanel(panel, dummyDoc, context.extensionUri, true /* skipInitialRender */);
         p.isDocx = true;
         p.docxPath = docxPath;
         p.commentsManager = new CommentsManager(docxPath);
@@ -492,7 +497,10 @@ export class PreviewPanel {
                 `- ${toolPrefix}writeElementXml — replace an element's XML to make changes (for single-element edits)\n` +
                 `- ${toolPrefix}saveDocument — save the modified document back to .docx\n` +
                 `For substantial multi-element edits, you can directly edit the XML file at the path returned by readElementXml.${xmlInfo}\n` +
-                `WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> elements — those are existing Word comments from other reviewers.\n\n` +
+                `XML EDITING RULES:\n` +
+                `1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs\n` +
+                `2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")\n` +
+                `3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments from other reviewers\n\n` +
                 `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to get the full context, ` +
                 `then address the comment by making the requested change and using ${toolPrefix}replyToReviewComment to explain what you changed.`;
         } else {
@@ -528,7 +536,10 @@ export class PreviewPanel {
                 `- ${toolPrefix}writeElementXml — replace an element's XML\n` +
                 `- ${toolPrefix}saveDocument — save changes back to .docx\n` +
                 `For substantial edits, you can directly edit the XML file.${xmlInfo}\n` +
-                `WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments.\n\n` +
+                `XML EDITING RULES:\n` +
+                `1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs\n` +
+                `2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")\n` +
+                `3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments\n\n` +
                 `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to understand the comment, ` +
                 `then make the requested changes and use ${toolPrefix}replyToReviewComment to explain what you did.`;
         } else {
@@ -557,7 +568,10 @@ export class PreviewPanel {
             parts.push(`- ${toolPrefix}writeElementXml — replace an element's XML to make changes`);
             parts.push(`- ${toolPrefix}saveDocument — save all changes back to .docx`);
             parts.push(`For substantial multi-element edits, you can directly edit the document.xml file.${xmlInfo}`);
-            parts.push(`WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments from other reviewers.\n`);
+            parts.push(`XML EDITING RULES:`);
+            parts.push(`1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs`);
+            parts.push(`2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")`);
+            parts.push(`3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments from other reviewers\n`);
         } else {
             parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
         }
@@ -707,7 +721,11 @@ export class PreviewPanel {
             this.debounceTimer = null;
         }
         this.commentsManager.reload();
-        this.updateContent();
+        if (this.isDocx) {
+            this.updateDocxContent();
+        } else {
+            this.updateContent();
+        }
     }
 
     private updateContent() {
@@ -797,8 +815,46 @@ export class PreviewPanel {
                 }
             }
 
-            // Merge review comments from sidecar
+            // Merge review comments from sidecar — reconcile elementIds
             const comments = this.commentsManager.getComments();
+            const elementIds = new Set(this.docxModel.elements.map((e: any) => e.id));
+            let reconciled = false;
+            for (const c of comments) {
+                if (!c.elementId) continue;
+                if (!elementIds.has(c.elementId)) {
+                    // Element ID not found — try contentHash fallback
+                    if (c.contentHash) {
+                        const hashMatch = this.docxModel.elements.find((e: any) => {
+                            const crypto = require('crypto');
+                            const h = crypto.createHash('sha256').update(e.content).digest('hex').substring(0, 16);
+                            return h === c.contentHash;
+                        });
+                        if (hashMatch) {
+                            log(`Comment ${c.id}: reconciled elementId ${c.elementId} → ${hashMatch.id} (hash match)`);
+                            c.elementId = hashMatch.id;
+                            reconciled = true;
+                            continue;
+                        }
+                    }
+                    // Try blockPreview fuzzy match
+                    if (c.blockPreview) {
+                        const preview = c.blockPreview.substring(0, 40);
+                        const fuzzyMatch = this.docxModel.elements.find((e: any) =>
+                            e.content.includes(preview)
+                        );
+                        if (fuzzyMatch) {
+                            log(`Comment ${c.id}: reconciled elementId ${c.elementId} → ${fuzzyMatch.id} (preview match)`);
+                            c.elementId = fuzzyMatch.id;
+                            reconciled = true;
+                            continue;
+                        }
+                    }
+                    log(`Comment ${c.id}: ORPHANED — element ${c.elementId} not found`);
+                }
+            }
+            if (reconciled) {
+                this.commentsManager.persist();
+            }
 
             this.panel.webview.html = this.getHtml(bodyHtml, blocks, comments);
             this.lastRenderTime = Date.now();
@@ -2092,7 +2148,11 @@ mermaid.run({ querySelector: '.mermaid' });
                     }
                     // Handle deleted comments — full re-render
                     if (newComments.length < oldComments.length) {
-                        this.updateContent();
+                        if (this.isDocx) {
+                            this.updateDocxContent();
+                        } else {
+                            this.updateContent();
+                        }
                     }
                 }, 500);
             });
@@ -2107,7 +2167,11 @@ mermaid.run({ querySelector: '.mermaid' });
                 this.commentsDebounceTimer = setTimeout(() => {
                     this.commentsDebounceTimer = null;
                     this.commentsManager.reload();
-                    this.updateContent();
+                    if (this.isDocx) {
+                        this.updateDocxContent();
+                    } else {
+                        this.updateContent();
+                    }
                 }, 500);
             });
         }
