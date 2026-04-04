@@ -78,7 +78,8 @@ export class ListCommentsTool implements vscode.LanguageModelTool<IListParams> {
         const summary = comments.map((c, i) => {
             const status = c.resolved ? 'RESOLVED' : 'OPEN';
             const replyCount = c.replies ? c.replies.length : 0;
-            return `${i + 1}. [${status}] id=${c.id} | ${c.blockType}: "${c.blockPreview.substring(0, 60)}" | "${c.comment.substring(0, 80)}" | ${replyCount} replies`;
+            const eidInfo = c.elementId ? ` | elementId=${c.elementId}` : '';
+            return `${i + 1}. [${status}] id=${c.id}${eidInfo} | ${c.blockType}: "${c.blockPreview.substring(0, 60)}" | "${c.comment.substring(0, 80)}" | ${replyCount} replies`;
         }).join('\n');
         return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart(`${comments.length} review comments on ${fileName} (${mdPath}):\n${summary}`)
@@ -114,11 +115,12 @@ export class ReadCommentTool implements vscode.LanguageModelTool<IReadCommentPar
                 `  ${i + 1}. [${r.role || 'user'}] "${r.text}" (${new Date(r.timestamp).toLocaleString()})`
             ).join('\n')
             : '\n\nNo replies.';
+        const eidLine = comment.elementId ? `\nElement ID (paraId): ${comment.elementId} — use this with readElementXml/writeElementXml to read or edit this element's XML` : '';
         const result =
             `Comment ${comment.id}:\n` +
             `Status: ${comment.resolved ? 'RESOLVED' : 'OPEN'}\n` +
             `Role: ${comment.role || 'user'}\n` +
-            `Block type: ${comment.blockType}\n` +
+            `Block type: ${comment.blockType}${eidLine}\n` +
             `Comment: "${comment.comment}"\n` +
             `Posted: ${new Date(comment.timestamp).toLocaleString()}` +
             repliesText +
