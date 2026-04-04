@@ -248,6 +248,14 @@ export class PreviewPanel {
                 return;
             }
             case 'resolveComment':
+                // Create sidecar entry for Word comments on first resolve
+                if (message.id.startsWith('word_') && !this.commentsManager.getComments().find((c: any) => c.id === message.id)) {
+                    const wc = this.docxModel?.comments?.find((w: any) => `word_${w.id}` === message.id);
+                    this.commentsManager.addDocxComment(wc?.elementId || '', 'paragraph', wc?.text?.substring(0, 60) || '', wc?.text || '');
+                    const added = this.commentsManager.getComments();
+                    added[added.length - 1].id = message.id;
+                    this.commentsManager.persist();
+                }
                 this.commentsManager.resolveComment(message.id);
                 this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
@@ -275,6 +283,22 @@ export class PreviewPanel {
                 this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
             case 'replyComment': {
+                // For Word comments (id starts with 'word_'), create a sidecar placeholder on first interaction
+                if (message.id.startsWith('word_') && !this.commentsManager.getComments().find((c: any) => c.id === message.id)) {
+                    // Find the Word comment data from the merged comments
+                    const wordComment = this.docxModel?.comments?.find((wc: any) => `word_${wc.id}` === message.id);
+                    this.commentsManager.addDocxComment(
+                        wordComment?.elementId || '',
+                        'paragraph',
+                        wordComment?.text?.substring(0, 60) || '',
+                        wordComment?.text || '(Word comment)',
+                    );
+                    // Fix the ID to match the word_ prefix
+                    const added = this.commentsManager.getComments();
+                    const last = added[added.length - 1];
+                    last.id = message.id;
+                    this.commentsManager.persist();
+                }
                 this.commentsManager.addReply(message.id, message.text);
                 this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
                 return;
@@ -891,7 +915,37 @@ export class PreviewPanel {
                 this.commentsManager.persist();
             }
 
-            this.panel.webview.html = this.getHtml(bodyHtml, blocks, comments);
+            // Merge Word native comments into the display list
+            // Convert WordComment → Comment-compatible shape with source='word'
+            const wordComments = (this.docxModel.comments || []).map((wc: any) => ({
+                id: `word_${wc.id}`,
+                anchor: '',
+                startOffset: 0,
+                endOffset: 0,
+                blockType: 'paragraph',
+                blockPreview: wc.text.substring(0, 60),
+                comment: wc.text,
+                role: 'user' as const,
+                timestamp: wc.date || new Date().toISOString(),
+                resolved: false,
+                elementId: wc.elementId,
+                replies: [],
+                _wordAuthor: wc.author,
+                _source: 'word',
+            }));
+
+            // Check for sidecar replies to Word comments
+            for (const wc of wordComments) {
+                const sidecar = comments.find((c: any) => c.id === wc.id);
+                if (sidecar && sidecar.replies) {
+                    wc.replies = sidecar.replies;
+                    wc.resolved = sidecar.resolved;
+                }
+            }
+
+            const allComments = [...comments, ...wordComments];
+
+            this.panel.webview.html = this.getHtml(bodyHtml, blocks, allComments);
             this.lastRenderTime = Date.now();
             log(`Docx preview rendered: ${this.docxModel.elements.length} elements, ${this.docxModel.comments.length} Word comments`);
 
@@ -1125,6 +1179,9 @@ img { max-width: 100%; }
 .role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; }
 .role-user { background: #0e639c; color: #fff; }
 .role-agent { background: #6a1b9a; color: #fff; }
+.role-word { background: #2e7d32; color: #fff; }
+.word-comment { border-left: 3px solid #4caf50 !important; }
+.word-comment .item-preview { color: #4caf50 !important; }
 .pop-reply-input { margin-top: 8px; }
 .pop-reply-input textarea {
     width: 100%; padding: 4px; border: 1px solid #555;
@@ -1575,7 +1632,8 @@ img { max-width: 100%; }
         }
         filtered.forEach(function(c) {
             var div = document.createElement('div');
-            div.className = 'clist-item' + (c.resolved ? ' resolved' : '');
+            var isWordComment = c._source === 'word';
+            div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + (isWordComment ? ' word-comment' : '');
             var resolveBtn = c.resolved
                 ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
                 : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
@@ -1584,16 +1642,20 @@ img { max-width: 100%; }
                 repliesHtml = '<div class="item-replies">';
                 c.replies.forEach(function(r) {
                     repliesHtml += '<div class="item-reply" id="list-reply-' + r.id + '"><div class="item-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
-                        ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button>' +
-                        ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">\u00d7</button></div>' +
+                        (isWordComment ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button>') +
+                        (isWordComment ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">\u00d7</button>') +
+                        '</div>' +
                         '<div class="item-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
                 });
                 repliesHtml += '</div>';
             }
+            var authorBadge = isWordComment
+                ? '<span class="role-badge role-word">\uD83D\uDCCE ' + esc(c._wordAuthor || 'Word') + '</span>'
+                : '<span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>';
+            var editBtn = isWordComment ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + c.id + '\\')">edit</button>';
             div.innerHTML =
                 '<div class="item-preview">' + esc(c.blockPreview || '(block)') + '</div>' +
-                '<div class="item-comment" id="list-comment-' + c.id + '"><span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>' + esc(c.comment) +
-                ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + c.id + '\\')">edit</button></div>' +
+                '<div class="item-comment" id="list-comment-' + c.id + '">' + authorBadge + esc(c.comment) + editBtn + '</div>' +
                 '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() +
                 (c.resolved ? ' \\u2705' : '') + '</div>' +
                 repliesHtml +
@@ -1603,7 +1665,7 @@ img { max-width: 100%; }
                 '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
                 '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
-                '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button></div>';
+                (isWordComment ? '' : '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button>') + '</div>';
             div.addEventListener('click', function() {
                 var el = findCommentElement(c);
                 if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
