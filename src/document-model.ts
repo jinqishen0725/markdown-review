@@ -34,6 +34,8 @@ export interface DocumentModel {
     relationships: Map<string, string>;
     media: Map<string, Buffer>;
     rawZip: any; // JSZip instance for write-back
+    tempDir?: string; // temp directory with extracted XML files for direct editing
+    documentXmlPath?: string; // path to extracted document.xml for direct agent editing
 }
 
 export interface ReviewComment {

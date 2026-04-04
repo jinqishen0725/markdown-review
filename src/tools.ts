@@ -300,6 +300,171 @@ export class CaptureScreenshotTool implements vscode.LanguageModelTool<ICaptureP
     }
 }
 
+// ---------- Word Document: Read Element XML ----------
+
+interface IReadElementXmlParams { elementId: string; filePath?: string; }
+
+export class ReadElementXmlTool implements vscode.LanguageModelTool<IReadElementXmlParams> {
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IReadElementXmlParams>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const filePath = resolveDocumentPath(options.input.filePath);
+        if (!filePath || !filePath.endsWith('.docx')) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('This tool only works with .docx files. Please provide a filePath to a .docx file.')
+            ]);
+        }
+        // Find the open preview panel for this docx
+        const panel = PreviewPanel.currentPanels.get(filePath);
+        if (!panel || !panel.isDocx || !(panel as any).docxModel) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('No open Word preview found. Open the .docx file with "Open Word Document Preview" first.')
+            ]);
+        }
+        const model = (panel as any).docxModel;
+        const element = model.elements.find((e: any) => e.id === options.input.elementId);
+        if (!element) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Element "${options.input.elementId}" not found. Use listReviewComments or read the document outline to find valid element IDs.`)
+            ]);
+        }
+
+        // Read the raw XML from the extracted document.xml
+        const docXmlPath = model.documentXmlPath;
+        if (!docXmlPath || !fs.existsSync(docXmlPath)) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('Extracted document.xml not found.')
+            ]);
+        }
+        const docXml = fs.readFileSync(docXmlPath, 'utf-8');
+        // Find the paragraph with matching paraId
+        const paraIdPattern = new RegExp(`<w:p[^>]*w14:paraId="${options.input.elementId}"[^>]*>[\\s\\S]*?</w:p>`, 'm');
+        const match = docXml.match(paraIdPattern);
+
+        const result = `Element ${options.input.elementId} (${element.type}):\n` +
+            `Plain text: "${element.content}"\n\n` +
+            `Raw XML:\n\`\`\`xml\n${match ? match[0] : '(XML not found — element may be a table or non-paragraph)'}\n\`\`\`\n\n` +
+            `Document XML file location: ${docXmlPath}\n` +
+            `You can edit this file directly for complex changes. ` +
+            `WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> elements — those are existing Word comments from other reviewers.`;
+
+        return new vscode.LanguageModelToolResult([
+            new vscode.LanguageModelTextPart(result)
+        ]);
+    }
+}
+
+// ---------- Word Document: Write Element XML ----------
+
+interface IWriteElementXmlParams { elementId: string; newXml: string; filePath?: string; }
+
+export class WriteElementXmlTool implements vscode.LanguageModelTool<IWriteElementXmlParams> {
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IWriteElementXmlParams>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const filePath = resolveDocumentPath(options.input.filePath);
+        if (!filePath || !filePath.endsWith('.docx')) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('This tool only works with .docx files.')
+            ]);
+        }
+        const panel = PreviewPanel.currentPanels.get(filePath);
+        if (!panel || !panel.isDocx || !(panel as any).docxModel) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('No open Word preview found.')
+            ]);
+        }
+        const model = (panel as any).docxModel;
+        const docXmlPath = model.documentXmlPath;
+        if (!docXmlPath || !fs.existsSync(docXmlPath)) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('Extracted document.xml not found.')
+            ]);
+        }
+
+        // Read current XML
+        let docXml = fs.readFileSync(docXmlPath, 'utf-8');
+
+        // Find and replace the element
+        const paraIdPattern = new RegExp(`<w:p[^>]*w14:paraId="${options.input.elementId}"[^>]*>[\\s\\S]*?</w:p>`, 'm');
+        const match = docXml.match(paraIdPattern);
+        if (!match) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Element "${options.input.elementId}" not found in document.xml. Cannot replace.`)
+            ]);
+        }
+
+        // Validate new XML is well-formed
+        try {
+            const { DOMParser: DP } = require('@xmldom/xmldom');
+            new DP().parseFromString(`<root xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">${options.input.newXml}</root>`, 'text/xml');
+        } catch (e: any) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Invalid XML: ${e.message}. Please fix and retry.`)
+            ]);
+        }
+
+        const oldText = model.elements.find((e: any) => e.id === options.input.elementId)?.content || '';
+        docXml = docXml.replace(match[0], options.input.newXml);
+        fs.writeFileSync(docXmlPath, docXml, 'utf-8');
+
+        // Refresh the preview
+        (panel as any).updateDocxContent();
+
+        return new vscode.LanguageModelToolResult([
+            new vscode.LanguageModelTextPart(`Element "${options.input.elementId}" updated.\nBefore: "${oldText.substring(0, 100)}..."\nThe preview has been refreshed. Use saveDocument to write the changes back to a .docx file.`)
+        ]);
+    }
+}
+
+// ---------- Word Document: Save Document ----------
+
+interface ISaveDocumentParams { filePath?: string; outputPath?: string; }
+
+export class SaveDocumentTool implements vscode.LanguageModelTool<ISaveDocumentParams> {
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<ISaveDocumentParams>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const filePath = resolveDocumentPath(options.input?.filePath);
+        if (!filePath || !filePath.endsWith('.docx')) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('This tool only works with .docx files.')
+            ]);
+        }
+        const panel = PreviewPanel.currentPanels.get(filePath);
+        if (!panel || !panel.isDocx || !(panel as any).docxModel) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('No open Word preview found.')
+            ]);
+        }
+
+        const model = (panel as any).docxModel;
+        const { saveDocx } = require('./docx-parser');
+
+        // Determine output path
+        let outputPath = options.input?.outputPath;
+        if (!outputPath) {
+            const ext = path.extname(filePath);
+            const base = filePath.slice(0, -ext.length);
+            outputPath = `${base}_reviewed${ext}`;
+        }
+
+        try {
+            const saved = await saveDocx(model, outputPath);
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Document saved to: ${saved}\nAll existing Word comments preserved. All images and formatting preserved.`)
+            ]);
+        } catch (e: any) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Failed to save: ${e.message}`)
+            ]);
+        }
+    }
+}
+
 // ---------- Registration ----------
 
 export function registerTools(context: vscode.ExtensionContext) {
@@ -311,5 +476,8 @@ export function registerTools(context: vscode.ExtensionContext) {
         vscode.lm.registerTool('markdownReview_delete_comment', new DeleteCommentTool()),
         vscode.lm.registerTool('markdownReview_scroll_to_comment', new ScrollToCommentTool()),
         vscode.lm.registerTool('markdownReview_capture_screenshot', new CaptureScreenshotTool()),
+        vscode.lm.registerTool('markdownReview_read_element_xml', new ReadElementXmlTool()),
+        vscode.lm.registerTool('markdownReview_write_element_xml', new WriteElementXmlTool()),
+        vscode.lm.registerTool('markdownReview_save_document', new SaveDocumentTool()),
     );
 }

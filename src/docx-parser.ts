@@ -6,7 +6,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import JSZip from 'jszip';
-import { DOMParser } from '@xmldom/xmldom';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { DocumentModel, DocElement, WordComment } from './document-model';
 import { ommlToLatex } from './omml-to-latex';
 
@@ -43,12 +43,15 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
     }
 
     // Parse comments
-    const comments = await parseComments(zip);
+    const commentsFile = zip.file('word/comments.xml');
+    const commentsXmlStr = commentsFile ? await commentsFile.async('string') : null;
+    const comments = await parseCommentsFromString(commentsXmlStr);
 
     // Parse document body
     const docFile = zip.file('word/document.xml');
     if (!docFile) throw new Error('No word/document.xml found in the docx file');
-    const docXml = new DOMParser().parseFromString(await docFile.async('string'), 'text/xml');
+    const docXmlStr = await docFile.async('string');
+    const docXml = new DOMParser().parseFromString(docXmlStr, 'text/xml');
     const body = docXml.getElementsByTagNameNS(W, 'body')[0];
     if (!body) throw new Error('No w:body found in document.xml');
 
@@ -63,6 +66,20 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
         if (eid) c.elementId = eid;
     }
 
+    // Extract document.xml to temp dir for direct agent editing
+    const os = require('os');
+    const crypto = require('crypto');
+    const hash = crypto.createHash('md5').update(filePath).digest('hex').substring(0, 8);
+    const tempDir = path.join(os.tmpdir(), `docx-review-${hash}`);
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    const docXmlPath = path.join(tempDir, 'document.xml');
+    fs.writeFileSync(docXmlPath, docXmlStr, 'utf-8');
+
+    // Also extract comments.xml if it exists
+    if (commentsXmlStr) {
+        fs.writeFileSync(path.join(tempDir, 'comments.xml'), commentsXmlStr, 'utf-8');
+    }
+
     return {
         filePath,
         format: 'docx',
@@ -71,17 +88,18 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
         relationships,
         media,
         rawZip: zip,
+        tempDir,
+        documentXmlPath: docXmlPath,
     };
 }
 
 // ---------- Comment Parser ----------
 
-async function parseComments(zip: JSZip): Promise<WordComment[]> {
+async function parseCommentsFromString(xmlStr: string | null): Promise<WordComment[]> {
     const comments: WordComment[] = [];
-    const commentsFile = zip.file('word/comments.xml');
-    if (!commentsFile) return comments;
+    if (!xmlStr) return comments;
 
-    const xml = new DOMParser().parseFromString(await commentsFile.async('string'), 'text/xml');
+    const xml = new DOMParser().parseFromString(xmlStr, 'text/xml');
     const nodes = xml.getElementsByTagNameNS(W, 'comment');
     for (let i = 0; i < nodes.length; i++) {
         const el = nodes[i];
@@ -94,26 +112,6 @@ async function parseComments(zip: JSZip): Promise<WordComment[]> {
             date: el.getAttribute('w:date') || '',
             text,
         });
-    }
-
-    // Parse threading from commentsExtended.xml
-    const extFile = zip.file('word/commentsExtended.xml');
-    if (extFile) {
-        try {
-            const extXml = new DOMParser().parseFromString(await extFile.async('string'), 'text/xml');
-            const extNs = 'http://schemas.microsoft.com/office/word/2012/wordml';
-            const infos = extXml.getElementsByTagNameNS(extNs, 'commentEx');
-            for (let i = 0; i < infos.length; i++) {
-                const paraId = infos[i].getAttribute('w15:paraId');
-                const parentParaId = infos[i].getAttribute('w15:paraIdParent');
-                if (parentParaId) {
-                    // Find the comment with this paraId and set its parent
-                    // (simplified — full implementation would use paraId mapping)
-                }
-            }
-        } catch {
-            // commentsExtended parsing is optional
-        }
     }
 
     return comments;
@@ -435,4 +433,36 @@ function getDirectChildren(parent: any, ns: string, localName: string): any[] {
         if (c.nodeType === 1 && c.localName === localName && c.namespaceURI === ns) result.push(c);
     }
     return result;
+}
+
+// ---------- Save / Export ----------
+
+/**
+ * Save the modified document.xml back into the ZIP and write to outputPath.
+ * Reads from the temp dir (where agent may have edited document.xml directly)
+ * and re-zips everything back into a valid .docx file.
+ */
+export async function saveDocx(model: DocumentModel, outputPath: string): Promise<string> {
+    if (!model.rawZip || !model.documentXmlPath) {
+        throw new Error('No parsed document model available for saving.');
+    }
+
+    // Read the (possibly modified) document.xml from temp dir
+    const modifiedXml = fs.readFileSync(model.documentXmlPath, 'utf-8');
+
+    // Validate XML is well-formed
+    try {
+        new DOMParser().parseFromString(modifiedXml, 'text/xml');
+    } catch (e: any) {
+        throw new Error(`Invalid XML in document.xml: ${e.message}. Please fix the XML before saving.`);
+    }
+
+    // Update the ZIP with the modified document.xml
+    model.rawZip.file('word/document.xml', modifiedXml);
+
+    // Generate the output .docx
+    const outputBuf = await model.rawZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    fs.writeFileSync(outputPath, outputBuf);
+
+    return outputPath;
 }

@@ -345,6 +345,31 @@ export class PreviewPanel {
                 this.exportAsDocx();
                 return;
             }
+            case 'saveDocxFile': {
+                if (!this.isDocx || !this.docxModel) {
+                    vscode.window.showWarningMessage('No Word document open.');
+                    return;
+                }
+                try {
+                    const { saveDocx } = require('./docx-parser');
+                    const ext = path.extname(this.docxPath);
+                    const defaultName = path.basename(this.docxPath, ext) + '_reviewed' + ext;
+                    const defaultUri = vscode.Uri.file(path.join(path.dirname(this.docxPath), defaultName));
+
+                    const saveUri = await vscode.window.showSaveDialog({
+                        defaultUri,
+                        filters: { 'Word Documents': ['docx'] },
+                        title: 'Save Word Document',
+                    });
+                    if (!saveUri) return;
+
+                    await saveDocx(this.docxModel, saveUri.fsPath);
+                    vscode.window.showInformationMessage(`Document saved to: ${path.basename(saveUri.fsPath)}`);
+                } catch (e: any) {
+                    vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
+                }
+                return;
+            }
             case 'jumpToSource': {
                 // Map clean-text offset to document position and reveal
                 const text = this.document.getText();
@@ -458,13 +483,18 @@ export class PreviewPanel {
 
         let prompt: string;
         if (this.isDocx) {
+            const xmlInfo = this.docxModel?.documentXmlPath ? `\nThe extracted document.xml is at: ${this.docxModel.documentXmlPath}` : '';
             prompt = `I'm reviewing a Word document "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
                 `- On element: "${comment.blockPreview || '(unknown)'}"\n\n` +
-                `IMPORTANT: This is a Word (.docx) document. The underlying format is XML. ` +
-                `Do NOT try to edit the file directly — use the review tools to interact with the document.\n\n` +
+                `This is a Word (.docx) document stored as XML. You have these tools available:\n` +
+                `- ${toolPrefix}readElementXml — read the raw XML of a specific element to understand its structure\n` +
+                `- ${toolPrefix}writeElementXml — replace an element's XML to make changes (for single-element edits)\n` +
+                `- ${toolPrefix}saveDocument — save the modified document back to .docx\n` +
+                `For substantial multi-element edits, you can directly edit the XML file at the path returned by readElementXml.${xmlInfo}\n` +
+                `WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> elements — those are existing Word comments from other reviewers.\n\n` +
                 `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to get the full context, ` +
-                `then use ${toolPrefix}replyToReviewComment to post a helpful response addressing this comment.`;
+                `then address the comment by making the requested change and using ${toolPrefix}replyToReviewComment to explain what you changed.`;
         } else {
             prompt = `I'm reviewing "${fileName}" (${filePath}). A new review comment was just added:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
@@ -487,15 +517,20 @@ export class PreviewPanel {
 
         let prompt: string;
         if (this.isDocx) {
+            const xmlInfo = this.docxModel?.documentXmlPath ? `\nThe extracted document.xml is at: ${this.docxModel.documentXmlPath}` : '';
             prompt = `I'm reviewing a Word document "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
                 `- On element: "${comment.blockPreview || '(unknown)'}"\n` +
                 `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
                 repliesText + '\n\n' +
-                `IMPORTANT: This is a Word (.docx) document stored as XML. ` +
-                `Do NOT try to edit the .docx file directly. Use the review tools to read content and post responses.\n\n` +
-                `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to get the full context, ` +
-                `then use ${toolPrefix}replyToReviewComment to post a helpful response continuing this thread.`;
+                `This is a Word (.docx) document stored as XML. You have these tools:\n` +
+                `- ${toolPrefix}readElementXml — read raw XML of a specific element\n` +
+                `- ${toolPrefix}writeElementXml — replace an element's XML\n` +
+                `- ${toolPrefix}saveDocument — save changes back to .docx\n` +
+                `For substantial edits, you can directly edit the XML file.${xmlInfo}\n` +
+                `WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments.\n\n` +
+                `Please use ${toolPrefix}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") to understand the comment, ` +
+                `then make the requested changes and use ${toolPrefix}replyToReviewComment to explain what you did.`;
         } else {
             prompt = `I'm reviewing "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
@@ -515,8 +550,14 @@ export class PreviewPanel {
         const parts: string[] = [];
 
         if (this.isDocx) {
+            const xmlInfo = this.docxModel?.documentXmlPath ? ` The extracted document.xml is at: ${this.docxModel.documentXmlPath}` : '';
             parts.push(`Review comments on Word document "${fileName}" (${filePath}):`);
-            parts.push(`NOTE: This is a .docx file (XML-based). Do NOT edit the file directly. Use the review tools to read elements and post responses.\n`);
+            parts.push(`This is a .docx file (XML-based). Available tools for editing:`);
+            parts.push(`- ${toolPrefix}readElementXml — read raw XML of a specific element`);
+            parts.push(`- ${toolPrefix}writeElementXml — replace an element's XML to make changes`);
+            parts.push(`- ${toolPrefix}saveDocument — save all changes back to .docx`);
+            parts.push(`For substantial multi-element edits, you can directly edit the document.xml file.${xmlInfo}`);
+            parts.push(`WARNING: Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments from other reviewers.\n`);
         } else {
             parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
         }
@@ -1032,9 +1073,13 @@ img { max-width: 100%; }
     &#x1F4AC; <span id="badge-count">0</span> comments
 </div>
 <div class="export-buttons">
+    ${this.isDocx ? `
+    <button class="export-btn" onclick="saveDocx()" title="Save changes back to .docx file">&#x1F4BE; Save .docx</button>
+    ` : `
     <button class="export-btn" onclick="jumpToSource()" title="Jump to source editor at current scroll position. You can also double-click anywhere in the preview to jump to that block in the source.">&#x2190; Source</button>
     <button class="export-btn" onclick="exportPdf()" title="Export to PDF">&#x1F4C4; PDF</button>
     <button class="export-btn" onclick="exportDocx()" title="Export to DOCX">&#x1F4DD; DOCX</button>
+    `}
 </div>
 
 <div id="wrapper">
@@ -1317,6 +1362,9 @@ img { max-width: 100%; }
     };
     window.exportDocx = function() {
         vscode.postMessage({ command: 'exportDocx' });
+    };
+    window.saveDocx = function() {
+        vscode.postMessage({ command: 'saveDocxFile' });
     };
 
     // ========== comment actions ==========
@@ -2002,7 +2050,9 @@ mermaid.run({ querySelector: '.mermaid' });
     }
 
     private dispose() {
-        PreviewPanel.currentPanels.delete(this.document.uri.fsPath);
+        // Remove from currentPanels using the correct key
+        const key = this.isDocx ? this.docxPath : this.document.uri.fsPath;
+        PreviewPanel.currentPanels.delete(key);
         if (this.commentsWatcher) {
             this.commentsWatcher.close();
             this.commentsWatcher = null;

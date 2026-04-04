@@ -267,6 +267,75 @@
             }
           }
         }
+      },
+      {
+        "name": "markdownReview_read_element_xml",
+        "displayName": "Read Word Element XML",
+        "toolReferenceName": "readElementXml",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(code)",
+        "modelDescription": "Reads the raw XML of a specific element (paragraph, heading, etc.) from a Word (.docx) document. Returns the element's plain text content, its raw XML for editing, and the path to the extracted document.xml file. Use this to inspect element structure before making changes. For substantial edits, you can edit the document.xml file directly at the returned path. WARNING: Do NOT modify commentRangeStart/commentRangeEnd elements — those are existing Word comments.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "The element ID (paraId) to read, e.g. '77FE7CF5'. Get IDs from listReviewComments or readReviewComment."
+            },
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to the .docx file."
+            }
+          },
+          "required": ["elementId"]
+        }
+      },
+      {
+        "name": "markdownReview_write_element_xml",
+        "displayName": "Write Word Element XML",
+        "toolReferenceName": "writeElementXml",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(edit)",
+        "modelDescription": "Replaces the raw XML of a specific element in a Word (.docx) document. Provide the complete replacement XML for the element (including the <w:p> tags and all attributes). The preview will refresh after the edit. Use saveDocument to write the changes back to a .docx file. WARNING: Do NOT remove or modify commentRangeStart/commentRangeEnd elements. For substantial multi-element edits, use readElementXml to get the document.xml path and edit the file directly instead.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "The element ID (paraId) to replace."
+            },
+            "newXml": {
+              "type": "string",
+              "description": "The complete replacement XML for this element, including <w:p> tags and all namespace attributes."
+            },
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to the .docx file."
+            }
+          },
+          "required": ["elementId", "newXml"]
+        }
+      },
+      {
+        "name": "markdownReview_save_document",
+        "displayName": "Save Word Document",
+        "toolReferenceName": "saveDocument",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(save)",
+        "modelDescription": "Saves all pending edits back to a .docx file. Re-zips the modified XML into a valid Word document. If outputPath is not provided, saves as filename_reviewed.docx. All existing Word comments, images, styles, and formatting are preserved.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to the source .docx file."
+            },
+            "outputPath": {
+              "type": "string",
+              "description": "Optional. Path for the output .docx file. Defaults to filename_reviewed.docx."
+            }
+          }
+        }
       }
     ]
   },
