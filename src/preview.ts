@@ -493,6 +493,7 @@ export class PreviewPanel {
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
                 `- On element (paraId=${comment.elementId || 'unknown'}): "${comment.blockPreview || '(unknown)'}"\n\n` +
                 `This is a Word (.docx) document stored as XML. You have these tools available:\n` +
+                `- ${toolPrefix}listElements — get a compact text outline of the entire document (use this first if you need general context)\n` +
                 `- ${toolPrefix}readElementXml — read the raw XML of a specific element to understand its structure\n` +
                 `- ${toolPrefix}writeElementXml — replace an element's XML to make changes (for single-element edits)\n` +
                 `- ${toolPrefix}saveDocument — save the modified document back to .docx\n` +
@@ -535,6 +536,7 @@ export class PreviewPanel {
                 `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
                 repliesText + '\n\n' +
                 `This is a Word (.docx) document stored as XML. You have these tools:\n` +
+                `- ${toolPrefix}listElements — get a compact text outline of the document (use first for general context)\n` +
                 `- ${toolPrefix}readElementXml — read raw XML of a specific element\n` +
                 `- ${toolPrefix}writeElementXml — replace an element's XML\n` +
                 `- ${toolPrefix}saveDocument — save changes back to .docx\n` +
@@ -570,6 +572,7 @@ export class PreviewPanel {
             const xmlInfo = this.docxModel?.documentXmlPath ? ` The extracted document.xml is at: ${this.docxModel.documentXmlPath}` : '';
             parts.push(`Review comments on Word document "${fileName}" (${filePath}):`);
             parts.push(`This is a .docx file (XML-based). Available tools for editing:`);
+            parts.push(`- ${toolPrefix}listElements — get a compact text outline of the document (use first for general context)`);
             parts.push(`- ${toolPrefix}readElementXml — read raw XML of a specific element`);
             parts.push(`- ${toolPrefix}writeElementXml — replace an element's XML to make changes`);
             parts.push(`- ${toolPrefix}saveDocument — save all changes back to .docx`);

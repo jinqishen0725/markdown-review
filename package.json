@@ -336,6 +336,23 @@
             }
           }
         }
+      },
+      {
+        "name": "markdownReview_list_elements",
+        "displayName": "List Word Document Elements",
+        "toolReferenceName": "listElements",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-tree)",
+        "modelDescription": "Lists all elements (paragraphs, headings, tables, images, formulas) in a Word (.docx) document as a compact text outline with element IDs. Use this to understand the document structure and content before making targeted edits. Each element shows its type, paraId, and a text preview. Much smaller than raw XML (~7K tokens vs ~68K).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to the .docx file."
+            }
+          }
+        }
       }
     ]
   },

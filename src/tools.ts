@@ -482,6 +482,57 @@ export class SaveDocumentTool implements vscode.LanguageModelTool<ISaveDocumentP
     }
 }
 
+// ---------- Word Document: List Elements (compact text outline) ----------
+
+interface IListElementsParams { filePath?: string; }
+
+export class ListElementsTool implements vscode.LanguageModelTool<IListElementsParams> {
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<IListElementsParams>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const filePath = resolveDocumentPath(options.input?.filePath);
+        if (!filePath || !filePath.endsWith('.docx')) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('This tool only works with .docx files. Pass the filePath to a .docx file.')
+            ]);
+        }
+        const panel = PreviewPanel.currentPanels.get(filePath);
+        if (!panel || !panel.isDocx || !(panel as any).docxModel) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('No open Word preview found. Open the .docx file with "Open Word Document Preview" first.')
+            ]);
+        }
+        const model = (panel as any).docxModel;
+        const fileName = path.basename(filePath);
+
+        const typeLabels: Record<string, string> = {
+            heading: 'H', paragraph: 'P', table: 'TABLE', image: 'IMG',
+            'list-item': 'LI', formula: 'FORMULA', 'code-block': 'CODE',
+        };
+
+        const lines: string[] = [];
+        lines.push(`Document: ${fileName} (${model.elements.length} elements, ${model.comments.length} Word comments)\n`);
+
+        for (const el of model.elements) {
+            const label = typeLabels[el.type] || el.type.toUpperCase();
+            const level = el.level ? `${el.level}` : '';
+            const tag = el.type === 'heading' ? `${label}${level}` : label;
+            const preview = el.content.substring(0, 80).replace(/\n/g, ' ');
+            const commentCount = el.commentIds?.length || 0;
+            const commentMark = commentCount > 0 ? ` 💬${commentCount}` : '';
+            lines.push(`[${tag} id=${el.id}] "${preview}"${commentMark}`);
+        }
+
+        lines.push(`\nUse readElementXml(elementId="<id>") to see the raw XML of any element.`);
+        lines.push(`Use writeElementXml(elementId, newXml) to edit an element.`);
+
+        return new vscode.LanguageModelToolResult([
+            new vscode.LanguageModelTextPart(lines.join('\n'))
+        ]);
+    }
+}
+
 // ---------- Registration ----------
 
 export function registerTools(context: vscode.ExtensionContext) {
@@ -496,5 +547,6 @@ export function registerTools(context: vscode.ExtensionContext) {
         vscode.lm.registerTool('markdownReview_read_element_xml', new ReadElementXmlTool()),
         vscode.lm.registerTool('markdownReview_write_element_xml', new WriteElementXmlTool()),
         vscode.lm.registerTool('markdownReview_save_document', new SaveDocumentTool()),
+        vscode.lm.registerTool('markdownReview_list_elements', new ListElementsTool()),
     );
 }
