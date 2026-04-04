@@ -72,11 +72,15 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
     const extractDir = path.join(docDir, `.${docBase}_xml`);
     if (!fs.existsSync(extractDir)) fs.mkdirSync(extractDir, { recursive: true });
     const docXmlPath = path.join(extractDir, 'document.xml');
-    fs.writeFileSync(docXmlPath, docXmlStr, 'utf-8');
+
+    // Pretty-print the XML so agents can read and edit individual elements on separate lines
+    // This adds newlines between tags but preserves content inside <w:t> elements
+    const formattedXml = formatXml(docXmlStr);
+    fs.writeFileSync(docXmlPath, formattedXml, 'utf-8');
 
     // Also extract comments.xml if it exists
     if (commentsXmlStr) {
-        fs.writeFileSync(path.join(extractDir, 'comments.xml'), commentsXmlStr, 'utf-8');
+        fs.writeFileSync(path.join(extractDir, 'comments.xml'), formatXml(commentsXmlStr), 'utf-8');
     }
 
     return {
@@ -469,4 +473,32 @@ export async function saveDocx(model: DocumentModel, outputPath: string): Promis
     fs.writeFileSync(outputPath, outputBuf);
 
     return outputPath;
+}
+
+// ---------- XML Formatting ----------
+
+/**
+ * Pretty-print XML by adding newlines between tags.
+ * Preserves content inside <w:t> elements (text runs).
+ * Each <w:p>, <w:tbl>, <w:tr>, <w:tc> starts on its own line for easy agent editing.
+ */
+function formatXml(xml: string): string {
+    // Add newline before major block-level opening tags
+    let formatted = xml
+        .replace(/(<w:p[\s>])/g, '\n$1')
+        .replace(/(<w:tbl[\s>])/g, '\n$1')
+        .replace(/(<w:tr[\s>])/g, '\n$1')
+        .replace(/(<w:tc[\s>])/g, '\n$1')
+        .replace(/(<\/w:p>)/g, '$1\n')
+        .replace(/(<\/w:tbl>)/g, '$1\n')
+        .replace(/(<\/w:tr>)/g, '$1\n')
+        .replace(/(<\/w:tc>)/g, '$1\n')
+        .replace(/(<w:body[\s>])/g, '\n$1')
+        .replace(/(<\/w:body>)/g, '\n$1')
+        .replace(/(<w:sectPr[\s>])/g, '\n$1');
+
+    // Remove excessive blank lines (collapse multiple newlines to max 1)
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+
+    return formatted;
 }
