@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>pptx-renderer Standalone Test</title>
+<style>
+body { background: #eee; padding: 20px; margin: 0; font-family: Arial; }
+#container { width: 960px; margin: 0 auto; }
+#status { padding: 10px; background: #333; color: #0f0; font-family: monospace; font-size: 12px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div id="status">Loading library...</div>
+<div id="container"></div>
+
+<script src="../media/pptx-viewer.js"></script>
+<script>
+var status = document.getElementById('status');
+
+async function run() {
+    try {
+        status.textContent = 'Library loaded: ' + (typeof PptxLib !== 'undefined') + ', PptxViewer: ' + (typeof PptxLib?.PptxViewer);
+        
+        var resp = await fetch('UMS_Experiment_Proposal.pptx');
+        var buffer = await resp.arrayBuffer();
+        status.textContent += ' | File: ' + (buffer.byteLength / 1024).toFixed(0) + 'KB';
+
+        var container = document.getElementById('container');
+        
+        var viewer = await PptxLib.PptxViewer.open(buffer, container, {
+            renderMode: 'list',
+            listOptions: { windowed: false },
+            fitMode: 'contain',
+        });
+        
+        status.textContent += ' | Rendered: ' + viewer.slideCount + ' slides';
+        status.textContent += ' | SlideW: ' + viewer.slideWidth + ' SlideH: ' + viewer.slideHeight;
+        
+        // Check actual rendered dimensions
+        var firstSlide = container.children[0];
+        if (firstSlide) {
+            status.textContent += ' | DOM W: ' + firstSlide.offsetWidth + ' H: ' + firstSlide.offsetHeight;
+            status.textContent += ' | Container W: ' + container.offsetWidth;
+            
+            // Check ALL children for any that overflow
+            var maxChildWidth = 0;
+            container.querySelectorAll('*').forEach(function(el) {
+                var r = el.getBoundingClientRect();
+                var containerR = container.getBoundingClientRect();
+                if (r.right > containerR.right + 2) {
+                    var text = (el.textContent || '').trim().substring(0, 30);
+                    if (text && !el.querySelector('*')) { // leaf elements only
+                        console.log('OVERFLOW:', el.tagName, 'right=' + r.right.toFixed(0), 'container.right=' + containerR.right.toFixed(0), 'text="' + text + '"');
+                    }
+                    maxChildWidth = Math.max(maxChildWidth, r.right - containerR.left);
+                }
+            });
+            status.textContent += ' | MaxChildW: ' + Math.round(maxChildWidth);
+        }
+        
+        // Check for white text on light backgrounds (the defRPr bug)
+        setTimeout(function() {
+            var whiteSpans = [];
+            container.querySelectorAll('span').forEach(function(span) {
+                if (span.style.color === 'rgb(255, 255, 255)') {
+                    var text = span.textContent.trim();
+                    if (text && text.length > 2) {
+                        // Check if parent has a light background
+                        var parent = span.closest('[style*="background"]') || span.closest('div');
+                        var bg = parent ? getComputedStyle(parent).backgroundColor : '';
+                        whiteSpans.push(text.substring(0, 30) + ' [bg:' + bg + ']');
+                    }
+                }
+            });
+            if (whiteSpans.length) {
+                var info = document.createElement('div');
+                info.style.cssText = 'background:#800;color:#fff;padding:10px;margin:10px auto;max-width:960px;font-size:12px;';
+                info.innerHTML = '<b>White text spans (defRPr bug):</b><br>' + whiteSpans.map(function(s) { return '• ' + s; }).join('<br>');
+                document.body.insertBefore(info, container);
+            }
+        }, 2000);
+        
+    } catch(e) {
+        status.textContent = 'ERROR: ' + e.message;
+        console.error(e);
+    }
+}
+run();
+</script>
+</body>
+</html>

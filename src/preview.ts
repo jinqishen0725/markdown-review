@@ -1135,121 +1135,47 @@ export class PreviewPanel {
         if (!this.isPptx || !this.pptxPath) return;
         try {
             const { parsePptx } = require('./pptx-parser');
+            const fs = require('fs');
 
             if (!this.pptxModel) {
                 this.pptxModel = await parsePptx(this.pptxPath);
             }
 
             const model = this.pptxModel;
-            const EMU_PER_INCH = 914400;
-            const slideWidthInches = model.dimensions.cx / EMU_PER_INCH;
-            const slideHeightInches = model.dimensions.cy / EMU_PER_INCH;
-            const aspectRatio = slideHeightInches / slideWidthInches;
-            const RENDER_WIDTH = 960; // px
-            const RENDER_HEIGHT = Math.round(RENDER_WIDTH * aspectRatio);
-            const scale = RENDER_WIDTH / model.dimensions.cx;
 
-            // Build HTML for all slides
-            let slidesHtml = '';
+            const pptxFileUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.file(this.pptxPath)
+            ).toString();
+            const pptxViewerUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this.extensionUri, 'media', 'pptx-viewer.js')
+            ).toString();
+
+            // Build notes data
+            const notesData = model.slides
+                .filter((s: any) => s.notes?.trim())
+                .map((s: any) => ({ slideIndex: s.index, notes: s.notes }));
+
+            // Build color fix data from our parser
+            const colorFixes: any[] = [];
             for (const slide of model.slides) {
-                let shapesHtml = '';
                 for (const shape of slide.shapes) {
-                    const left = Math.round(shape.x * scale);
-                    const top = Math.round(shape.y * scale);
-                    const width = Math.round(shape.cx * scale);
-                    const height = Math.round(shape.cy * scale);
-
-                    if (width <= 0 && height <= 0) continue;
-
-                    const bgStyle = shape.fillColor ? `background:${shape.fillColor};` : '';
-                    const borderStyle = shape.borderColor ? `border:1px solid ${shape.borderColor};` : '';
-                    const textColor = shape.fillColor && isColorDark(shape.fillColor) ? 'color:#fff;' : '';
-
-                    // Geometry-specific rendering
-                    const geom = shape.geometry || 'rect';
-                    let extraStyle = '';
-                    let shapeContent = shape.htmlContent;
-
-                    if (geom === 'roundRect') {
-                        extraStyle += 'border-radius:8px;';
-                    } else if (geom === 'rightArrow') {
-                        // Render as CSS arrow pointing right
-                        shapeContent = '';
-                        extraStyle += 'background:transparent !important;';
-                        const arrowHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;">` +
-                            `<div style="flex:1;height:50%;background:${shape.fillColor || '#333'};"></div>` +
-                            `<div style="width:0;height:0;border-top:${Math.round(height/2)}px solid transparent;` +
-                            `border-bottom:${Math.round(height/2)}px solid transparent;` +
-                            `border-left:${Math.round(width*0.4)}px solid ${shape.fillColor || '#333'};"></div></div>`;
-                        shapeContent = arrowHtml;
-                    } else if (geom === 'downArrow') {
-                        shapeContent = '';
-                        extraStyle += 'background:transparent !important;';
-                        const arrowHtml = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;">` +
-                            `<div style="height:60%;width:50%;background:${shape.fillColor || '#333'};"></div>` +
-                            `<div style="width:0;height:0;border-left:${Math.round(width/2)}px solid transparent;` +
-                            `border-right:${Math.round(width/2)}px solid transparent;` +
-                            `border-top:${Math.round(height*0.4)}px solid ${shape.fillColor || '#333'};"></div></div>`;
-                        shapeContent = arrowHtml;
-                    } else if (geom === 'ellipse') {
-                        extraStyle += 'border-radius:50%;';
+                    for (const para of shape.paragraphs) {
+                        for (const run of para.runs) {
+                            if (run.color) {
+                                colorFixes.push({
+                                    text: run.text.substring(0, 30),
+                                    color: '#' + run.color,
+                                });
+                            }
+                        }
                     }
-
-                    // Body padding (scale EMU insets to px)
-                    let padStyle = 'padding:4px;';
-                    if (shape.bodyInsets) {
-                        const pl = Math.round(shape.bodyInsets.l * scale);
-                        const pt = Math.round(shape.bodyInsets.t * scale);
-                        const pr = Math.round(shape.bodyInsets.r * scale);
-                        const pb = Math.round(shape.bodyInsets.b * scale);
-                        padStyle = `padding:${pt}px ${pr}px ${pb}px ${pl}px;`;
-                    }
-
-                    // Font scale (normAutofit)
-                    let fontScaleStyle = '';
-                    if (shape.fontScale && shape.fontScale < 100) {
-                        fontScaleStyle = `font-size:${shape.fontScale}%;`;
-                    }
-
-                    const shapeClass = shape.type === 'picture' ? 'pptx-pic' :
-                        shape.type === 'table' ? 'pptx-table-wrap' :
-                        shape.placeholderType === 'title' || shape.placeholderType === 'ctrTitle' ? 'pptx-title' :
-                        'pptx-shape';
-
-                    shapesHtml += `<div class="${shapeClass}" data-shape-id="${shape.id}" data-slide="${slide.index}" ` +
-                        `style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;` +
-                        `overflow:hidden;${padStyle}box-sizing:border-box;${bgStyle}${borderStyle}${textColor}${extraStyle}${fontScaleStyle}">` +
-                        `${shapeContent}</div>\n`;
                 }
-
-                // Slide comments markers
-                const slideComments = model.comments.filter((c: any) => c.slideIndex === slide.index);
-
-                slidesHtml += `<div class="pptx-slide-wrapper">` +
-                    `<div class="pptx-slide-number">Slide ${slide.index}</div>` +
-                    `<div class="pptx-slide" data-slide-index="${slide.index}" ` +
-                    `style="position:relative;width:${RENDER_WIDTH}px;height:${RENDER_HEIGHT}px;` +
-                    `background:#fff;border:1px solid #444;overflow:hidden;margin:0 auto;">` +
-                    shapesHtml +
-                    `</div>`;
-
-                // Speaker notes
-                if (slide.notes) {
-                    slidesHtml += `<div class="pptx-notes"><b>Speaker Notes:</b> ${escapeHtml(slide.notes)}</div>`;
-                }
-
-                slidesHtml += `</div>\n`;
             }
 
-            // Merge sidecar comments
+            // Merge comments
             const sidecarComments = this.commentsManager.getComments();
-
-            // Build pptx comments as review comment objects
             const pptxCommentObjs = model.comments.map((c: any) => ({
                 id: `pptx_${c.id}`,
-                anchor: '',
-                startOffset: 0,
-                endOffset: 0,
                 blockType: 'slide',
                 blockPreview: `Slide ${c.slideIndex}` + (c.shapeId ? ` (shape ${c.shapeId})` : ''),
                 comment: c.text,
@@ -1261,8 +1187,6 @@ export class PreviewPanel {
                 _wordAuthor: c.authorName,
                 _source: 'pptx',
             }));
-
-            // Merge sidecar data
             for (const pc of pptxCommentObjs) {
                 const sidecar = sidecarComments.find((c: any) => c.id === pc.id);
                 if (sidecar) {
@@ -1270,377 +1194,214 @@ export class PreviewPanel {
                     pc.resolved = sidecar.resolved;
                 }
             }
-
             const reviewOnly = sidecarComments.filter((c: any) => !c.id.startsWith('pptx_'));
             const allComments = [...reviewOnly, ...pptxCommentObjs];
 
-            const blocks: Block[] = model.slides.map((s: any) => ({
-                type: 'slide',
-                startOffset: 0,
-                endOffset: 0,
-                startLine: 0,
-                preview: `Slide ${s.index}`,
-                eid: `slide_${s.index}`,
-            }));
+            const commentsJson = JSON.stringify(allComments).replace(/</g, '\\u003c');
+            const notesJson = JSON.stringify(notesData).replace(/</g, '\\u003c');
+            const colorFixesJson = JSON.stringify(colorFixes).replace(/</g, '\\u003c');
 
-            this.panel.webview.html = this.getPptxHtml(slidesHtml, blocks, allComments, model);
+            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, pptxViewerUri, pptxFileUri);
             this.lastRenderTime = Date.now();
-            log(`Pptx preview rendered: ${model.slides.length} slides, ${model.comments.length} comments`);
+            log(`Pptx preview rendered: ${model.slides.length} slides, ${colorFixes.length} color fixes`);
         } catch (e: any) {
             logError('Failed to render pptx', e);
             this.panel.webview.html = `<html><body><h1>Error loading presentation</h1><pre>${e.message}\n${e.stack}</pre></body></html>`;
         }
     }
 
-    private getPptxHtml(slidesBody: string, blocks: Block[], comments: any[], model: any): string {
-        const commentsJson = JSON.stringify(comments).replace(/</g, '\\u003c');
-        const blocksJson = JSON.stringify(blocks).replace(/</g, '\\u003c');
-
+    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, pptxViewerUri: string, pptxFileUri: string): string {
         return /*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PowerPoint Review</title>
 <style>
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    font-size: 13px; line-height: 1.5;
     background: var(--vscode-editor-background, #1e1e1e);
     color: var(--vscode-editor-foreground, #d4d4d4);
-    margin: 0;
-    padding: 20px;
+    margin: 0; padding: 20px;
 }
-.pptx-slide-wrapper {
-    margin-bottom: 30px;
-}
-.pptx-slide-number {
-    font-size: 14px;
-    font-weight: bold;
-    color: var(--vscode-foreground, #ccc);
-    margin-bottom: 8px;
-    padding-left: 4px;
-}
-.pptx-slide {
-    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-    border-radius: 4px;
-    font-family: 'Segoe UI', Calibri, Arial, sans-serif;
-    color: #333;
-}
-.pptx-shape {
-    font-size: 11px;
-    line-height: 1.3;
-    border-radius: 3px;
-}
-.pptx-shape .bold, .pptx-shape b {
-    font-weight: 600;
-}
-.pptx-title {
-    font-size: 16px;
-    font-weight: 600;
-}
-.pptx-pic {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f0f0f0;
-    border: 1px dashed #ccc;
-}
-.pptx-table-wrap {
-    overflow: auto;
-}
-.pptx-table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 10px;
-}
-.pptx-table th, .pptx-table td {
-    border: 1px solid #999;
-    padding: 3px 6px;
-    text-align: left;
-}
-.pptx-table th {
-    background: #1B3A5C;
-    color: #fff;
-    font-weight: 600;
-}
-.pptx-notes {
-    margin-top: 6px;
-    padding: 8px 12px;
-    background: var(--vscode-textBlockQuote-background, #2d2d30);
-    border-left: 3px solid #888;
-    font-size: 12px;
-    color: var(--vscode-foreground, #ccc);
-    border-radius: 3px;
-    max-width: 960px;
-    margin-left: auto;
-    margin-right: auto;
-}
-.pptx-image-placeholder, .pptx-chart-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    background: #f5f5f5;
-    color: #666;
-    font-style: italic;
-    border: 1px dashed #ccc;
-    border-radius: 3px;
-}
-
-/* Comment sidebar */
-#sidebar {
-    position: fixed;
-    top: 0;
-    right: -360px;
-    width: 350px;
-    height: 100vh;
-    background: var(--vscode-sideBar-background, #252526);
-    border-left: 1px solid var(--vscode-panel-border, #444);
-    z-index: 1000;
-    overflow-y: auto;
-    transition: right 0.2s;
-    padding: 12px;
-    box-sizing: border-box;
-}
+/* The library renders at native slide size. We wrap each slide in a scaler. */
+#pptx-render { visibility: hidden; position: absolute; left: 0; top: 0; }
+.slide-outer { margin: 0 auto 24px; width: 960px; overflow: hidden; }
+.slide-label { font-size: 14px; font-weight: bold; color: var(--vscode-foreground, #ccc); margin: 16px 0 6px 0; max-width: 960px; margin-left: auto; margin-right: auto; }
+.pptx-notes { margin: 6px auto 0; padding: 8px 12px; background: var(--vscode-textBlockQuote-background, #2d2d30); border-left: 3px solid #888; font-size: 12px; color: var(--vscode-foreground, #ccc); border-radius: 3px; max-width: 960px; }
+#loading { text-align: center; padding: 60px; color: #888; font-size: 16px; }
+.spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #555; border-top-color: #0078D4; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#sidebar { position: fixed; top: 0; right: -360px; width: 350px; height: 100vh; background: var(--vscode-sideBar-background, #252526); border-left: 1px solid var(--vscode-panel-border, #444); z-index: 1000; overflow-y: auto; transition: right 0.2s; padding: 12px; box-sizing: border-box; }
 #sidebar.open { right: 0; }
-.sidebar-close {
-    position: sticky;
-    top: 0;
-    float: right;
-    background: none;
-    border: none;
-    color: var(--vscode-foreground, #ccc);
-    font-size: 20px;
-    cursor: pointer;
-    z-index: 1001;
-}
-#comment-badge {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background: var(--vscode-badge-background, #007acc);
-    color: var(--vscode-badge-foreground, #fff);
-    padding: 6px 14px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 13px;
-    z-index: 999;
-    display: none;
-}
-
-/* Comment list items */
-.clist-item {
-    padding: 10px;
-    margin-bottom: 8px;
-    background: var(--vscode-input-background, #3c3c3c);
-    border-radius: 6px;
-    border-left: 3px solid var(--vscode-badge-background, #007acc);
-    cursor: pointer;
-}
-.clist-item.pptx-comment {
-    border-left-color: #2196F3;
-}
-.clist-item.resolved {
-    opacity: 0.5;
-    border-left-color: #666;
-}
-.item-preview {
-    font-size: 11px;
-    color: #888;
-    margin-bottom: 4px;
-}
-.item-comment {
-    font-size: 13px;
-    margin-bottom: 4px;
-}
-.role-badge {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    margin-right: 6px;
-    font-weight: 600;
-}
+.sidebar-close { position: sticky; top: 0; float: right; background: none; border: none; color: var(--vscode-foreground, #ccc); font-size: 20px; cursor: pointer; z-index: 1001; }
+#comment-badge { position: fixed; top: 10px; right: 10px; background: var(--vscode-badge-background, #007acc); color: var(--vscode-badge-foreground, #fff); padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 13px; z-index: 999; display: none; }
+.clist-item { padding: 10px; margin-bottom: 8px; background: var(--vscode-input-background, #3c3c3c); border-radius: 6px; border-left: 3px solid #007acc; cursor: pointer; }
+.clist-item.pptx-comment { border-left-color: #2196F3; }
+.clist-item.resolved { opacity: 0.5; border-left-color: #666; }
+.item-preview { font-size: 11px; color: #888; margin-bottom: 4px; }
+.item-comment { font-size: 13px; margin-bottom: 4px; }
+.role-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-right: 6px; font-weight: 600; }
 .role-pptx { background: #2196F3; color: #fff; }
 .role-user { background: #0078D4; color: #fff; }
 .role-agent { background: #68217A; color: #fff; }
-.item-meta {
-    font-size: 11px;
-    color: #888;
-}
-.item-replies {
-    margin-top: 6px;
-    padding-left: 12px;
-    border-left: 2px solid #555;
-}
-.item-reply {
-    margin-bottom: 4px;
-    font-size: 12px;
-}
-.item-reply-input {
-    margin-top: 6px;
-}
-.item-actions {
-    margin-top: 6px;
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-.item-actions button, .item-reply-input button {
-    padding: 3px 10px;
-    background: var(--vscode-button-background, #0078D4);
-    color: var(--vscode-button-foreground, #fff);
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 11px;
-}
-.btn-copilot {
-    background: #68217A !important;
-}
+.item-meta { font-size: 11px; color: #888; }
+.item-replies { margin-top: 6px; padding-left: 12px; border-left: 2px solid #555; }
+.item-reply { margin-bottom: 4px; font-size: 12px; }
+.item-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.item-actions button, .item-reply-input button { padding: 3px 10px; background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+.btn-copilot { background: #68217A !important; }
 </style>
+<script src="${pptxViewerUri}"></script>
 </head>
 <body>
-
-<div id="comment-badge" onclick="toggleSidebar()">
-    💬 <span id="badge-count">0</span>
-</div>
-
+<div id="comment-badge" onclick="toggleSidebar()">&#x1F4AC; <span id="badge-count">0</span></div>
 <div id="sidebar">
-    <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+    <button class="sidebar-close" onclick="toggleSidebar()">&#x00D7;</button>
     <h3>Comments</h3>
     <div id="comment-list"></div>
 </div>
-
-<div id="content">
-${slidesBody}
-</div>
-
+<div id="loading"><span class="spinner"></span>Rendering presentation...</div>
+<div id="pptx-render"></div>
+<div id="slides-output"></div>
 <script>
 (function() {
+    window.onerror = function(msg, url, line, col, err) {
+        document.getElementById('loading').innerHTML = '<b>Error:</b> ' + msg + '<br><pre>' + (err && err.stack || '') + '</pre>';
+        return true;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+        document.getElementById('loading').innerHTML = '<b>Promise Error:</b><pre>' + (e.reason && e.reason.stack || e.reason || '') + '</pre>';
+    });
+
     var vscode = acquireVsCodeApi();
     var comments = ${commentsJson};
-    var blocks = ${blocksJson};
+    var notesData = ${notesJson};
+    var colorFixes = ${colorFixesJson};
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    // Build color fix lookup
+    var colorFixMap = {};
+    colorFixes.forEach(function(f) { colorFixMap[f.text] = f.color; });
 
-    // Badge
+    function fixColors(root) {
+        var spans = root.querySelectorAll('span');
+        for (var i = 0; i < spans.length; i++) {
+            var span = spans[i];
+            if (!span.style || span.style.color !== 'rgb(255, 255, 255)') continue;
+            var text = (span.textContent || '').trim();
+            if (!text) continue;
+            var fix = colorFixMap[text.substring(0, 30)];
+            if (fix && fix !== '#FFFFFF' && fix !== '#ffffff') {
+                span.style.color = fix;
+            }
+        }
+    }
+
+    // Render into hidden container, then extract each slide with CSS scaling
+    var renderDiv = document.getElementById('pptx-render');
+    var output = document.getElementById('slides-output');
+    var TARGET_WIDTH = 960;
+
+    fetch('${pptxFileUri}')
+        .then(function(resp) { return resp.arrayBuffer(); })
+        .then(function(buffer) {
+            return PptxLib.PptxViewer.open(buffer, renderDiv, {
+                renderMode: 'list',
+                listOptions: { windowed: false, batchSize: 50 },
+                fitMode: 'none',
+            });
+        })
+        .then(function(viewer) {
+            document.getElementById('loading').style.display = 'none';
+
+            // Fix colors
+            fixColors(renderDiv);
+
+            // Get the native slide width from the first rendered slide
+            var slideElements = Array.from(renderDiv.children);
+            var nativeWidth = slideElements.length > 0 ? slideElements[0].offsetWidth : 960;
+            var scale = nativeWidth > 0 ? TARGET_WIDTH / nativeWidth : 1;
+
+            // Move each slide into a scaled wrapper
+            slideElements.forEach(function(slideEl, idx) {
+                var label = document.createElement('div');
+                label.className = 'slide-label';
+                label.textContent = 'Slide ' + (idx + 1);
+                output.appendChild(label);
+
+                var outer = document.createElement('div');
+                outer.className = 'slide-outer';
+                var nativeH = slideEl.offsetHeight;
+                outer.style.height = Math.round(nativeH * scale) + 'px';
+
+                slideEl.style.transform = 'scale(' + scale + ')';
+                slideEl.style.transformOrigin = 'top left';
+                slideEl.style.visibility = 'visible';
+                outer.appendChild(slideEl);
+                output.appendChild(outer);
+
+                // Add notes if any
+                var nd = notesData.find(function(n) { return n.slideIndex === idx + 1; });
+                if (nd) {
+                    var notesDiv = document.createElement('div');
+                    notesDiv.className = 'pptx-notes';
+                    notesDiv.innerHTML = '<b>Speaker Notes:</b> ' + esc(nd.notes);
+                    output.appendChild(notesDiv);
+                }
+            });
+
+            // Hide the offscreen render container
+            renderDiv.style.display = 'none';
+        })
+        .catch(function(err) {
+            document.getElementById('loading').innerHTML = '<b>Error:</b> ' + esc(err.message || String(err)) + '<pre>' + esc(err.stack || '') + '</pre>';
+        });
+
+    // --- Comment sidebar ---
     function updateBadge() {
         var badge = document.getElementById('comment-badge');
         var span = document.getElementById('badge-count');
         var unresolved = comments.filter(function(c) { return !c.resolved; });
-        if (comments.length > 0) {
-            badge.style.display = 'block';
-            span.textContent = unresolved.length + ' / ' + comments.length;
-        } else {
-            badge.style.display = 'none';
-        }
+        badge.style.display = comments.length > 0 ? 'block' : 'none';
+        span.textContent = unresolved.length + ' / ' + comments.length;
     }
-
-    // Sidebar
     var sidebarOpen = false;
     window.toggleSidebar = function() {
         sidebarOpen = !sidebarOpen;
         document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
         if (sidebarOpen) buildList();
     };
-
     function buildList() {
-        var container = document.getElementById('comment-list');
-        container.innerHTML = '';
-        if (comments.length === 0) {
-            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">No comments</div>';
-            return;
-        }
+        var list = document.getElementById('comment-list');
+        list.innerHTML = '';
+        if (!comments.length) { list.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">No comments</div>'; return; }
         comments.forEach(function(c) {
             var div = document.createElement('div');
-            var isPptxComment = c._source === 'pptx';
-            div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + (isPptxComment ? ' pptx-comment' : '');
-
-            var authorBadge = isPptxComment
-                ? '<span class="role-badge role-pptx">📊 ' + esc(c._wordAuthor || 'PowerPoint') + '</span>'
-                : '<span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>';
-
-            var repliesHtml = '';
-            if (c.replies && c.replies.length > 0) {
-                repliesHtml = '<div class="item-replies">';
-                c.replies.forEach(function(r) {
-                    repliesHtml += '<div class="item-reply"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) + '</div>';
-                });
-                repliesHtml += '</div>';
-            }
-
-            var resolveBtn = c.resolved
-                ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
-                : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
-
-            div.innerHTML =
-                '<div class="item-preview">' + esc(c.blockPreview || '') + '</div>' +
-                '<div class="item-comment">' + authorBadge + esc(c.comment) + '</div>' +
-                '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() + (c.resolved ? ' ✅' : '') + '</div>' +
-                repliesHtml +
-                '<div class="item-reply-input" onclick="event.stopPropagation()">' +
-                '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
-                '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
-                '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">✨ Ask Copilot</button></div>' +
-                '<div class="item-actions">' + resolveBtn +
-                '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">📋 Copy</button>' +
-                '</div>';
-
-            div.addEventListener('click', function() {
-                // Scroll to the slide
-                var slideEl = document.querySelector('[data-slide-index="' + (c.elementId || '').replace('slide_', '') + '"]');
-                if (slideEl) slideEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            });
-            container.appendChild(div);
+            var isPptx = c._source === 'pptx';
+            div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + (isPptx ? ' pptx-comment' : '');
+            var badge = isPptx ? '<span class="role-badge role-pptx">' + esc(c._wordAuthor || 'PPT') + '</span>' : '<span class="role-badge role-' + (c.role||'user') + '">' + (c.role||'user') + '</span>';
+            var replies = '';
+            if (c.replies && c.replies.length) { replies = '<div class="item-replies">'; c.replies.forEach(function(r) { replies += '<div class="item-reply"><span class="role-badge role-' + (r.role||'user') + '">' + (r.role||'user') + '</span>' + esc(r.text) + '</div>'; }); replies += '</div>'; }
+            var resolveBtn = c.resolved ? '<button onclick="event.stopPropagation();vscode.postMessage({command:\\'unresolveComment\\',id:\\'' + c.id + '\\'})">Reopen</button>' : '<button onclick="event.stopPropagation();vscode.postMessage({command:\\'resolveComment\\',id:\\'' + c.id + '\\'})">Resolve</button>';
+            div.innerHTML = '<div class="item-preview">' + esc(c.blockPreview) + '</div><div class="item-comment">' + badge + esc(c.comment) + '</div><div class="item-meta">' + new Date(c.timestamp).toLocaleString() + (c.resolved ? ' &#x2705;' : '') + '</div>' + replies +
+                '<div class="item-reply-input" onclick="event.stopPropagation()"><textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
+                '<button onclick="event.stopPropagation();var t=document.getElementById(\\'list-reply-' + c.id + '\\').value.trim();if(t)vscode.postMessage({command:\\'replyComment\\',id:\\'' + c.id + '\\',text:t})" style="margin-top:4px;">Reply</button>' +
+                '<button class="btn-copilot" onclick="event.stopPropagation();vscode.postMessage({command:\\'askCopilotThread\\',id:\\'' + c.id + '\\'})" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
+                '<div class="item-actions">' + resolveBtn + '</div>';
+            list.appendChild(div);
         });
     }
-
-    // Actions
-    window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
-    window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
-    window.submitListReply = function(id) {
-        var input = document.getElementById('list-reply-' + id);
-        var text = input ? input.value.trim() : '';
-        if (!text) return;
-        vscode.postMessage({ command: 'replyComment', id: id, text: text });
-        input.value = '';
-    };
-    window.askCopilotThread = function(id) {
-        vscode.postMessage({ command: 'askCopilotThread', id: id });
-    };
-    window.copyComment = function(id) {
-        var c = comments.find(function(x) { return x.id === id; });
-        if (!c) return;
-        var text = c.blockPreview + '\\n' + c.comment;
-        if (c.replies) {
-            c.replies.forEach(function(r) { text += '\\n  [' + (r.role || 'user') + '] ' + r.text; });
-        }
-        navigator.clipboard.writeText(text);
-    };
-
-    // Handle messages from extension host
-    window.addEventListener('message', function(event) {
-        var msg = event.data;
-        if (!msg || !msg.command) return;
-        if (msg.command === 'commentUpdated') {
-            var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
-            if (idx >= 0) { comments[idx] = msg.comment; }
-            updateBadge();
-            if (sidebarOpen) buildList();
-        }
+    window.addEventListener('message', function(e) {
+        var msg = e.data; if (!msg || !msg.command) return;
+        if (msg.command === 'commentUpdated') { var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; }); if (idx >= 0) comments[idx] = msg.comment; updateBadge(); if (sidebarOpen) buildList(); }
     });
-
     updateBadge();
 })();
 </script>
 </body>
 </html>`;
     }
-
     /** Rewrite relative image src paths to data URIs or webview URIs */
     private resolveImagePaths(html: string): string {
         const docDir = path.dirname(this.document.uri.fsPath);

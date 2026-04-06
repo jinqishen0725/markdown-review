@@ -298,7 +298,9 @@
               "description": "Absolute path to the .docx file."
             }
           },
-          "required": ["elementId"]
+          "required": [
+            "elementId"
+          ]
         }
       },
       {
@@ -324,7 +326,10 @@
               "description": "Absolute path to the .docx file."
             }
           },
-          "required": ["elementId", "newXml"]
+          "required": [
+            "elementId",
+            "newXml"
+          ]
         }
       },
       {
@@ -368,8 +373,10 @@
     ]
   },
   "scripts": {
+    "postinstall": "node patches/apply-pptx-renderer-patches.js",
     "compile": "tsc -p ./",
     "bundle": "npx esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "bundle:pptx-viewer": "npx esbuild src/pptx-viewer-webview.ts --bundle --outfile=media/pptx-viewer.js --format=iife --global-name=PptxLib --platform=browser --target=es2020",
     "watch": "tsc -watch -p ./",
     "package": "npm run bundle && vsce package"
   },
@@ -382,6 +389,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "@aiden0z/pptx-renderer": "^1.0.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@traptitech/markdown-it-katex": "^3.6.0",
     "@xmldom/xmldom": "^0.9.9",
@@ -390,6 +398,8 @@
     "katex": "^0.16.38",
     "markdown-it": "^14.0.0",
     "pngjs": "^7.0.0",
+    "pptx-glimpse": "^0.10.3",
+    "pptx-preview": "^1.0.7",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
     "rehype-stringify": "^10.0.1",
@@ -400,4 +410,3 @@
     "unified": "^11.0.5"
   }
 }
-
