@@ -45,12 +45,19 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
     // Parse comments
     const commentsFile = zip.file('word/comments.xml');
     const commentsXmlStr = commentsFile ? await commentsFile.async('string') : null;
-    const comments = await parseCommentsFromString(commentsXmlStr);
+    let comments = await parseCommentsFromString(commentsXmlStr);
+
+    // Parse threading from commentsExtended.xml
+    comments = await parseCommentThreading(zip, comments);
 
     // Parse document body
     const docFile = zip.file('word/document.xml');
     if (!docFile) throw new Error('No word/document.xml found in the docx file');
     const docXmlStr = await docFile.async('string');
+
+    // Extract anchor texts (the text each comment is attached to)
+    extractCommentAnchorTexts(docXmlStr, comments);
+
     const docXml = new DOMParser().parseFromString(docXmlStr, 'text/xml');
     const body = docXml.getElementsByTagNameNS(W, 'body')[0];
     if (!body) throw new Error('No w:body found in document.xml');
@@ -93,9 +100,21 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
         fs.writeFileSync(docXmlPath, formattedXml, 'utf-8');
     }
 
-    // Also extract comments.xml if it exists
-    if (commentsXmlStr && !fs.existsSync(path.join(extractDir, 'comments.xml'))) {
-        fs.writeFileSync(path.join(extractDir, 'comments.xml'), formatXml(commentsXmlStr), 'utf-8');
+    // Also extract comments.xml and commentsExtended.xml
+    const commentsXmlPath = path.join(extractDir, 'comments.xml');
+    const commentsExtPath = path.join(extractDir, 'commentsExtended.xml');
+    if (commentsXmlStr) {
+        // Re-extract if .docx was newer or file doesn't exist
+        if (xmlWasOverwritten || !fs.existsSync(commentsXmlPath)) {
+            fs.writeFileSync(commentsXmlPath, formatXml(commentsXmlStr), 'utf-8');
+        }
+    }
+    const commentsExtXml = zip.file('word/commentsExtended.xml');
+    if (commentsExtXml) {
+        if (xmlWasOverwritten || !fs.existsSync(commentsExtPath)) {
+            const extStr = await commentsExtXml.async('string');
+            fs.writeFileSync(commentsExtPath, formatXml(extStr), 'utf-8');
+        }
     }
 
     return {
@@ -114,26 +133,133 @@ export async function parseDocx(filePath: string): Promise<DocumentModel> {
 
 // ---------- Comment Parser ----------
 
+interface CommentParaIdMap {
+    commentId: string;
+    paraId: string;
+}
+
 async function parseCommentsFromString(xmlStr: string | null): Promise<WordComment[]> {
     const comments: WordComment[] = [];
     if (!xmlStr) return comments;
 
     const xml = new DOMParser().parseFromString(xmlStr, 'text/xml');
+    const W14 = 'http://schemas.microsoft.com/office/word/2010/wordml';
     const nodes = xml.getElementsByTagNameNS(W, 'comment');
+
+    // Build comment-to-paraId mapping (each comment contains a <w:p> with w14:paraId)
+    const commentParaIds: CommentParaIdMap[] = [];
+
     for (let i = 0; i < nodes.length; i++) {
         const el = nodes[i];
         const tNodes = el.getElementsByTagNameNS(W, 't');
         let text = '';
         for (let j = 0; j < tNodes.length; j++) text += tNodes[j].textContent || '';
+
+        // Extract the paraId from the comment's internal paragraph
+        // Extract the paraId from the comment's paragraphs.
+        // Word's commentsExtended.xml references the LAST paragraph's paraId for threading,
+        // so we must collect all and use the last one.
+        const paras = el.getElementsByTagNameNS(W, 'p');
+        let commentParaId = '';
+        for (let p = 0; p < paras.length; p++) {
+            const pid = paras[p].getAttributeNS?.(W14, 'paraId')
+                || paras[p].getAttribute?.('w14:paraId');
+            if (pid) { commentParaId = pid; }
+        }
+
+        const cid = el.getAttribute('w:id') || String(i);
+        commentParaIds.push({ commentId: cid, paraId: commentParaId });
+
         comments.push({
-            id: el.getAttribute('w:id') || String(i),
+            id: cid,
             author: el.getAttribute('w:author') || '',
             date: el.getAttribute('w:date') || '',
             text,
+            _commentParaId: commentParaId,
         });
     }
 
     return comments;
+}
+
+/**
+ * Parse commentsExtended.xml to get threading info and merge into comments.
+ * Groups replies under their parent comment.
+ */
+export async function parseCommentThreading(
+    zip: any, // JSZip
+    comments: WordComment[]
+): Promise<WordComment[]> {
+    const extFile = zip.file('word/commentsExtended.xml');
+    if (!extFile) return comments;
+
+    try {
+        const extXml = new DOMParser().parseFromString(await extFile.async('string'), 'text/xml');
+        const W15 = 'http://schemas.microsoft.com/office/word/2012/wordml';
+        const exts = extXml.getElementsByTagNameNS(W15, 'commentEx');
+
+        // Build paraId → parentParaId map
+        const parentMap = new Map<string, string>();
+        for (let i = 0; i < exts.length; i++) {
+            const paraId = exts[i].getAttributeNS?.(W15, 'paraId')
+                || exts[i].getAttribute?.('w15:paraId') || '';
+            const parentParaId = exts[i].getAttributeNS?.(W15, 'paraIdParent')
+                || exts[i].getAttribute?.('w15:paraIdParent') || '';
+            if (paraId && parentParaId) {
+                parentMap.set(paraId, parentParaId);
+            }
+        }
+
+        // Map comment paraIds to parent comment IDs
+        const paraIdToCommentId = new Map<string, string>();
+        for (const c of comments) {
+            if ((c as any)._commentParaId) {
+                paraIdToCommentId.set((c as any)._commentParaId, c.id);
+            }
+        }
+
+        // Set parentId on each reply comment
+        for (const c of comments) {
+            const myParaId = (c as any)._commentParaId;
+            if (!myParaId) continue;
+            const parentParaId = parentMap.get(myParaId);
+            if (parentParaId) {
+                const parentCommentId = paraIdToCommentId.get(parentParaId);
+                if (parentCommentId) {
+                    c.parentId = parentCommentId;
+                }
+            }
+        }
+    } catch {
+        // Threading parsing is optional — fail silently
+    }
+
+    return comments;
+}
+
+/**
+ * Extract the text that each comment is anchored to from document.xml.
+ * Uses commentRangeStart/commentRangeEnd markers.
+ */
+export function extractCommentAnchorTexts(docXmlStr: string, comments: WordComment[]): void {
+    // Find text between commentRangeStart and commentRangeEnd for each comment ID
+    for (const c of comments) {
+        const startPattern = new RegExp(`<w:commentRangeStart\\s+w:id="${c.id}"\\s*/>`, 'g');
+        const endPattern = new RegExp(`<w:commentRangeEnd\\s+w:id="${c.id}"\\s*/>`, 'g');
+        const startMatch = startPattern.exec(docXmlStr);
+        const endMatch = endPattern.exec(docXmlStr);
+        if (startMatch && endMatch && endMatch.index > startMatch.index) {
+            const between = docXmlStr.substring(startMatch.index + startMatch[0].length, endMatch.index);
+            // Extract all <w:t> text from between the markers
+            const textMatches = between.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+            if (textMatches) {
+                const anchorText = textMatches
+                    .map(m => m.replace(/<w:t[^>]*>/, '').replace(/<\/w:t>/, ''))
+                    .join('');
+                (c as any)._anchorText = anchorText;
+            }
+        }
+    }
 }
 
 // ---------- Body Parser ----------

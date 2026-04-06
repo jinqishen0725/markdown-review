@@ -24,6 +24,8 @@ export interface WordComment {
     text: string;
     parentId?: string;      // for threading (reply to which comment)
     elementId?: string;     // which DocElement this is anchored to
+    _commentParaId?: string; // internal paraId of the comment paragraph
+    _anchorText?: string;    // the document text this comment is anchored to
 }
 
 export interface DocumentModel {

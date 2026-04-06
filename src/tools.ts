@@ -16,7 +16,7 @@ function resolveDocumentPath(explicitPath?: string): string | undefined {
             const abs = path.join(folder.uri.fsPath, explicitPath);
             if (fs.existsSync(abs)) return abs;
         }
-        if (explicitPath.endsWith('.md') || explicitPath.endsWith('.docx')) return explicitPath;
+        if (explicitPath.endsWith('.md') || explicitPath.endsWith('.docx') || explicitPath.endsWith('.pptx')) return explicitPath;
     }
     // 2. Active text editor (markdown only — .docx isn't a TextDocument)
     const editor = vscode.window.activeTextEditor;
@@ -64,25 +64,57 @@ export class ListCommentsTool implements vscode.LanguageModelTool<IListParams> {
         const resolved = getCommentsManagerFor(options.input?.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter set to the absolute path of the markdown file.')
+                new vscode.LanguageModelTextPart('No document found. Please retry with the filePath parameter set to the absolute path of the markdown file.')
             ]);
         }
         const { mgr, mdPath } = resolved;
-        const comments = mgr.getComments();
-        if (comments.length === 0) {
+        const sidecarComments = mgr.getComments();
+
+        // Include Word native comments from open preview panels
+        let wordComments: any[] = [];
+        for (const [, panel] of PreviewPanel.currentPanels) {
+            const model = (panel as any).docxModel;
+            if (model?.comments) {
+                const roots = model.comments.filter((wc: any) => !wc.parentId);
+                const replies = model.comments.filter((wc: any) => wc.parentId);
+                wordComments = roots.map((wc: any) => {
+                    const sidecar = sidecarComments.find(c => c.id === `word_${wc.id}`);
+                    const wordReplies = replies.filter((r: any) => r.parentId === wc.id);
+                    const sidecarReplies = sidecar?.replies || [];
+                    return {
+                        id: `word_${wc.id}`,
+                        blockPreview: wc._anchorText || wc.text.substring(0, 60),
+                        comment: wc.text,
+                        resolved: sidecar?.resolved || false,
+                        elementId: wc.elementId,
+                        replies: [...wordReplies.map((r: any) => ({ text: `[${r.author}] ${r.text}` })), ...sidecarReplies],
+                        _wordAuthor: wc.author,
+                        _source: 'word',
+                    };
+                });
+                break;
+            }
+        }
+
+        // Merge: sidecar-only comments (non-word_*) + Word comments
+        const reviewOnly = sidecarComments.filter(c => !c.id.startsWith('word_'));
+        const allComments = [...reviewOnly, ...wordComments];
+
+        if (allComments.length === 0) {
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(`No review comments found on ${path.basename(mdPath)} (${mdPath}). If you expected comments on a different file, retry with the correct filePath parameter.`)
             ]);
         }
         const fileName = path.basename(mdPath);
-        const summary = comments.map((c, i) => {
+        const summary = allComments.map((c: any, i: number) => {
             const status = c.resolved ? 'RESOLVED' : 'OPEN';
             const replyCount = c.replies ? c.replies.length : 0;
             const eidInfo = c.elementId ? ` | elementId=${c.elementId}` : '';
-            return `${i + 1}. [${status}] id=${c.id}${eidInfo} | ${c.blockType}: "${c.blockPreview.substring(0, 60)}" | "${c.comment.substring(0, 80)}" | ${replyCount} replies`;
+            const source = c._source === 'word' ? ` [Word: ${c._wordAuthor}]` : '';
+            return `${i + 1}. [${status}] id=${c.id}${eidInfo}${source} | "${c.blockPreview?.substring(0, 60) || ''}" | "${c.comment?.substring(0, 80) || ''}" | ${replyCount} replies`;
         }).join('\n');
         return new vscode.LanguageModelToolResult([
-            new vscode.LanguageModelTextPart(`${comments.length} review comments on ${fileName} (${mdPath}):\n${summary}`)
+            new vscode.LanguageModelTextPart(`${allComments.length} comments on ${fileName} (${mdPath}):\n${summary}`)
         ]);
     }
 }
@@ -99,14 +131,14 @@ export class ReadCommentTool implements vscode.LanguageModelTool<IReadCommentPar
         const resolved = getCommentsManagerFor(options.input.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
+                new vscode.LanguageModelTextPart('No document found. Please retry with the filePath parameter.')
             ]);
         }
         const { mgr, mdPath } = resolved;
         const comment = mgr.getComments().find(c => c.id === options.input.commentId);
         if (!comment) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found in ${path.basename(mdPath)}. This may be the wrong file — retry with the filePath parameter set to the correct markdown file path.`)
+                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found in ${path.basename(mdPath)}. This may be the wrong file — retry with the filePath parameter set to the correct document file path.`)
             ]);
         }
         const context = getMarkdownContext(mdPath, comment.startOffset);
@@ -143,21 +175,48 @@ export class ReplyToCommentTool implements vscode.LanguageModelTool<IReplyParams
         const resolved = getCommentsManagerFor(options.input.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
+                new vscode.LanguageModelTextPart('No document found. Please retry with the filePath parameter.')
             ]);
         }
         const { mgr } = resolved;
-        const reply = mgr.addReply(options.input.commentId, options.input.text, 'agent');
+        const commentId = options.input.commentId;
+
+        // For Word comments (word_*), create sidecar entry if it doesn't exist yet
+        if (commentId.startsWith('word_') && !mgr.getComments().find(c => c.id === commentId)) {
+            const wordModel = this.findWordComment(commentId);
+            mgr.addDocxComment(
+                wordModel?.elementId || '',
+                'paragraph',
+                wordModel?.text?.substring(0, 60) || '',
+                wordModel?.text || '(Word comment)',
+            );
+            const added = mgr.getComments();
+            added[added.length - 1].id = commentId;
+            mgr.persist();
+        }
+
+        const reply = mgr.addReply(commentId, options.input.text, 'agent');
         if (!reply) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} not found. The active file may not be the one containing this comment — retry with the filePath parameter set to the correct markdown file path.`)
+                new vscode.LanguageModelTextPart(`Comment ${commentId} not found. The active file may not be the one containing this comment — retry with the filePath parameter set to the correct document file path.`)
             ]);
         }
-        // Trigger preview refresh without full re-render
-        this.refreshPreview(options.input.commentId);
+        // Trigger preview refresh
+        this.refreshPreview(commentId);
         return new vscode.LanguageModelToolResult([
-            new vscode.LanguageModelTextPart(`Reply added to comment ${options.input.commentId}.`)
+            new vscode.LanguageModelTextPart(`Reply added to comment ${commentId}.`)
         ]);
+    }
+
+    private findWordComment(wordCommentId: string): any {
+        const wcId = wordCommentId.replace('word_', '');
+        for (const [, panel] of PreviewPanel.currentPanels) {
+            const model = (panel as any).docxModel;
+            if (model?.comments) {
+                return model.comments.find((wc: any) => wc.id === wcId);
+            }
+        }
+        return undefined;
     }
 
     private refreshPreview(commentId: string) {
@@ -179,15 +238,37 @@ export class ResolveCommentTool implements vscode.LanguageModelTool<IResolvePara
         const resolved = getCommentsManagerFor(options.input.filePath);
         if (!resolved) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
+                new vscode.LanguageModelTextPart('No document found. Please retry with the filePath parameter.')
             ]);
         }
         const { mgr } = resolved;
-        mgr.resolveComment(options.input.commentId);
-        this.refreshPreview(options.input.commentId);
+        const commentId = options.input.commentId;
+
+        // For Word comments (word_*), create sidecar entry if it doesn't exist yet
+        if (commentId.startsWith('word_') && !mgr.getComments().find(c => c.id === commentId)) {
+            const wordModel = this.findWordComment(commentId);
+            mgr.addDocxComment(wordModel?.elementId || '', 'paragraph', wordModel?.text?.substring(0, 60) || '', wordModel?.text || '');
+            const added = mgr.getComments();
+            added[added.length - 1].id = commentId;
+            mgr.persist();
+        }
+
+        mgr.resolveComment(commentId);
+        this.refreshPreview(commentId);
         return new vscode.LanguageModelToolResult([
-            new vscode.LanguageModelTextPart(`Comment ${options.input.commentId} marked as resolved.`)
+            new vscode.LanguageModelTextPart(`Comment ${commentId} marked as resolved.`)
         ]);
+    }
+
+    private findWordComment(wordCommentId: string): any {
+        const wcId = wordCommentId.replace('word_', '');
+        for (const [, panel] of PreviewPanel.currentPanels) {
+            const model = (panel as any).docxModel;
+            if (model?.comments) {
+                return model.comments.find((wc: any) => wc.id === wcId);
+            }
+        }
+        return undefined;
     }
 
     private refreshPreview(commentId: string) {
@@ -209,7 +290,7 @@ export class DeleteCommentTool implements vscode.LanguageModelTool<IDeleteParams
         const mdPath = resolveDocumentPath(options.input.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
+                new vscode.LanguageModelTextPart('No document found. Please retry with the filePath parameter.')
             ]);
         }
         // Use the PreviewPanel if available (it handles anchor removal via VS Code API)
@@ -239,7 +320,7 @@ export class ScrollToCommentTool implements vscode.LanguageModelTool<IScrollPara
         const mdPath = resolveDocumentPath(options.input.filePath);
         if (!mdPath) {
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart('No markdown document found. Please retry with the filePath parameter.')
+                new vscode.LanguageModelTextPart('No document found. Please retry with the filePath parameter.')
             ]);
         }
         const mgr = new CommentsManager(mdPath);
@@ -537,16 +618,17 @@ export class ListElementsTool implements vscode.LanguageModelTool<IListElementsP
 
 export function registerTools(context: vscode.ExtensionContext) {
     context.subscriptions.push(
-        vscode.lm.registerTool('markdownReview_list_comments', new ListCommentsTool()),
-        vscode.lm.registerTool('markdownReview_read_comment', new ReadCommentTool()),
-        vscode.lm.registerTool('markdownReview_reply_to_comment', new ReplyToCommentTool()),
-        vscode.lm.registerTool('markdownReview_resolve_comment', new ResolveCommentTool()),
-        vscode.lm.registerTool('markdownReview_delete_comment', new DeleteCommentTool()),
-        vscode.lm.registerTool('markdownReview_scroll_to_comment', new ScrollToCommentTool()),
-        vscode.lm.registerTool('markdownReview_capture_screenshot', new CaptureScreenshotTool()),
-        vscode.lm.registerTool('markdownReview_read_element_xml', new ReadElementXmlTool()),
-        vscode.lm.registerTool('markdownReview_write_element_xml', new WriteElementXmlTool()),
-        vscode.lm.registerTool('markdownReview_save_document', new SaveDocumentTool()),
-        vscode.lm.registerTool('markdownReview_list_elements', new ListElementsTool()),
+        vscode.lm.registerTool('docReview_list_comments', new ListCommentsTool()),
+        vscode.lm.registerTool('docReview_read_comment', new ReadCommentTool()),
+        vscode.lm.registerTool('docReview_reply_to_comment', new ReplyToCommentTool()),
+        vscode.lm.registerTool('docReview_resolve_comment', new ResolveCommentTool()),
+        vscode.lm.registerTool('docReview_delete_comment', new DeleteCommentTool()),
+        vscode.lm.registerTool('docReview_scroll_to_comment', new ScrollToCommentTool()),
+        vscode.lm.registerTool('docReview_capture_screenshot', new CaptureScreenshotTool()),
+        vscode.lm.registerTool('docReview_read_element_xml', new ReadElementXmlTool()),
+        vscode.lm.registerTool('docReview_write_element_xml', new WriteElementXmlTool()),
+        vscode.lm.registerTool('docReview_save_document', new SaveDocumentTool()),
+        vscode.lm.registerTool('docReview_list_elements', new ListElementsTool()),
     );
 }
+

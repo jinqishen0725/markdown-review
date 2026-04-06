@@ -14,6 +14,18 @@ const rehypeRaw = require('rehype-raw').default || require('rehype-raw');
 
 // ---------- AST helpers ----------
 
+function escapeHtml(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function isColorDark(hex: string): boolean {
+    const c = hex.replace('#', '');
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+}
+
 interface Block {
     type: string;
     startOffset: number;
@@ -94,6 +106,11 @@ export class PreviewPanel {
     private docxXmlWatcher: ReturnType<typeof import('fs').watch> | null = null;
     private docxXmlDebounce: ReturnType<typeof setTimeout> | null = null;
     private docxXmlExtractTime: number = 0; // timestamp when XML was first extracted
+
+    // PowerPoint-specific fields
+    public isPptx: boolean = false;
+    private pptxPath: string = '';
+    private pptxModel: any = null; // PptxModel from pptx-parser
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -189,7 +206,9 @@ export class PreviewPanel {
         const existing = PreviewPanel.currentPanels.get(key);
         if (existing) {
             existing.panel.reveal(vscode.ViewColumn.Active);
-            existing.updateContent();
+            // Force re-parse from the .docx to pick up new/modified comments
+            existing.docxModel = null;
+            await existing.updateDocxContent();
             return;
         }
 
@@ -215,6 +234,38 @@ export class PreviewPanel {
         p.docxPath = docxPath;
         p.commentsManager = new CommentsManager(docxPath);
         await p.updateDocxContent();
+        PreviewPanel.currentPanels.set(key, p);
+    }
+
+    public static async createOrShowPptx(context: vscode.ExtensionContext, pptxPath: string) {
+        const key = pptxPath;
+        const existing = PreviewPanel.currentPanels.get(key);
+        if (existing) {
+            existing.panel.reveal(vscode.ViewColumn.Active);
+            existing.pptxModel = null;
+            await existing.updatePptxContent();
+            return;
+        }
+
+        const dummyDoc = await vscode.workspace.openTextDocument({ content: '', language: 'plaintext' });
+        const panel = vscode.window.createWebviewPanel(
+            'markdownReview',
+            '📊 ' + path.basename(pptxPath),
+            vscode.ViewColumn.Active,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [
+                    vscode.Uri.joinPath(context.extensionUri, 'media'),
+                    vscode.Uri.file(path.dirname(pptxPath)),
+                ],
+            },
+        );
+        const p = new PreviewPanel(panel, dummyDoc, context.extensionUri, true /* skipInitialRender */);
+        p.isPptx = true;
+        p.pptxPath = pptxPath;
+        p.commentsManager = new CommentsManager(pptxPath);
+        await p.updatePptxContent();
         PreviewPanel.currentPanels.set(key, p);
     }
 
@@ -248,16 +299,10 @@ export class PreviewPanel {
                 return;
             }
             case 'resolveComment':
-                // Create sidecar entry for Word comments on first resolve
-                if (message.id.startsWith('word_') && !this.commentsManager.getComments().find((c: any) => c.id === message.id)) {
-                    const wc = this.docxModel?.comments?.find((w: any) => `word_${w.id}` === message.id);
-                    this.commentsManager.addDocxComment(wc?.elementId || '', 'paragraph', wc?.text?.substring(0, 60) || '', wc?.text || '');
-                    const added = this.commentsManager.getComments();
-                    added[added.length - 1].id = message.id;
-                    this.commentsManager.persist();
-                }
+                // Create sidecar entry for imported comments on first resolve
+                this.ensureSidecarForImportedComment(message.id);
                 this.commentsManager.resolveComment(message.id);
-                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
+                this.sendImportedCommentUpdate(message.id);
                 return;
             case 'deleteComment': {
                 const delAnswer = await vscode.window.showWarningMessage(
@@ -271,7 +316,7 @@ export class PreviewPanel {
                     }
                     this.commentsManager.deleteComment(message.id);
                     if (this.isDocx) {
-                        this.updateDocxContent();
+                        try { await this.updateDocxContent(); } catch (e: any) { log('deleteComment re-render failed: ' + e.message); }
                     } else {
                         this.immediateRender();
                     }
@@ -280,27 +325,13 @@ export class PreviewPanel {
             }
             case 'unresolveComment':
                 this.commentsManager.unresolveComment(message.id);
-                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
+                this.sendImportedCommentUpdate(message.id);
                 return;
             case 'replyComment': {
-                // For Word comments (id starts with 'word_'), create a sidecar placeholder on first interaction
-                if (message.id.startsWith('word_') && !this.commentsManager.getComments().find((c: any) => c.id === message.id)) {
-                    // Find the Word comment data from the merged comments
-                    const wordComment = this.docxModel?.comments?.find((wc: any) => `word_${wc.id}` === message.id);
-                    this.commentsManager.addDocxComment(
-                        wordComment?.elementId || '',
-                        'paragraph',
-                        wordComment?.text?.substring(0, 60) || '',
-                        wordComment?.text || '(Word comment)',
-                    );
-                    // Fix the ID to match the word_ prefix
-                    const added = this.commentsManager.getComments();
-                    const last = added[added.length - 1];
-                    last.id = message.id;
-                    this.commentsManager.persist();
-                }
+                // For imported comments, create sidecar on first interaction
+                this.ensureSidecarForImportedComment(message.id);
                 this.commentsManager.addReply(message.id, message.text);
-                this.panel.webview.postMessage({ command: 'commentUpdated', comment: this.commentsManager.getComments().find((c: any) => c.id === message.id) });
+                this.sendImportedCommentUpdate(message.id);
                 return;
             }
             case 'editComment': {
@@ -447,7 +478,23 @@ export class PreviewPanel {
                 if (message.pendingReply) {
                     this.commentsManager.reload();
                 }
-                const comment = this.commentsManager.getComments().find((c: any) => c.id === message.id);
+                let comment = this.commentsManager.getComments().find((c: any) => c.id === message.id);
+                // For Word comments, build a compatible comment object from the Word model
+                if (!comment && message.id.startsWith('word_') && this.docxModel) {
+                    const wcId = message.id.replace('word_', '');
+                    const wc = this.docxModel.comments.find((w: any) => w.id === wcId);
+                    if (wc) {
+                        const sidecar = this.commentsManager.getComments().find((c: any) => c.id === message.id);
+                        comment = {
+                            id: message.id,
+                            comment: wc.text,
+                            blockPreview: (wc as any)._anchorText || wc.text.substring(0, 60),
+                            resolved: sidecar?.resolved || false,
+                            replies: sidecar?.replies || [],
+                            elementId: wc.elementId,
+                        };
+                    }
+                }
                 if (comment) {
                     this.openCopilotForThread(comment);
                 }
@@ -805,6 +852,106 @@ export class PreviewPanel {
         this.lastRenderTime = Date.now();
     }
 
+    /**
+     * Build a merged Word comment object with all metadata for targeted webview updates.
+     * Combines native Word comment data with sidecar replies/resolved status.
+     */
+    private buildMergedWordComment(wordCommentId: string): any | undefined {
+        if (!this.docxModel) return undefined;
+        const wcId = wordCommentId.replace('word_', '');
+        const allWordComments = this.docxModel.comments || [];
+        const wc = allWordComments.find((c: any) => c.id === wcId && !c.parentId);
+        if (!wc) return undefined;
+
+        const replyComments = allWordComments.filter((c: any) => c.parentId === wcId);
+        const wordReplies = replyComments.map((r: any) => ({
+            id: `wr_${r.id}`,
+            role: 'user' as const,
+            text: `[${r.author}] ${r.text}`,
+            timestamp: r.date || new Date().toISOString(),
+        }));
+
+        const sidecar = this.commentsManager.getComments().find((c: any) => c.id === wordCommentId);
+        const sidecarReplies = sidecar?.replies || [];
+
+        return {
+            id: wordCommentId,
+            anchor: '',
+            startOffset: 0,
+            endOffset: 0,
+            blockType: 'paragraph',
+            blockPreview: (wc as any)._anchorText || '(document text)',
+            comment: wc.text,
+            role: 'user' as const,
+            timestamp: wc.date || new Date().toISOString(),
+            resolved: sidecar?.resolved || false,
+            elementId: wc.elementId,
+            replies: [...wordReplies, ...sidecarReplies],
+            _wordAuthor: wc.author,
+            _source: 'word',
+        };
+    }
+
+    private buildMergedPptxComment(pptxCommentId: string): any | undefined {
+        if (!this.pptxModel) return undefined;
+        const pcId = pptxCommentId.replace('pptx_', '');
+        const pc = this.pptxModel.comments.find((c: any) => c.id === pcId);
+        if (!pc) return undefined;
+
+        const sidecar = this.commentsManager.getComments().find((c: any) => c.id === pptxCommentId);
+        const sidecarReplies = sidecar?.replies || [];
+
+        return {
+            id: pptxCommentId,
+            anchor: '',
+            startOffset: 0,
+            endOffset: 0,
+            blockType: 'slide',
+            blockPreview: `Slide ${pc.slideIndex}` + (pc.shapeId ? ` (shape ${pc.shapeId})` : ''),
+            comment: pc.text,
+            role: 'user' as const,
+            timestamp: pc.created || new Date().toISOString(),
+            resolved: sidecar?.resolved || false,
+            elementId: `slide_${pc.slideIndex}`,
+            replies: [...sidecarReplies],
+            _wordAuthor: pc.authorName,
+            _source: 'pptx',
+        };
+    }
+
+    /** Create sidecar entry for imported comments on first interaction */
+    private ensureSidecarForImportedComment(id: string): void {
+        if (!this.commentsManager.getComments().find((c: any) => c.id === id)) {
+            if (id.startsWith('word_') && this.docxModel) {
+                const wc = this.docxModel.comments.find((w: any) => `word_${w.id}` === id);
+                this.commentsManager.addDocxComment(wc?.elementId || '', 'paragraph', wc?.text?.substring(0, 60) || '', wc?.text || '');
+            } else if (id.startsWith('pptx_') && this.pptxModel) {
+                const pc = this.pptxModel.comments.find((c: any) => `pptx_${c.id}` === id);
+                this.commentsManager.addDocxComment(`slide_${pc?.slideIndex || 0}`, 'slide', `Slide ${pc?.slideIndex || '?'}`, pc?.text || '');
+            } else {
+                return; // not an imported comment
+            }
+            const added = this.commentsManager.getComments();
+            added[added.length - 1].id = id;
+            this.commentsManager.persist();
+        }
+    }
+
+    /** Send targeted update for imported or sidecar comments */
+    private sendImportedCommentUpdate(id: string): void {
+        let merged: any;
+        if (id.startsWith('word_')) {
+            merged = this.buildMergedWordComment(id);
+        } else if (id.startsWith('pptx_')) {
+            merged = this.buildMergedPptxComment(id);
+        } else {
+            merged = this.commentsManager.getComments().find((c: any) => c.id === id);
+        }
+        if (merged) {
+            this.panel.webview.postMessage({ command: 'commentUpdated', comment: merged });
+        }
+    }
+
     private async updateDocxContent() {
         if (!this.isDocx || !this.docxPath) return;
         try {
@@ -846,30 +993,33 @@ export class PreviewPanel {
             // Build HTML body from elements
             let bodyHtml = '';
             for (const el of this.docxModel.elements) {
-                const commentClass = el.commentIds.length > 0 ? ' commented-block' : '';
+                const hasWordComments = el.commentIds.length > 0;
+                const commentClass = hasWordComments ? ' word-commented-block' : '';
                 const eidAttr = `data-eid="${el.id}"`;
+                // Store comment IDs as data attribute for click handling
+                const commentIdsAttr = hasWordComments ? ` data-word-comment-ids="${el.commentIds.join(',')}"` : '';
                 switch (el.type) {
                     case 'heading': {
                         const lvl = Math.min(el.level || 1, 6);
-                        bodyHtml += `<h${lvl} ${eidAttr} class="${commentClass}">${el.htmlContent}</h${lvl}>\n`;
+                        bodyHtml += `<h${lvl} ${eidAttr}${commentIdsAttr} class="${commentClass}">${el.htmlContent}</h${lvl}>\n`;
                         break;
                     }
                     case 'table':
-                        bodyHtml += `<div ${eidAttr} class="table-wrapper${commentClass}">${el.htmlContent}</div>\n`;
+                        bodyHtml += `<div ${eidAttr}${commentIdsAttr} class="table-wrapper${commentClass}">${el.htmlContent}</div>\n`;
                         break;
                     case 'list-item': {
                         const indent = (el.level || 0) * 24 + 24;
-                        bodyHtml += `<div ${eidAttr} class="list-item${commentClass}" style="padding-left:${indent}px">• ${el.htmlContent}</div>\n`;
+                        bodyHtml += `<div ${eidAttr}${commentIdsAttr} class="list-item${commentClass}" style="padding-left:${indent}px">• ${el.htmlContent}</div>\n`;
                         break;
                     }
                     case 'code-block':
-                        bodyHtml += `<pre ${eidAttr} class="code-block${commentClass}"><code>${el.htmlContent}</code></pre>\n`;
+                        bodyHtml += `<pre ${eidAttr}${commentIdsAttr} class="code-block${commentClass}"><code>${el.htmlContent}</code></pre>\n`;
                         break;
                     default:
                         if (!el.content.trim() && !el.htmlContent.trim()) {
                             bodyHtml += `<p ${eidAttr} class="empty-para">&nbsp;</p>\n`;
                         } else {
-                            bodyHtml += `<p ${eidAttr} class="${commentClass}">${el.htmlContent}</p>\n`;
+                            bodyHtml += `<p ${eidAttr}${commentIdsAttr} class="${commentClass}">${el.htmlContent}</p>\n`;
                         }
                 }
             }
@@ -915,35 +1065,57 @@ export class PreviewPanel {
                 this.commentsManager.persist();
             }
 
-            // Merge Word native comments into the display list
-            // Convert WordComment → Comment-compatible shape with source='word'
-            const wordComments = (this.docxModel.comments || []).map((wc: any) => ({
-                id: `word_${wc.id}`,
-                anchor: '',
-                startOffset: 0,
-                endOffset: 0,
-                blockType: 'paragraph',
-                blockPreview: wc.text.substring(0, 60),
-                comment: wc.text,
-                role: 'user' as const,
-                timestamp: wc.date || new Date().toISOString(),
-                resolved: false,
-                elementId: wc.elementId,
-                replies: [],
-                _wordAuthor: wc.author,
-                _source: 'word',
-            }));
+            // Merge Word native comments into the display list (threaded)
+            const allWordComments = this.docxModel.comments || [];
 
-            // Check for sidecar replies to Word comments
+            // Separate root comments from replies
+            const rootComments = allWordComments.filter((wc: any) => !wc.parentId);
+            const replyComments = allWordComments.filter((wc: any) => wc.parentId);
+
+            const wordComments = rootComments.map((wc: any) => {
+                // Find Word replies to this comment
+                const wordReplies = replyComments
+                    .filter((r: any) => r.parentId === wc.id)
+                    .map((r: any) => ({
+                        id: `wr_${r.id}`,
+                        role: 'user' as const,
+                        text: `[${r.author}] ${r.text}`,
+                        timestamp: r.date || new Date().toISOString(),
+                    }));
+
+                return {
+                    id: `word_${wc.id}`,
+                    anchor: '',
+                    startOffset: 0,
+                    endOffset: 0,
+                    blockType: 'paragraph',
+                    blockPreview: (wc as any)._anchorText || '(document text)',
+                    comment: wc.text,
+                    role: 'user' as const,
+                    timestamp: wc.date || new Date().toISOString(),
+                    resolved: false,
+                    elementId: wc.elementId,
+                    replies: wordReplies,
+                    _wordAuthor: wc.author,
+                    _source: 'word',
+                };
+            });
+
+            // Merge sidecar replies/resolved status for Word comments
             for (const wc of wordComments) {
                 const sidecar = comments.find((c: any) => c.id === wc.id);
-                if (sidecar && sidecar.replies) {
-                    wc.replies = sidecar.replies;
+                if (sidecar) {
+                    // Append sidecar replies after Word replies
+                    if (sidecar.replies) {
+                        wc.replies = [...wc.replies, ...sidecar.replies];
+                    }
                     wc.resolved = sidecar.resolved;
                 }
             }
 
-            const allComments = [...comments, ...wordComments];
+            // Filter out sidecar entries that are just placeholders for Word comments
+            const reviewOnlyComments = comments.filter((c: any) => !c.id.startsWith('word_'));
+            const allComments = [...reviewOnlyComments, ...wordComments];
 
             this.panel.webview.html = this.getHtml(bodyHtml, blocks, allComments);
             this.lastRenderTime = Date.now();
@@ -955,6 +1127,518 @@ export class PreviewPanel {
             logError('Failed to render docx', e);
             this.panel.webview.html = `<html><body><h1>Error loading document</h1><pre>${e.message}\n${e.stack}</pre></body></html>`;
         }
+    }
+
+    // ---------- PowerPoint rendering ----------
+
+    private async updatePptxContent() {
+        if (!this.isPptx || !this.pptxPath) return;
+        try {
+            const { parsePptx } = require('./pptx-parser');
+
+            if (!this.pptxModel) {
+                this.pptxModel = await parsePptx(this.pptxPath);
+            }
+
+            const model = this.pptxModel;
+            const EMU_PER_INCH = 914400;
+            const slideWidthInches = model.dimensions.cx / EMU_PER_INCH;
+            const slideHeightInches = model.dimensions.cy / EMU_PER_INCH;
+            const aspectRatio = slideHeightInches / slideWidthInches;
+            const RENDER_WIDTH = 960; // px
+            const RENDER_HEIGHT = Math.round(RENDER_WIDTH * aspectRatio);
+            const scale = RENDER_WIDTH / model.dimensions.cx;
+
+            // Build HTML for all slides
+            let slidesHtml = '';
+            for (const slide of model.slides) {
+                let shapesHtml = '';
+                for (const shape of slide.shapes) {
+                    const left = Math.round(shape.x * scale);
+                    const top = Math.round(shape.y * scale);
+                    const width = Math.round(shape.cx * scale);
+                    const height = Math.round(shape.cy * scale);
+
+                    if (width <= 0 && height <= 0) continue;
+
+                    const bgStyle = shape.fillColor ? `background:${shape.fillColor};` : '';
+                    const borderStyle = shape.borderColor ? `border:1px solid ${shape.borderColor};` : '';
+                    const textColor = shape.fillColor && isColorDark(shape.fillColor) ? 'color:#fff;' : '';
+
+                    // Geometry-specific rendering
+                    const geom = shape.geometry || 'rect';
+                    let extraStyle = '';
+                    let shapeContent = shape.htmlContent;
+
+                    if (geom === 'roundRect') {
+                        extraStyle += 'border-radius:8px;';
+                    } else if (geom === 'rightArrow') {
+                        // Render as CSS arrow pointing right
+                        shapeContent = '';
+                        extraStyle += 'background:transparent !important;';
+                        const arrowHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;">` +
+                            `<div style="flex:1;height:50%;background:${shape.fillColor || '#333'};"></div>` +
+                            `<div style="width:0;height:0;border-top:${Math.round(height/2)}px solid transparent;` +
+                            `border-bottom:${Math.round(height/2)}px solid transparent;` +
+                            `border-left:${Math.round(width*0.4)}px solid ${shape.fillColor || '#333'};"></div></div>`;
+                        shapeContent = arrowHtml;
+                    } else if (geom === 'downArrow') {
+                        shapeContent = '';
+                        extraStyle += 'background:transparent !important;';
+                        const arrowHtml = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;">` +
+                            `<div style="height:60%;width:50%;background:${shape.fillColor || '#333'};"></div>` +
+                            `<div style="width:0;height:0;border-left:${Math.round(width/2)}px solid transparent;` +
+                            `border-right:${Math.round(width/2)}px solid transparent;` +
+                            `border-top:${Math.round(height*0.4)}px solid ${shape.fillColor || '#333'};"></div></div>`;
+                        shapeContent = arrowHtml;
+                    } else if (geom === 'ellipse') {
+                        extraStyle += 'border-radius:50%;';
+                    }
+
+                    // Body padding (scale EMU insets to px)
+                    let padStyle = 'padding:4px;';
+                    if (shape.bodyInsets) {
+                        const pl = Math.round(shape.bodyInsets.l * scale);
+                        const pt = Math.round(shape.bodyInsets.t * scale);
+                        const pr = Math.round(shape.bodyInsets.r * scale);
+                        const pb = Math.round(shape.bodyInsets.b * scale);
+                        padStyle = `padding:${pt}px ${pr}px ${pb}px ${pl}px;`;
+                    }
+
+                    // Font scale (normAutofit)
+                    let fontScaleStyle = '';
+                    if (shape.fontScale && shape.fontScale < 100) {
+                        fontScaleStyle = `font-size:${shape.fontScale}%;`;
+                    }
+
+                    const shapeClass = shape.type === 'picture' ? 'pptx-pic' :
+                        shape.type === 'table' ? 'pptx-table-wrap' :
+                        shape.placeholderType === 'title' || shape.placeholderType === 'ctrTitle' ? 'pptx-title' :
+                        'pptx-shape';
+
+                    shapesHtml += `<div class="${shapeClass}" data-shape-id="${shape.id}" data-slide="${slide.index}" ` +
+                        `style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;` +
+                        `overflow:hidden;${padStyle}box-sizing:border-box;${bgStyle}${borderStyle}${textColor}${extraStyle}${fontScaleStyle}">` +
+                        `${shapeContent}</div>\n`;
+                }
+
+                // Slide comments markers
+                const slideComments = model.comments.filter((c: any) => c.slideIndex === slide.index);
+
+                slidesHtml += `<div class="pptx-slide-wrapper">` +
+                    `<div class="pptx-slide-number">Slide ${slide.index}</div>` +
+                    `<div class="pptx-slide" data-slide-index="${slide.index}" ` +
+                    `style="position:relative;width:${RENDER_WIDTH}px;height:${RENDER_HEIGHT}px;` +
+                    `background:#fff;border:1px solid #444;overflow:hidden;margin:0 auto;">` +
+                    shapesHtml +
+                    `</div>`;
+
+                // Speaker notes
+                if (slide.notes) {
+                    slidesHtml += `<div class="pptx-notes"><b>Speaker Notes:</b> ${escapeHtml(slide.notes)}</div>`;
+                }
+
+                slidesHtml += `</div>\n`;
+            }
+
+            // Merge sidecar comments
+            const sidecarComments = this.commentsManager.getComments();
+
+            // Build pptx comments as review comment objects
+            const pptxCommentObjs = model.comments.map((c: any) => ({
+                id: `pptx_${c.id}`,
+                anchor: '',
+                startOffset: 0,
+                endOffset: 0,
+                blockType: 'slide',
+                blockPreview: `Slide ${c.slideIndex}` + (c.shapeId ? ` (shape ${c.shapeId})` : ''),
+                comment: c.text,
+                role: 'user' as const,
+                timestamp: c.created || new Date().toISOString(),
+                resolved: false,
+                elementId: `slide_${c.slideIndex}`,
+                replies: [] as any[],
+                _wordAuthor: c.authorName,
+                _source: 'pptx',
+            }));
+
+            // Merge sidecar data
+            for (const pc of pptxCommentObjs) {
+                const sidecar = sidecarComments.find((c: any) => c.id === pc.id);
+                if (sidecar) {
+                    if (sidecar.replies) pc.replies = [...pc.replies, ...sidecar.replies];
+                    pc.resolved = sidecar.resolved;
+                }
+            }
+
+            const reviewOnly = sidecarComments.filter((c: any) => !c.id.startsWith('pptx_'));
+            const allComments = [...reviewOnly, ...pptxCommentObjs];
+
+            const blocks: Block[] = model.slides.map((s: any) => ({
+                type: 'slide',
+                startOffset: 0,
+                endOffset: 0,
+                startLine: 0,
+                preview: `Slide ${s.index}`,
+                eid: `slide_${s.index}`,
+            }));
+
+            this.panel.webview.html = this.getPptxHtml(slidesHtml, blocks, allComments, model);
+            this.lastRenderTime = Date.now();
+            log(`Pptx preview rendered: ${model.slides.length} slides, ${model.comments.length} comments`);
+        } catch (e: any) {
+            logError('Failed to render pptx', e);
+            this.panel.webview.html = `<html><body><h1>Error loading presentation</h1><pre>${e.message}\n${e.stack}</pre></body></html>`;
+        }
+    }
+
+    private getPptxHtml(slidesBody: string, blocks: Block[], comments: any[], model: any): string {
+        const commentsJson = JSON.stringify(comments).replace(/</g, '\\u003c');
+        const blocksJson = JSON.stringify(blocks).replace(/</g, '\\u003c');
+
+        return /*html*/`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerPoint Review</title>
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    background: var(--vscode-editor-background, #1e1e1e);
+    color: var(--vscode-editor-foreground, #d4d4d4);
+    margin: 0;
+    padding: 20px;
+}
+.pptx-slide-wrapper {
+    margin-bottom: 30px;
+}
+.pptx-slide-number {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--vscode-foreground, #ccc);
+    margin-bottom: 8px;
+    padding-left: 4px;
+}
+.pptx-slide {
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    border-radius: 4px;
+    font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+    color: #333;
+}
+.pptx-shape {
+    font-size: 11px;
+    line-height: 1.3;
+    border-radius: 3px;
+}
+.pptx-shape .bold, .pptx-shape b {
+    font-weight: 600;
+}
+.pptx-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+.pptx-pic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0f0f0;
+    border: 1px dashed #ccc;
+}
+.pptx-table-wrap {
+    overflow: auto;
+}
+.pptx-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10px;
+}
+.pptx-table th, .pptx-table td {
+    border: 1px solid #999;
+    padding: 3px 6px;
+    text-align: left;
+}
+.pptx-table th {
+    background: #1B3A5C;
+    color: #fff;
+    font-weight: 600;
+}
+.pptx-notes {
+    margin-top: 6px;
+    padding: 8px 12px;
+    background: var(--vscode-textBlockQuote-background, #2d2d30);
+    border-left: 3px solid #888;
+    font-size: 12px;
+    color: var(--vscode-foreground, #ccc);
+    border-radius: 3px;
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.pptx-image-placeholder, .pptx-chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: #f5f5f5;
+    color: #666;
+    font-style: italic;
+    border: 1px dashed #ccc;
+    border-radius: 3px;
+}
+
+/* Comment sidebar */
+#sidebar {
+    position: fixed;
+    top: 0;
+    right: -360px;
+    width: 350px;
+    height: 100vh;
+    background: var(--vscode-sideBar-background, #252526);
+    border-left: 1px solid var(--vscode-panel-border, #444);
+    z-index: 1000;
+    overflow-y: auto;
+    transition: right 0.2s;
+    padding: 12px;
+    box-sizing: border-box;
+}
+#sidebar.open { right: 0; }
+.sidebar-close {
+    position: sticky;
+    top: 0;
+    float: right;
+    background: none;
+    border: none;
+    color: var(--vscode-foreground, #ccc);
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 1001;
+}
+#comment-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: var(--vscode-badge-background, #007acc);
+    color: var(--vscode-badge-foreground, #fff);
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    z-index: 999;
+    display: none;
+}
+
+/* Comment list items */
+.clist-item {
+    padding: 10px;
+    margin-bottom: 8px;
+    background: var(--vscode-input-background, #3c3c3c);
+    border-radius: 6px;
+    border-left: 3px solid var(--vscode-badge-background, #007acc);
+    cursor: pointer;
+}
+.clist-item.pptx-comment {
+    border-left-color: #2196F3;
+}
+.clist-item.resolved {
+    opacity: 0.5;
+    border-left-color: #666;
+}
+.item-preview {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 4px;
+}
+.item-comment {
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+.role-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-right: 6px;
+    font-weight: 600;
+}
+.role-pptx { background: #2196F3; color: #fff; }
+.role-user { background: #0078D4; color: #fff; }
+.role-agent { background: #68217A; color: #fff; }
+.item-meta {
+    font-size: 11px;
+    color: #888;
+}
+.item-replies {
+    margin-top: 6px;
+    padding-left: 12px;
+    border-left: 2px solid #555;
+}
+.item-reply {
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+.item-reply-input {
+    margin-top: 6px;
+}
+.item-actions {
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.item-actions button, .item-reply-input button {
+    padding: 3px 10px;
+    background: var(--vscode-button-background, #0078D4);
+    color: var(--vscode-button-foreground, #fff);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+}
+.btn-copilot {
+    background: #68217A !important;
+}
+</style>
+</head>
+<body>
+
+<div id="comment-badge" onclick="toggleSidebar()">
+    💬 <span id="badge-count">0</span>
+</div>
+
+<div id="sidebar">
+    <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+    <h3>Comments</h3>
+    <div id="comment-list"></div>
+</div>
+
+<div id="content">
+${slidesBody}
+</div>
+
+<script>
+(function() {
+    var vscode = acquireVsCodeApi();
+    var comments = ${commentsJson};
+    var blocks = ${blocksJson};
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+    // Badge
+    function updateBadge() {
+        var badge = document.getElementById('comment-badge');
+        var span = document.getElementById('badge-count');
+        var unresolved = comments.filter(function(c) { return !c.resolved; });
+        if (comments.length > 0) {
+            badge.style.display = 'block';
+            span.textContent = unresolved.length + ' / ' + comments.length;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    // Sidebar
+    var sidebarOpen = false;
+    window.toggleSidebar = function() {
+        sidebarOpen = !sidebarOpen;
+        document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+        if (sidebarOpen) buildList();
+    };
+
+    function buildList() {
+        var container = document.getElementById('comment-list');
+        container.innerHTML = '';
+        if (comments.length === 0) {
+            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">No comments</div>';
+            return;
+        }
+        comments.forEach(function(c) {
+            var div = document.createElement('div');
+            var isPptxComment = c._source === 'pptx';
+            div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + (isPptxComment ? ' pptx-comment' : '');
+
+            var authorBadge = isPptxComment
+                ? '<span class="role-badge role-pptx">📊 ' + esc(c._wordAuthor || 'PowerPoint') + '</span>'
+                : '<span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>';
+
+            var repliesHtml = '';
+            if (c.replies && c.replies.length > 0) {
+                repliesHtml = '<div class="item-replies">';
+                c.replies.forEach(function(r) {
+                    repliesHtml += '<div class="item-reply"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) + '</div>';
+                });
+                repliesHtml += '</div>';
+            }
+
+            var resolveBtn = c.resolved
+                ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
+                : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
+
+            div.innerHTML =
+                '<div class="item-preview">' + esc(c.blockPreview || '') + '</div>' +
+                '<div class="item-comment">' + authorBadge + esc(c.comment) + '</div>' +
+                '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() + (c.resolved ? ' ✅' : '') + '</div>' +
+                repliesHtml +
+                '<div class="item-reply-input" onclick="event.stopPropagation()">' +
+                '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
+                '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
+                '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">✨ Ask Copilot</button></div>' +
+                '<div class="item-actions">' + resolveBtn +
+                '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">📋 Copy</button>' +
+                '</div>';
+
+            div.addEventListener('click', function() {
+                // Scroll to the slide
+                var slideEl = document.querySelector('[data-slide-index="' + (c.elementId || '').replace('slide_', '') + '"]');
+                if (slideEl) slideEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+            container.appendChild(div);
+        });
+    }
+
+    // Actions
+    window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
+    window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
+    window.submitListReply = function(id) {
+        var input = document.getElementById('list-reply-' + id);
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'replyComment', id: id, text: text });
+        input.value = '';
+    };
+    window.askCopilotThread = function(id) {
+        vscode.postMessage({ command: 'askCopilotThread', id: id });
+    };
+    window.copyComment = function(id) {
+        var c = comments.find(function(x) { return x.id === id; });
+        if (!c) return;
+        var text = c.blockPreview + '\\n' + c.comment;
+        if (c.replies) {
+            c.replies.forEach(function(r) { text += '\\n  [' + (r.role || 'user') + '] ' + r.text; });
+        }
+        navigator.clipboard.writeText(text);
+    };
+
+    // Handle messages from extension host
+    window.addEventListener('message', function(event) {
+        var msg = event.data;
+        if (!msg || !msg.command) return;
+        if (msg.command === 'commentUpdated') {
+            var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
+            if (idx >= 0) { comments[idx] = msg.comment; }
+            updateBadge();
+            if (sidebarOpen) buildList();
+        }
+    });
+
+    updateBadge();
+})();
+</script>
+</body>
+</html>`;
     }
 
     /** Rewrite relative image src paths to data URIs or webview URIs */
@@ -1052,6 +1736,8 @@ img { max-width: 100%; }
 /* ---------- commented block highlight ---------- */
 .commented-block { border-left: 4px solid #ffc107; padding-left: 8px; cursor: pointer; }
 .commented-block:hover { background: rgba(255,193,7,.08); }
+.word-commented-block { border-left: 4px solid #4caf50; padding-left: 8px; background: rgba(76,175,80,.04); }
+.word-commented-block:hover { background: rgba(76,175,80,.08); }
 
 /* ---------- popover ---------- */
 #comment-popover {
@@ -1343,9 +2029,37 @@ img { max-width: 100%; }
         document.querySelectorAll('.commented-block').forEach(function(el) {
             el.classList.remove('commented-block');
         });
+        // Toggle green Word comment highlights based on resolved state
+        document.querySelectorAll('.word-commented-block').forEach(function(el) {
+            var wcIds = (el.getAttribute('data-word-comment-ids') || '').split(',');
+            // Check if any Word comment on this element is unresolved
+            var hasUnresolved = wcIds.some(function(wcId) {
+                var wc = comments.find(function(c) { return c.id === 'word_' + wcId; });
+                return wc && !wc.resolved;
+            });
+            if (!hasUnresolved) {
+                el.classList.remove('word-commented-block');
+                el.classList.add('word-commented-block-resolved');
+            } else {
+                el.classList.remove('word-commented-block-resolved');
+            }
+        });
+        // Also re-add green class on formerly-resolved blocks that are now unresolved
+        document.querySelectorAll('.word-commented-block-resolved').forEach(function(el) {
+            var wcIds = (el.getAttribute('data-word-comment-ids') || '').split(',');
+            var hasUnresolved = wcIds.some(function(wcId) {
+                var wc = comments.find(function(c) { return c.id === 'word_' + wcId; });
+                return wc && !wc.resolved;
+            });
+            if (hasUnresolved) {
+                el.classList.remove('word-commented-block-resolved');
+                el.classList.add('word-commented-block');
+            }
+        });
         var content = document.getElementById('content');
         comments.forEach(function(c) {
             if (c.resolved) return;
+            if (c._source === 'word') return; // Word comments use green word-commented-block, not yellow
             var el = findCommentElement(c);
             if (!el) return;
             el.classList.add('commented-block');
@@ -1361,6 +2075,17 @@ img { max-width: 100%; }
                 var cid = el.getAttribute('data-comment-id');
                 var c = comments.find(function(x) { return x.id === cid; });
                 if (c) showPopover(c, el);
+            };
+        });
+        // Also attach click handlers for Word-commented blocks
+        document.querySelectorAll('.word-commented-block').forEach(function(el) {
+            el.onclick = function(e) {
+                e.stopPropagation();
+                var wcIds = (el.getAttribute('data-word-comment-ids') || '').split(',');
+                if (wcIds.length > 0) {
+                    var c = comments.find(function(x) { return x.id === 'word_' + wcIds[0]; });
+                    if (c) showPopover(c, el);
+                }
             };
         });
     }
@@ -1381,6 +2106,7 @@ img { max-width: 100%; }
     // ========== popover ==========
     function showPopover(comment, anchorEl) {
         var pop = document.getElementById('comment-popover');
+        var isWord = comment._source === 'word';
         var resolveBtn = comment.resolved
             ? '<button onclick="unresolveComment(\\'' + comment.id + '\\')">Reopen</button>'
             : '<button class="btn-resolve" onclick="resolveComment(\\'' + comment.id + '\\')">Resolve</button>';
@@ -1388,16 +2114,21 @@ img { max-width: 100%; }
         if (comment.replies && comment.replies.length > 0) {
             repliesHtml = '<div class="pop-replies">';
             comment.replies.forEach(function(r) {
-                repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
-                    ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button>' +
-                    ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">\u00d7</button></div>' +
+                var replyBadge = '<span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>';
+                var editBtn = isWord ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button>';
+                var delBtn = isWord ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">\u00d7</button>';
+                repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text">' + replyBadge + esc(r.text) +
+                    editBtn + delBtn + '</div>' +
                     '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
             });
             repliesHtml += '</div>';
         }
+        var authorBadge = isWord
+            ? '<span class="role-badge role-word">\uD83D\uDCCE ' + esc(comment._wordAuthor || 'Word') + '</span>'
+            : '<span class="role-badge role-' + (comment.role || 'user') + '">' + (comment.role || 'user') + '</span>';
+        var editBtn = isWord ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button>';
         pop.innerHTML =
-            '<div class="pop-text" id="pop-comment-' + comment.id + '"><span class="role-badge role-' + (comment.role || 'user') + '">' + (comment.role || 'user') + '</span>' + esc(comment.comment) +
-            ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button></div>' +
+            '<div class="pop-text" id="pop-comment-' + comment.id + '">' + authorBadge + esc(comment.comment) + editBtn + '</div>' +
             '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() +
             (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
             repliesHtml +
@@ -1406,7 +2137,7 @@ img { max-width: 100%; }
             '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
             '<button onclick="copyComment(\\'' + comment.id + '\\')">&#x1F4CB; Copy</button>' +
-            '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button></div>';
+            (isWord ? '' : '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button>') + '</div>';
         var rect = anchorEl.getBoundingClientRect();
         pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
         pop.style.left = (rect.left + window.scrollX) + 'px';
@@ -1529,6 +2260,13 @@ img { max-width: 100%; }
         var text = input ? input.value.trim() : '';
         if (!text) return;
         vscode.postMessage({ command: 'replyComment', id: id, text: text });
+    };
+    window.submitListReply = function(id) {
+        var input = document.getElementById('list-reply-' + id);
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'replyComment', id: id, text: text });
+        input.value = '';
     };
     window.startEditComment = function(id) {
         var c = comments.find(function(x) { return x.id === id; });
@@ -1661,7 +2399,7 @@ img { max-width: 100%; }
                 repliesHtml +
                 '<div class="item-reply-input" onclick="event.stopPropagation()">' +
                 '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
-                '<button onclick="event.stopPropagation();var inp=document.getElementById(\\'list-reply-' + c.id + '\\');var t=inp.value.trim();if(t){vscode.postMessage({command:\\'replyComment\\',id:\\'' + c.id + '\\',text:t});}" style="margin-top:4px;">Reply</button>' +
+                '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
                 '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
                 '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
@@ -1847,6 +2585,13 @@ img { max-width: 100%; }
     /** Send updated comment to webview without full re-render (keeps popover open) */
     public refreshComment(commentId: string) {
         this.commentsManager.reload();
+        if (commentId.startsWith('word_') && this.isDocx) {
+            const merged = this.buildMergedWordComment(commentId);
+            if (merged) {
+                this.panel.webview.postMessage({ command: 'commentUpdated', comment: merged });
+            }
+            return;
+        }
         const comment = this.commentsManager.getComments().find((c: any) => c.id === commentId);
         if (comment) {
             this.panel.webview.postMessage({ command: 'commentUpdated', comment });

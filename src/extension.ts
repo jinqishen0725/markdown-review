@@ -41,6 +41,26 @@ export function activate(context: vscode.ExtensionContext) {
             PreviewPanel.createOrShowDocx(context, docxPath);
         }),
 
+        vscode.commands.registerCommand('markdownReview.openPptxPreview', async (uri?: vscode.Uri) => {
+            let pptxPath: string | undefined;
+            if (uri) {
+                pptxPath = uri.fsPath;
+            } else {
+                const files = await vscode.window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectMany: false,
+                    filters: { 'PowerPoint Presentations': ['pptx'] },
+                });
+                if (files && files.length > 0) pptxPath = files[0].fsPath;
+            }
+            if (!pptxPath) return;
+            if (!pptxPath.toLowerCase().endsWith('.pptx')) {
+                vscode.window.showWarningMessage('Only .pptx files are supported.');
+                return;
+            }
+            PreviewPanel.createOrShowPptx(context, pptxPath);
+        }),
+
         vscode.commands.registerCommand('markdownReview.exportComments', async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) { return; }
