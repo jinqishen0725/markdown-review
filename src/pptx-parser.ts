@@ -183,7 +183,39 @@ export async function parsePptx(filePath: string): Promise<PptxModel> {
         c.slideIndex = sldIdToIndex.get(c.slideId) || 0;
     }
 
-    return { filePath, slides, comments, authors, dimensions, rawZip: zip };
+    // Extract slide XML files to a sibling folder for agent editing/inspection
+    let extractDir = '';
+    try {
+        const docDir = path.dirname(filePath);
+        const docBase = path.basename(filePath, path.extname(filePath));
+        extractDir = path.join(docDir, `.${docBase}_xml`);
+        if (!fs.existsSync(extractDir)) fs.mkdirSync(extractDir, { recursive: true });
+
+        const xmlFiles = [
+            'ppt/presentation.xml',
+            ...Object.keys(zip.files).filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f)),
+        ];
+        const commentXmlFiles = Object.keys(zip.files).filter(f =>
+            f.startsWith('ppt/comments/') || f === 'ppt/authors.xml' || f === 'ppt/commentAuthors.xml'
+        );
+        xmlFiles.push(...commentXmlFiles);
+
+        for (const xmlPath of xmlFiles) {
+            const file = zip.file(xmlPath);
+            if (!file) continue;
+            const outPath = path.join(extractDir, xmlPath.replace('ppt/', ''));
+            const outDir = path.dirname(outPath);
+            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+            if (!fs.existsSync(outPath)) {
+                const content = await file.async('string');
+                fs.writeFileSync(outPath, formatPptxXml(content), 'utf-8');
+            }
+        }
+    } catch {
+        // XML extraction is optional — don't block preview
+    }
+
+    return { filePath, slides, comments, authors, dimensions, rawZip: zip, extractDir };
 }
 
 // ---------- Authors ----------
@@ -748,4 +780,30 @@ function escapeHtml(text: string): string {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+// ---------- XML Formatting ----------
+
+function formatPptxXml(xml: string): string {
+    // Add newlines before major PresentationML block-level tags for readability
+    let formatted = xml
+        .replace(/(<p:sp[\s>])/g, '\n$1')
+        .replace(/(<\/p:sp>)/g, '$1\n')
+        .replace(/(<p:pic[\s>])/g, '\n$1')
+        .replace(/(<\/p:pic>)/g, '$1\n')
+        .replace(/(<p:grpSp[\s>])/g, '\n$1')
+        .replace(/(<\/p:grpSp>)/g, '$1\n')
+        .replace(/(<p:graphicFrame[\s>])/g, '\n$1')
+        .replace(/(<\/p:graphicFrame>)/g, '$1\n')
+        .replace(/(<p:cSld[\s>])/g, '\n$1')
+        .replace(/(<p:spTree[\s>])/g, '\n$1')
+        .replace(/(<a:p[\s>])/g, '\n  $1')
+        .replace(/(<\/a:p>)/g, '$1\n')
+        .replace(/(<p:txBody[\s>])/g, '\n$1')
+        .replace(/(<\/p:txBody>)/g, '$1\n')
+        .replace(/(<p188:cm[\s>])/g, '\n$1')
+        .replace(/(<\/p188:cm>)/g, '$1\n');
+
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+    return formatted;
 }
