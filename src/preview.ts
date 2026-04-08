@@ -139,7 +139,7 @@ export class PreviewPanel {
         // Debounced re-render on any text change (1s delay) — skip for docx mode
         vscode.workspace.onDidChangeTextDocument(
             (e) => {
-                if (this.isDocx) return; // docx doesn't use TextDocument
+                if (this.isDocx || this.isPptx) return; // docx/pptx don't use TextDocument
                 if (e.document.uri.fsPath === this.document.uri.fsPath) {
                     if (this.debounceTimer) { clearTimeout(this.debounceTimer); }
                     this.debounceTimer = setTimeout(() => {
@@ -160,10 +160,10 @@ export class PreviewPanel {
         // Watch .comments.json for external changes (e.g., MCP server replies)
         this.setupCommentsFileWatcher();
 
-        // Source → Preview: scroll preview to match editor cursor — skip for docx
+        // Source → Preview: scroll preview to match editor cursor — skip for docx/pptx
         vscode.window.onDidChangeTextEditorSelection(
             (e) => {
-                if (this.isDocx) return;
+                if (this.isDocx || this.isPptx) return;
                 if (e.textEditor.document.uri.fsPath !== this.document.uri.fsPath) { return; }
                 if (e.kind === vscode.TextEditorSelectionChangeKind.Command) { return; }
                 const cursorOffset = this.document.offsetAt(e.selections[0].active);
@@ -1266,8 +1266,8 @@ body {
     color: var(--vscode-editor-foreground, #d4d4d4);
     margin: 0; padding: 20px;
 }
-#pptx-render { visibility: hidden; position: absolute; left: 0; top: 0; }
-.slide-outer { margin: 0 auto 24px; width: 960px; overflow: hidden; position: relative; }
+#slides-output { width: 960px; margin: 0 auto; }
+#slides-output > div { margin-bottom: 16px; position: relative; }
 .slide-label { font-size: 14px; font-weight: bold; color: var(--vscode-foreground, #ccc); margin: 16px 0 6px 0; max-width: 960px; margin-left: auto; margin-right: auto; }
 .pptx-notes { margin: 6px auto 0; padding: 8px 12px; background: var(--vscode-textBlockQuote-background, #2d2d30); border-left: 3px solid #888; font-size: 12px; color: var(--vscode-foreground, #ccc); border-radius: 3px; max-width: 960px; }
 #loading { text-align: center; padding: 60px; color: #888; font-size: 16px; }
@@ -1330,7 +1330,6 @@ body {
     </div>
 </div>
 <div id="loading"><span class="spinner"></span>Rendering presentation...</div>
-<div id="pptx-render"></div>
 <div id="slides-output"></div>
 <script>
 (function() {
@@ -1431,70 +1430,73 @@ body {
     };
 
     // === Render slides ===
-    var renderDiv = document.getElementById('pptx-render');
     var output = document.getElementById('slides-output');
-    var TARGET_WIDTH = 960;
 
     setStatus('Fetching presentation file...');
     fetch('${pptxFileUri}')
         .then(function(resp) {
             if (!resp.ok) throw new Error('Fetch failed: ' + resp.status + ' ' + resp.statusText);
-            setStatus('Parsing PPTX (' + Math.round(resp.headers.get('content-length')/1024) + 'KB)...');
+            setStatus('Rendering slides...');
             return resp.arrayBuffer();
         })
         .then(function(buffer) {
-            setStatus('Rendering ' + buffer.byteLength + ' bytes...');
-            return PptxLib.PptxViewer.open(buffer, renderDiv, {
+            return PptxLib.PptxViewer.open(buffer, output, {
                 renderMode: 'list',
-                listOptions: { windowed: false, batchSize: 50 },
-                fitMode: 'none',
+                listOptions: { windowed: true, batchSize: 4, initialSlides: 3 },
+                fitMode: 'contain',
+                width: 960,
+                onSlideRendered: function(idx) {
+                    // Fix colors on each slide as it renders
+                    var slides = output.children;
+                    if (slides[idx]) fixColors(slides[idx]);
+                },
             });
         })
         .then(function(viewer) {
-            setStatus('Scaling slides...');
-            fixColors(renderDiv);
-
-            var slideElements = Array.from(renderDiv.children);
-            var nativeWidth = slideElements.length > 0 ? slideElements[0].offsetWidth : 960;
-            var scale = nativeWidth > 0 ? TARGET_WIDTH / nativeWidth : 1;
-
-            slideElements.forEach(function(slideEl, idx) {
-                var slideIdx = idx + 1;
-                var label = document.createElement('div');
-                label.className = 'slide-label';
-                label.textContent = 'Slide ' + slideIdx;
-                output.appendChild(label);
-
-                var outer = document.createElement('div');
-                outer.className = 'slide-outer';
-                var nativeH = slideEl.offsetHeight;
-                outer.style.height = Math.round(nativeH * scale) + 'px';
-
-                // Add comment button on each slide
-                var addBtn = document.createElement('button');
-                addBtn.className = 'slide-add-comment';
-                addBtn.textContent = '+';
-                addBtn.title = 'Add comment on Slide ' + slideIdx;
-                addBtn.onclick = function(e) { e.stopPropagation(); openCommentDialog(slideIdx); };
-                outer.appendChild(addBtn);
-
-                slideEl.style.transform = 'scale(' + scale + ')';
-                slideEl.style.transformOrigin = 'top left';
-                slideEl.style.visibility = 'visible';
-                outer.appendChild(slideEl);
-                output.appendChild(outer);
-
-                var nd = notesData.find(function(n) { return n.slideIndex === slideIdx; });
-                if (nd) {
-                    var notesDiv = document.createElement('div');
-                    notesDiv.className = 'pptx-notes';
-                    notesDiv.innerHTML = '<b>Speaker Notes:</b> ' + esc(nd.notes);
-                    output.appendChild(notesDiv);
-                }
-            });
-
-            renderDiv.style.display = 'none';
             loadingEl.style.display = 'none';
+            fixColors(output);
+
+            // Add slide labels and + buttons
+            setTimeout(function() {
+                var slideEls = Array.from(output.children);
+                for (var i = slideEls.length - 1; i >= 0; i--) {
+                    var slideIdx = i + 1;
+                    // Slide label
+                    var label = document.createElement('div');
+                    label.className = 'slide-label';
+                    label.textContent = 'Slide ' + slideIdx;
+                    output.insertBefore(label, slideEls[i]);
+
+                    // Add comment button
+                    var wrapper = slideEls[i];
+                    wrapper.style.position = 'relative';
+                    var addBtn = document.createElement('button');
+                    addBtn.className = 'slide-add-comment';
+                    addBtn.textContent = '+';
+                    addBtn.title = 'Add comment on Slide ' + slideIdx;
+                    (function(si) { addBtn.onclick = function(e) { e.stopPropagation(); openCommentDialog(si); }; })(slideIdx);
+                    wrapper.appendChild(addBtn);
+                }
+
+                // Add notes after each slide
+                notesData.forEach(function(nd) {
+                    var labels = output.querySelectorAll('.slide-label');
+                    for (var j = 0; j < labels.length; j++) {
+                        if (labels[j].textContent === 'Slide ' + nd.slideIndex && labels[j].nextElementSibling) {
+                            var notesDiv = document.createElement('div');
+                            notesDiv.className = 'pptx-notes';
+                            notesDiv.innerHTML = '<b>Speaker Notes:</b> ' + esc(nd.notes);
+                            labels[j].nextElementSibling.after(notesDiv);
+                            break;
+                        }
+                    }
+                });
+
+                // Color fix again for any lazy-loaded slides
+                setTimeout(function() { fixColors(output); }, 1000);
+                setTimeout(function() { fixColors(output); }, 3000);
+            }, 500);
+
             updateBadge();
         })
         .catch(function(err) {
@@ -1578,13 +1580,18 @@ body {
             case 'commentAdded':
                 comments.push(msg.comment);
                 updateBadge();
-                if (sidebarOpen) buildList();
+                // Auto-open sidebar to show the new comment
+                if (!sidebarOpen) {
+                    sidebarOpen = true;
+                    document.getElementById('sidebar').classList.add('open');
+                }
+                buildList();
                 break;
             case 'commentUpdated': {
                 var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
                 if (idx >= 0) comments[idx] = msg.comment;
                 updateBadge();
-                if (sidebarOpen) buildList();
+                buildList();
                 break;
             }
             case 'commentDeleted':
