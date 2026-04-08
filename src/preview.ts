@@ -1258,7 +1258,6 @@ ${commentUiCss()}
     var pendingSlideIndex = null;
     var pendingShapeId = null;
     var pendingShapeName = null;
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
     // Build color fix lookup
     var colorFixMap = {};
@@ -1603,29 +1602,14 @@ img { max-width: 100%; }
 .word-commented-block { border-left: 4px solid #4caf50; padding-left: 8px; background: rgba(76,175,80,.04); }
 .word-commented-block:hover { background: rgba(76,175,80,.08); }
 
-/* ---------- popover ---------- */
-#comment-popover {
-    display: none; position: absolute;
-    background: var(--vscode-editorWidget-background, #252526);
-    color: var(--vscode-editorWidget-foreground, #ccc);
-    border: 1px solid var(--vscode-editorWidget-border, #454545);
-    border-radius: 6px; padding: 12px 16px;
-    min-width: 250px; max-width: 400px; max-height: 60vh; overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,.4); z-index: 1000; font-size: 13px;
-}
-#comment-popover .pop-text { white-space: pre-wrap; margin-bottom: 6px; }
-#comment-popover .pop-meta { font-size: 11px; color: #888; margin-bottom: 8px; }
-#comment-popover .pop-actions { display: flex; gap: 6px; margin-top: 8px; }
-#comment-popover button {
-    padding: 3px 10px; border: 1px solid #555; background: #333;
-    color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
-}
+/* ---------- popover, dialog, badge, sidebar, and roles (from comment-ui.ts) ---------- */
+${commentUiCss()}
+
+/* ---------- Markdown/Word-specific comment styles ---------- */
 #comment-popover button:hover { background: #444; }
 #comment-popover button.btn-resolve { border-color: #4caf50; }
-.btn-copilot { background: #7c3aed !important; color: #fff !important; border-color: #7c3aed !important; padding: 3px 10px !important; font-size: 11px !important; line-height: normal !important; box-sizing: border-box !important; }
-.btn-copilot:hover { background: #6d28d9 !important; }
 
-/* ---------- comment dialog ---------- */
+/* overlay dialog (different from PPTX inline dialog) */
 #dialog-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,.4); z-index: 1999;
@@ -1657,13 +1641,14 @@ img { max-width: 100%; }
 #comment-dialog .btn-primary:hover { background: #106ebe; }
 #comment-dialog .btn-cancel { background: #333; color: #ccc; border: 1px solid #555; }
 
-/* ---------- comment badge + list panel ---------- */
+/* badge override (Markdown uses different class) */
 .comment-badge {
     position: fixed; top: 10px; right: 10px; background: #0078d4; color: #fff;
     border-radius: 12px; padding: 4px 12px; font-size: 12px; z-index: 100; cursor: pointer;
 }
 .comment-badge:hover { background: #106ebe; }
 
+/* sidebar panel (Markdown uses #comment-list-panel instead of #sidebar) */
 #comment-list-panel {
     display: none; position: fixed; top: 0; right: 0; width: 350px; height: 100%;
     background: var(--vscode-editorWidget-background, #1e1e1e);
@@ -1688,74 +1673,13 @@ img { max-width: 100%; }
     width: 100%; padding: 4px 8px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c);
     color: var(--vscode-input-foreground, #ccc); border-radius: 3px; font-size: 12px; box-sizing: border-box;
 }
-.panel-filters {
-    display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap;
-}
-.panel-filters button {
-    padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc;
-    border-radius: 3px; cursor: pointer; font-size: 10px;
-}
+.panel-filters { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.panel-filters button { padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc; border-radius: 3px; cursor: pointer; font-size: 10px; }
 .panel-filters button:hover { background: #444; }
 .panel-filters button.active { background: #0078d4; border-color: #0078d4; color: #fff; }
-.panel-bulk {
-    display: flex; gap: 4px; margin-top: 6px;
-}
-.panel-bulk button {
-    padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc;
-    border-radius: 3px; cursor: pointer; font-size: 10px;
-}
+.panel-bulk { display: flex; gap: 4px; margin-top: 6px; }
+.panel-bulk button { padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc; border-radius: 3px; cursor: pointer; font-size: 10px; }
 .panel-bulk button:hover { background: #444; }
-.clist-item {
-    padding: 12px 16px; border-bottom: 1px solid #333; cursor: pointer;
-}
-.clist-item:hover { background: rgba(255,255,255,.05); }
-.clist-item.resolved { opacity: .5; }
-.clist-item .item-preview { font-size: 12px; color: #e8a317; margin-bottom: 4px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.clist-item .item-comment { font-size: 13px; white-space: pre-wrap; margin-bottom: 4px; }
-.clist-item .item-meta { font-size: 11px; color: #888; }
-.clist-item .item-actions { margin-top: 8px; display: flex; gap: 6px; }
-.clist-item button {
-    padding: 2px 8px; border: 1px solid #555; background: #333;
-    color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
-}
-.clist-item button:hover { background: #444; }
-
-/* ---------- reply styles ---------- */
-.pop-replies, .item-replies { margin: 8px 0; padding-left: 12px; border-left: 2px solid #555; max-height: 40vh; overflow-y: auto; }
-.pop-reply, .item-reply { margin-bottom: 6px; }
-.pop-reply-text, .item-reply-text { font-size: 12px; white-space: pre-wrap; }
-.pop-reply-meta, .item-reply-meta { font-size: 10px; color: #888; }
-.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; font-weight: 600; }
-.role-user { background: #0078D4; color: #fff; }
-.role-agent { background: #68217A; color: #fff; }
-.role-word { background: #2e7d32; color: #fff; }
-.role-pptx { background: #2196F3; color: #fff; }
-.word-comment { border-left: 3px solid #4caf50 !important; }
-.word-comment .item-preview { color: #4caf50 !important; }
-.pop-reply-input { margin-top: 8px; }
-.pop-reply-input textarea {
-    width: 100%; padding: 4px; border: 1px solid #555;
-    background: var(--vscode-input-background, #3c3c3c);
-    color: var(--vscode-input-foreground, #ccc);
-    border-radius: 3px; font-family: inherit; font-size: 12px;
-    resize: none; box-sizing: border-box;
-}
-.pop-reply-input button {
-    margin-top: 4px; padding: 3px 10px; border: 1px solid #555; background: #333;
-    color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
-}
-.pop-reply-input button:hover { background: #444; }
-.reply-delete-btn {
-    font-size: 10px; padding: 0 4px; border: 1px solid #555; background: #333;
-    color: #ccc; border-radius: 2px; cursor: pointer; margin-left: 4px;
-}
-.reply-delete-btn:hover { background: #633; border-color: #c44; }
-.inline-edit-btn {
-    font-size: 10px; padding: 0 4px; border: 1px solid #555; background: #333;
-    color: #ccc; border-radius: 2px; cursor: pointer; margin-left: 4px;
-}
-.inline-edit-btn:hover { background: #444; }
 
 /* ---------- export buttons ---------- */
 .export-buttons {
@@ -1955,66 +1879,6 @@ img { max-width: 100%; }
         });
     }
 
-    // ========== badge ==========
-    function updateBadge() {
-        var badge = document.getElementById('comment-badge');
-        var span = document.getElementById('badge-count');
-        var unresolved = comments.filter(function(c) { return !c.resolved; });
-        if (comments.length > 0) {
-            badge.style.display = 'block';
-            span.textContent = unresolved.length + ' / ' + comments.length;
-        } else {
-            badge.style.display = 'none';
-        }
-    }
-
-    // ========== popover ==========
-    function showPopover(comment, anchorEl) {
-        var pop = document.getElementById('comment-popover');
-        var isWord = comment._source === 'word';
-        var resolveBtn = comment.resolved
-            ? '<button onclick="unresolveComment(\\'' + comment.id + '\\')">Reopen</button>'
-            : '<button class="btn-resolve" onclick="resolveComment(\\'' + comment.id + '\\')">Resolve</button>';
-        var repliesHtml = '';
-        if (comment.replies && comment.replies.length > 0) {
-            repliesHtml = '<div class="pop-replies">';
-            comment.replies.forEach(function(r) {
-                var replyBadge = '<span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>';
-                var editBtn = isWord ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button>';
-                var delBtn = isWord ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">\u00d7</button>';
-                repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text">' + replyBadge + esc(r.text) +
-                    editBtn + delBtn + '</div>' +
-                    '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
-            });
-            repliesHtml += '</div>';
-        }
-        var authorBadge = isWord
-            ? '<span class="role-badge role-word">\uD83D\uDCCE ' + esc(comment._wordAuthor || 'Word') + '</span>'
-            : '<span class="role-badge role-' + (comment.role || 'user') + '">' + (comment.role || 'user') + '</span>';
-        var editBtn = isWord ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button>';
-        pop.innerHTML =
-            '<div class="pop-text" id="pop-comment-' + comment.id + '">' + authorBadge + esc(comment.comment) + editBtn + '</div>' +
-            '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() +
-            (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
-            repliesHtml +
-            '<div class="pop-reply-input"><textarea id="reply-input" placeholder="Reply..." rows="2"></textarea>' +
-            '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button>' +
-            '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button></div>' +
-            '<div class="pop-actions">' + resolveBtn +
-            '<button onclick="copyComment(\\'' + comment.id + '\\')">&#x1F4CB; Copy</button>' +
-            (isWord ? '' : '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button>') + '</div>';
-        var rect = anchorEl.getBoundingClientRect();
-        pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-        pop.style.left = (rect.left + window.scrollX) + 'px';
-        pop.style.display = 'block';
-    }
-    document.addEventListener('click', function(e) {
-        var pop = document.getElementById('comment-popover');
-        if (pop.style.display === 'block' && !pop.contains(e.target) && !e.target.classList.contains('commented-block')) {
-            pop.style.display = 'none';
-        }
-    });
-
     // ========== dialog ==========
     function showDialog(preview) {
         document.getElementById('dlg-preview').textContent = preview;
@@ -2040,15 +1904,12 @@ img { max-width: 100%; }
             eid: pendingBlock.eid || null
         });
         hideDialog();
-        // optimistic UI: highlight immediately
         var el = findElement(pendingBlock);
         if (el) { el.classList.add('commented-block'); }
     };
     document.getElementById('dlg-input').addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { submitComment(); }
     });
-
-    // ========== Ask Copilot ==========
     window.submitCommentAndAsk = function() {
         var text = document.getElementById('dlg-input').value.trim();
         if (!text || !pendingBlock) return;
@@ -2065,292 +1926,72 @@ img { max-width: 100%; }
         var el = findElement(pendingBlock);
         if (el) { el.classList.add('commented-block'); }
     };
-    window.askCopilotThread = function(id) {
-        // Check for typed reply in popover or sidebar textarea
-        var replyText = '';
-        var popInput = document.getElementById('reply-input');
-        if (popInput && popInput.value.trim()) {
-            replyText = popInput.value.trim();
-            popInput.value = '';
-        } else {
-            var listInput = document.getElementById('list-reply-' + id);
-            if (listInput && listInput.value.trim()) {
-                replyText = listInput.value.trim();
-                listInput.value = '';
-            }
-        }
-        // If user typed a reply, save it first, then ask Copilot
-        if (replyText) {
-            vscode.postMessage({ command: 'replyComment', id: id, text: replyText });
-        }
-        vscode.postMessage({ command: 'askCopilotThread', id: id, pendingReply: replyText });
-    };
 
     // ========== export actions ==========
     window.jumpToSource = function() {
-        // Find the block closest to the current scroll position
-        var scrollTop = window.scrollY;
         var best = null;
         var bestDist = Infinity;
-        var content = document.getElementById('content');
         blocks.forEach(function(b) {
             var el = findElement(b);
             if (!el) return;
-            var rect = el.getBoundingClientRect();
-            var dist = Math.abs(rect.top);
+            var dist = Math.abs(el.getBoundingClientRect().top);
             if (dist < bestDist) { bestDist = dist; best = b; }
         });
-        if (best) {
-            vscode.postMessage({ command: 'jumpToSource', cleanOffset: best.startOffset });
+        if (best) { vscode.postMessage({ command: 'jumpToSource', cleanOffset: best.startOffset }); }
+    };
+    window.exportPdf = function() { vscode.postMessage({ command: 'exportPdf' }); };
+    window.exportDocx = function() { vscode.postMessage({ command: 'exportDocx' }); };
+    window.saveDocx = function() { vscode.postMessage({ command: 'saveDocxFile' }); };
+
+    // ========== Shared comment UI (from comment-ui.ts) ==========
+    var __nativePrefix = '${this.isDocx ? 'word_' : ''}';
+    var __nativeSource = '${this.isDocx ? 'word' : ''}';
+    ${commentUiJs()}
+
+    // ========== Markdown/Word-specific hooks for shared UI ==========
+    window.__onListItemClick = function(c) {
+        var el = findCommentElement(c);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    };
+    window.__findAnchorForComment = function(c) {
+        return findCommentElement(c);
+    };
+    window.__onCommentChange = function() {
+        highlightCommentedBlocks();
+        attachBlockClickHandlers();
+    };
+
+    // Close popover on outside click
+    document.addEventListener('click', function(e) {
+        var pop = document.getElementById('comment-popover');
+        if (pop.style.display === 'block' && !pop.contains(e.target) && !e.target.classList.contains('commented-block')) {
+            pop.style.display = 'none';
         }
-    };
-    window.exportPdf = function() {
-        vscode.postMessage({ command: 'exportPdf' });
-    };
-    window.exportDocx = function() {
-        vscode.postMessage({ command: 'exportDocx' });
-    };
-    window.saveDocx = function() {
-        vscode.postMessage({ command: 'saveDocxFile' });
-    };
+    });
 
-    // ========== comment actions ==========
-    window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
-    window.deleteComment = function(id) {
-        vscode.postMessage({ command: 'deleteComment', id: id });
-    };
-    window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
-    window.submitReply = function(id) {
-        var input = document.getElementById('reply-input');
-        var text = input ? input.value.trim() : '';
-        if (!text) return;
-        vscode.postMessage({ command: 'replyComment', id: id, text: text });
-    };
-    window.submitListReply = function(id) {
-        var input = document.getElementById('list-reply-' + id);
-        var text = input ? input.value.trim() : '';
-        if (!text) return;
-        vscode.postMessage({ command: 'replyComment', id: id, text: text });
-        input.value = '';
-    };
-    window.startEditComment = function(id) {
-        var c = comments.find(function(x) { return x.id === id; });
-        if (!c) return;
-        var el = document.getElementById('pop-comment-' + id) || document.getElementById('list-comment-' + id);
-        if (!el) return;
-        el.innerHTML =
-            '<textarea id="edit-input" style="width:100%;min-height:60px;padding:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:4px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;">' + esc(c.comment) + '</textarea>' +
-            '<div style="margin-top:6px;display:flex;gap:6px;">' +
-            '<button onclick="saveEditComment(\\'' + id + '\\')">Save</button>' +
-            '<button onclick="cancelEditComment()">Cancel</button></div>';
-        var ta = document.getElementById('edit-input');
-        if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
-    };
-    window.saveEditComment = function(id) {
-        var input = document.getElementById('edit-input');
-        var text = input ? input.value.trim() : '';
-        if (!text) return;
-        vscode.postMessage({ command: 'editComment', id: id, text: text });
-    };
-    window.cancelEditComment = function() {
-        document.getElementById('comment-popover').style.display = 'none';
-    };
-    window.startEditReply = function(commentId, replyId) {
-        var c = comments.find(function(x) { return x.id === commentId; });
-        if (!c || !c.replies) return;
-        var r = c.replies.find(function(x) { return x.id === replyId; });
-        if (!r) return;
-        var el = document.getElementById('pop-reply-' + replyId) || document.getElementById('list-reply-' + replyId);
-        if (!el) return;
-        var textEl = el.querySelector('.pop-reply-text') || el.querySelector('.item-reply-text') || el;
-        textEl.innerHTML =
-            '<textarea id="edit-reply-input" style="width:100%;min-height:40px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box;">' + esc(r.text) + '</textarea>' +
-            '<div style="margin-top:4px;display:flex;gap:4px;">' +
-            '<button onclick="saveEditReply(\\'' + commentId + '\\',\\'' + replyId + '\\')">Save</button>' +
-            '<button onclick="cancelEditComment()">Cancel</button></div>';
-        var ta = document.getElementById('edit-reply-input');
-        if (ta) { ta.focus(); }
-    };
-    window.saveEditReply = function(commentId, replyId) {
-        var input = document.getElementById('edit-reply-input');
-        var text = input ? input.value.trim() : '';
-        if (!text) return;
-        vscode.postMessage({ command: 'editReply', commentId: commentId, replyId: replyId, text: text });
-    };
-    window.deleteReply = function(commentId, replyId) {
-        vscode.postMessage({ command: 'deleteReply', commentId: commentId, replyId: replyId });
-    };
-
-    // ========== comment list panel ==========
-    var currentFilter = 'all';
-    window.setFilter = function(filter) {
-        currentFilter = filter;
-        document.querySelectorAll('.panel-filters button').forEach(function(btn) { btn.classList.remove('active'); });
-        document.getElementById('filter-' + filter).classList.add('active');
-        buildList();
-    };
-    window.resolveAll = function() {
-        vscode.postMessage({ command: 'resolveAll' });
-    };
-    window.deleteAllResolved = function() {
-        vscode.postMessage({ command: 'deleteAllResolved' });
-    };
-    window.sendAllToCopilot = function() {
-        vscode.postMessage({ command: 'sendAllToCopilot' });
-    };
-    window.copyAllToClipboard = function() {
-        vscode.postMessage({ command: 'copyAllToClipboard' });
-    };
-    window.copyComment = function(id) {
-        vscode.postMessage({ command: 'copyComment', id: id });
-    };
+    // Panel toggle
     window.togglePanel = function() {
         panelVisible = !panelVisible;
         document.getElementById('comment-list-panel').style.display = panelVisible ? 'block' : 'none';
         if (panelVisible) buildList();
     };
-    function buildList() {
-        var container = document.getElementById('comment-list-body');
-        container.innerHTML = '';
-        var searchInput = document.getElementById('comment-search');
-        var searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
-        var filtered = comments.filter(function(c) {
-            // Status filter
-            if (currentFilter === 'open' && c.resolved) return false;
-            if (currentFilter === 'resolved' && !c.resolved) return false;
-            if (currentFilter === 'user' && c.role === 'agent') return false;
-            if (currentFilter === 'agent' && (c.role || 'user') !== 'agent') return false;
-            // Search filter
-            if (searchText) {
-                var haystack = (c.comment + ' ' + (c.blockPreview || '') + ' ' +
-                    (c.replies || []).map(function(r) { return r.text; }).join(' ')).toLowerCase();
-                if (haystack.indexOf(searchText) < 0) return false;
-            }
-            return true;
-        });
-        if (filtered.length === 0) {
-            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">' +
-                (comments.length === 0 ? 'No comments yet' : 'No matching comments') + '</div>';
-            return;
-        }
-        filtered.forEach(function(c) {
-            var div = document.createElement('div');
-            var isWordComment = c._source === 'word';
-            div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + (isWordComment ? ' word-comment' : '');
-            var resolveBtn = c.resolved
-                ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
-                : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
-            var repliesHtml = '';
-            if (c.replies && c.replies.length > 0) {
-                repliesHtml = '<div class="item-replies">';
-                c.replies.forEach(function(r) {
-                    repliesHtml += '<div class="item-reply" id="list-reply-' + r.id + '"><div class="item-reply-text"><span class="role-badge role-' + (r.role || 'user') + '">' + (r.role || 'user') + '</span>' + esc(r.text) +
-                        (isWordComment ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button>') +
-                        (isWordComment ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">\u00d7</button>') +
-                        '</div>' +
-                        '<div class="item-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
-                });
-                repliesHtml += '</div>';
-            }
-            var authorBadge = isWordComment
-                ? '<span class="role-badge role-word">\uD83D\uDCCE ' + esc(c._wordAuthor || 'Word') + '</span>'
-                : '<span class="role-badge role-' + (c.role || 'user') + '">' + (c.role || 'user') + '</span>';
-            var editBtn = isWordComment ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + c.id + '\\')">edit</button>';
-            div.innerHTML =
-                '<div class="item-preview">' + esc(c.blockPreview || '(block)') + '</div>' +
-                '<div class="item-comment" id="list-comment-' + c.id + '">' + authorBadge + esc(c.comment) + editBtn + '</div>' +
-                '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() +
-                (c.resolved ? ' \\u2705' : '') + '</div>' +
-                repliesHtml +
-                '<div class="item-reply-input" onclick="event.stopPropagation()">' +
-                '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
-                '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
-                '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
-                '<div class="item-actions">' + resolveBtn +
-                '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
-                (isWordComment ? '' : '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button>') + '</div>';
-            div.addEventListener('click', function() {
-                var el = findCommentElement(c);
-                if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-            });
-            container.appendChild(div);
-        });
-    }
-    window.buildList = buildList;
 
     // ========== optimistic UI from extension host ==========
     window.addEventListener('message', function(event) {
         var msg = event.data;
         if (!msg || !msg.command) return;
-        switch (msg.command) {
-            case 'commentAdded':
-                comments.push(msg.comment);
-                highlightCommentedBlocks();
-                attachBlockClickHandlers();
-                if (panelVisible) buildList();
-                break;
-            case 'commentResolved': {
-                var el = document.querySelector('[data-comment-id="' + msg.id + '"]');
-                if (el) el.classList.remove('commented-block');
-                var ci = comments.find(function(x) { return x.id === msg.id; });
-                if (ci) ci.resolved = true;
-                updateBadge();
-                if (panelVisible) buildList();
-                document.getElementById('comment-popover').style.display = 'none';
-                break;
+        // Delegate shared comment messages
+        if (handleCommentMessage(msg)) {
+            highlightCommentedBlocks();
+            attachBlockClickHandlers();
+            if (msg.command === 'commentAdded') {
+                var newC = msg.comment;
+                var anchor = __findAnchorForComment(newC);
+                if (anchor) showPopover(newC, anchor);
             }
-            case 'commentDeleted': {
-                var el2 = document.querySelector('[data-comment-id="' + msg.id + '"]');
-                if (el2) { el2.classList.remove('commented-block'); el2.removeAttribute('data-comment-id'); }
-                comments = comments.filter(function(x) { return x.id !== msg.id; });
-                updateBadge();
-                if (panelVisible) buildList();
-                document.getElementById('comment-popover').style.display = 'none';
-                break;
-            }
-            case 'commentUnresolved': {
-                var ci2 = comments.find(function(x) { return x.id === msg.id; });
-                if (ci2) ci2.resolved = false;
-                highlightCommentedBlocks();
-                attachBlockClickHandlers();
-                if (panelVisible) buildList();
-                document.getElementById('comment-popover').style.display = 'none';
-                break;
-            }
-            case 'commentUpdated': {
-                var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
-                if (idx >= 0) { comments[idx] = msg.comment; }
-                highlightCommentedBlocks();
-                attachBlockClickHandlers();
-                updateBadge();
-                if (panelVisible) buildList();
-                // Re-show popover if it was open for this comment
-                var pop = document.getElementById('comment-popover');
-                if (pop.style.display === 'block') {
-                    var updatedComment = comments.find(function(x) { return x.id === msg.comment.id; });
-                    if (updatedComment) {
-                        var anchorEl = findCommentElement(updatedComment);
-                        if (anchorEl) { showPopover(updatedComment, anchorEl); }
-                    }
-                }
-                break;
-            }
-            case 'openPopover': {
-                var oc = comments.find(function(x) { return x.id === msg.commentId; });
-                if (oc) {
-                    var ocAnchor = findCommentElement(oc);
-                    if (ocAnchor) { showPopover(oc, ocAnchor); }
-                }
-                break;
-            }
+            return;
         }
     });
-
-    function esc(s) {
-        var d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
-    }
 
     // ========== init ==========
     placeGutterButtons();
