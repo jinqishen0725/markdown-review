@@ -1,0 +1,624 @@
+/**
+ * Shared comment UI components for all webview formats (Markdown, Word, PowerPoint).
+ *
+ * Generates CSS and JS strings that are injected into each format's HTML template.
+ * Format-specific behaviors are controlled by a `nativeSource` config parameter
+ * ('word', 'pptx', or null for plain markdown).
+ */
+
+// ---------- Shared CSS ----------
+
+/** CSS for popover, sidebar, badge, dialog, roles, and comment list — shared across all formats. */
+export function commentUiCss(): string {
+    return `
+/* ---------- comment badge ---------- */
+#comment-badge {
+    position: fixed; top: 10px; right: 10px;
+    background: var(--vscode-badge-background, #007acc);
+    color: var(--vscode-badge-foreground, #fff);
+    padding: 6px 14px; border-radius: 20px; cursor: pointer;
+    font-size: 13px; z-index: 999; display: none;
+}
+
+/* ---------- popover ---------- */
+#comment-popover {
+    display: none; position: absolute; z-index: 100;
+    background: var(--vscode-editor-background, #252526);
+    border: 1px solid var(--vscode-panel-border, #444);
+    border-radius: 8px; padding: 12px; width: 340px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    max-height: 400px; overflow-y: auto;
+}
+.pop-text { font-size: 13px; margin-bottom: 6px; }
+.pop-meta { font-size: 11px; color: #888; margin-bottom: 8px; }
+.pop-replies { margin: 8px 0; padding-left: 12px; border-left: 2px solid #555; max-height: 40vh; overflow-y: auto; }
+.pop-reply { margin-bottom: 6px; }
+.pop-reply-text { font-size: 12px; white-space: pre-wrap; }
+.pop-reply-meta { font-size: 10px; color: #888; }
+.pop-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pop-actions button { padding: 3px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); }
+.pop-reply-input { margin-top: 8px; }
+.pop-reply-input textarea {
+    width: 100%; padding: 4px; border: 1px solid #555;
+    background: var(--vscode-input-background, #3c3c3c);
+    color: var(--vscode-input-foreground, #ccc);
+    border-radius: 3px; font-family: inherit; font-size: 12px;
+    resize: none; box-sizing: border-box;
+}
+.pop-reply-input button {
+    margin-top: 4px; padding: 3px 10px; border: 1px solid #555; background: #333;
+    color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
+}
+.pop-reply-input button:hover { background: #444; }
+
+/* ---------- comment dialog ---------- */
+#comment-dialog { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+#comment-dialog.open { display: flex; }
+.dlg-box { background: var(--vscode-editor-background, #252526); border: 1px solid var(--vscode-panel-border, #444); border-radius: 8px; padding: 20px; width: 500px; max-width: 90vw; }
+.dlg-box h3 { margin: 0 0 8px; color: var(--vscode-foreground, #ccc); }
+.dlg-preview { font-size: 12px; color: #888; margin-bottom: 8px; padding: 6px; background: var(--vscode-textBlockQuote-background, #2d2d30); border-radius: 4px; }
+.dlg-box textarea { width: 100%; min-height: 80px; padding: 8px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c); color: var(--vscode-input-foreground, #ccc); border-radius: 4px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+.dlg-actions { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+.dlg-actions button { padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn-primary { background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); }
+.btn-cancel { background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #ccc); }
+.btn-copilot { background: #68217A !important; color: #fff; }
+
+/* ---------- role badges ---------- */
+.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; font-weight: 600; }
+.role-user { background: #0078D4; color: #fff; }
+.role-agent { background: #68217A; color: #fff; }
+.role-word { background: #2e7d32; color: #fff; }
+.role-pptx { background: #2196F3; color: #fff; }
+
+/* ---------- inline edit / delete buttons ---------- */
+.inline-edit-btn { background: none !important; border: none !important; color: #888 !important; cursor: pointer; font-size: 10px !important; padding: 0 2px !important; text-decoration: underline; }
+.inline-edit-btn:hover { color: #ccc !important; }
+.reply-delete-btn { background: none !important; border: none !important; color: #888 !important; cursor: pointer; font-size: 14px !important; padding: 0 2px !important; }
+.reply-delete-btn:hover { color: #f44 !important; }
+
+/* ---------- sidebar / comment list panel ---------- */
+.clist-item { padding: 10px; margin-bottom: 8px; background: var(--vscode-input-background, #3c3c3c); border-radius: 6px; border-left: 3px solid #007acc; cursor: pointer; }
+.clist-item.word-comment { border-left-color: #4caf50; }
+.clist-item.pptx-comment { border-left-color: #2196F3; }
+.clist-item.resolved { opacity: 0.5; border-left-color: #666; }
+.item-preview { font-size: 11px; color: #888; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-comment { font-size: 13px; margin-bottom: 4px; white-space: pre-wrap; }
+.item-meta { font-size: 11px; color: #888; }
+.item-replies { margin-top: 6px; padding-left: 12px; border-left: 2px solid #555; }
+.item-reply { margin-bottom: 4px; }
+.item-reply-text { font-size: 12px; white-space: pre-wrap; }
+.item-reply-meta { font-size: 10px; color: #888; }
+.item-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.item-actions button, .item-reply-input button { padding: 3px 10px; background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+`;
+}
+
+// ---------- Shared JS ----------
+
+/**
+ * Shared JS for comment actions: popover, reply, edit, delete, sidebar list, badge, etc.
+ *
+ * The generated code expects these globals to be set before this script runs:
+ *   - `vscode` (acquireVsCodeApi)
+ *   - `comments` (array of comment objects)
+ *   - `__nativePrefix` (string: 'word_', 'pptx_', or '' — prefix for native comment IDs)
+ *   - `__nativeSource` (string: 'word', 'pptx', or '' — _source field of native comments)
+ *
+ * The generated code defines these on `window`:
+ *   resolveComment, unresolveComment, deleteComment, submitReply, submitListReply,
+ *   askCopilotThread, copyComment, showPopover, startEditComment, saveEditComment,
+ *   cancelEdit, startEditReply, saveEditReply, deleteReply, setFilter, resolveAll,
+ *   deleteAllResolved, sendAllToCopilot, copyAllToClipboard, buildList, updateBadge
+ */
+export function commentUiJs(): string {
+    return `
+    // ======== Shared Comment UI ========
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+    // --- Comment actions ---
+    window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
+    window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
+    window.deleteComment = function(id) { vscode.postMessage({ command: 'deleteComment', id: id }); };
+
+    window.submitReply = function(id) {
+        var inp = document.getElementById('pop-reply-input');
+        if (!inp) inp = document.getElementById('reply-input');
+        var t = inp ? inp.value.trim() : '';
+        if (!t) return;
+        vscode.postMessage({ command: 'replyComment', id: id, text: t });
+        inp.value = '';
+    };
+    window.submitListReply = function(id) {
+        var inp = document.getElementById('list-reply-' + id);
+        var t = inp ? inp.value.trim() : '';
+        if (!t) return;
+        vscode.postMessage({ command: 'replyComment', id: id, text: t });
+        inp.value = '';
+    };
+    window.askCopilotThread = function(id) {
+        var inp = document.getElementById('pop-reply-input') || document.getElementById('reply-input');
+        if (!inp) inp = document.getElementById('list-reply-' + id);
+        var replyText = inp ? inp.value.trim() : '';
+        if (replyText) {
+            vscode.postMessage({ command: 'replyComment', id: id, text: replyText });
+            inp.value = '';
+        }
+        vscode.postMessage({ command: 'askCopilotThread', id: id, pendingReply: replyText });
+    };
+    window.copyComment = function(id) {
+        var c = comments.find(function(x) { return x.id === id; });
+        if (!c) return;
+        var text = c.blockPreview + '\\n' + c.comment;
+        if (c.replies) c.replies.forEach(function(r) { text += '\\n  [' + (r.role||'user') + '] ' + r.text; });
+        navigator.clipboard.writeText(text);
+    };
+
+    // --- Popover ---
+    function _isNativeComment(c) { return c._source === __nativeSource && __nativeSource; }
+    function _isNativeReply(r) { return r.id && __nativePrefix && r.id.startsWith(__nativePrefix); }
+    function _authorBadge(c) {
+        if (c._source === 'word') return '<span class="role-badge role-word">\\uD83D\\uDCCE ' + esc(c._wordAuthor || 'Word') + '</span>';
+        if (c._source === 'pptx') return '<span class="role-badge role-pptx">' + esc(c._wordAuthor || 'PPT') + '</span>';
+        return '<span class="role-badge role-' + (c.role||'user') + '">' + (c.role||'user') + '</span>';
+    }
+
+    function showPopover(comment, anchorEl) {
+        var pop = document.getElementById('comment-popover');
+        var isNative = _isNativeComment(comment);
+        var authorBadge = _authorBadge(comment);
+        var resolveBtn = comment.resolved
+            ? '<button onclick="unresolveComment(\\'' + comment.id + '\\')">Reopen</button>'
+            : '<button class="btn-resolve" onclick="resolveComment(\\'' + comment.id + '\\')">Resolve</button>';
+        var repliesHtml = '';
+        if (comment.replies && comment.replies.length) {
+            repliesHtml = '<div class="pop-replies">';
+            comment.replies.forEach(function(r) {
+                var rNative = _isNativeReply(r);
+                var editBtn = rNative ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button>';
+                var delBtn = rNative ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">\u00d7</button>';
+                repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text"><span class="role-badge role-' + (r.role||'user') + '">' + (r.role||'user') + '</span>' + esc(r.text) +
+                    editBtn + delBtn + '</div>' +
+                    '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
+            });
+            repliesHtml += '</div>';
+        }
+        var editBtn = isNative ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button>';
+        pop.innerHTML =
+            '<div class="pop-text" id="pop-comment-' + comment.id + '">' + authorBadge + esc(comment.comment) + editBtn + '</div>' +
+            '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() + (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
+            repliesHtml +
+            '<div class="pop-reply-input"><textarea id="pop-reply-input" placeholder="Reply..." rows="2"></textarea>' +
+            '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button>' +
+            '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button></div>' +
+            '<div class="pop-actions">' + resolveBtn +
+            '<button onclick="copyComment(\\'' + comment.id + '\\')">&#x1F4CB; Copy</button>' +
+            (isNative ? '' : '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button>') + '</div>';
+        var rect = anchorEl.getBoundingClientRect();
+        pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+        pop.style.left = Math.min(rect.left + window.scrollX, window.innerWidth - 360) + 'px';
+        pop.style.display = 'block';
+    }
+    window.showPopover = showPopover;
+
+    // --- Edit / Delete ---
+    window.startEditComment = function(id) {
+        var c = comments.find(function(x) { return x.id === id; });
+        if (!c) return;
+        var el = document.getElementById('pop-comment-' + id) || document.getElementById('list-comment-' + id);
+        if (!el) return;
+        el.innerHTML =
+            '<textarea id="edit-input" style="width:100%;min-height:60px;padding:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:4px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;">' + esc(c.comment) + '</textarea>' +
+            '<div style="margin-top:6px;display:flex;gap:6px;">' +
+            '<button onclick="saveEditComment(\\'' + id + '\\')">Save</button>' +
+            '<button onclick="cancelEdit()">Cancel</button></div>';
+        var ta = document.getElementById('edit-input');
+        if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    };
+    window.saveEditComment = function(id) {
+        var input = document.getElementById('edit-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'editComment', id: id, text: text });
+    };
+    window.cancelEdit = function() {
+        document.getElementById('comment-popover').style.display = 'none';
+        if (typeof buildList === 'function') buildList();
+    };
+    window.startEditReply = function(commentId, replyId) {
+        var c = comments.find(function(x) { return x.id === commentId; });
+        if (!c || !c.replies) return;
+        var r = c.replies.find(function(x) { return x.id === replyId; });
+        if (!r) return;
+        var el = document.getElementById('pop-reply-' + replyId) || document.getElementById('list-reply-item-' + replyId) || document.getElementById('list-reply-' + replyId);
+        if (!el) return;
+        var textEl = el.querySelector('.pop-reply-text') || el.querySelector('.item-reply-text') || el;
+        textEl.innerHTML =
+            '<textarea id="edit-reply-input" style="width:100%;min-height:40px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box;">' + esc(r.text) + '</textarea>' +
+            '<div style="margin-top:4px;display:flex;gap:4px;">' +
+            '<button onclick="saveEditReply(\\'' + commentId + '\\',\\'' + replyId + '\\')">Save</button>' +
+            '<button onclick="cancelEdit()">Cancel</button></div>';
+        var ta = document.getElementById('edit-reply-input');
+        if (ta) { ta.focus(); }
+    };
+    window.saveEditReply = function(commentId, replyId) {
+        var input = document.getElementById('edit-reply-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'editReply', commentId: commentId, replyId: replyId, text: text });
+    };
+    window.deleteReply = function(commentId, replyId) {
+        vscode.postMessage({ command: 'deleteReply', commentId: commentId, replyId: replyId });
+    };
+
+    // --- Filter & Bulk actions ---
+    var currentFilter = 'all';
+    window.setFilter = function(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.panel-filters button, #sidebar .panel-filters button').forEach(function(btn) {
+            var isActive = btn.id === 'filter-' + filter;
+            if (btn.classList) {
+                btn.classList.toggle('active', isActive);
+            }
+            btn.style.background = isActive ? 'var(--vscode-button-background,#0078D4)' : 'transparent';
+            btn.style.color = isActive ? '#fff' : '#ccc';
+        });
+        buildList();
+    };
+    window.resolveAll = function() { vscode.postMessage({ command: 'resolveAll' }); };
+    window.deleteAllResolved = function() { vscode.postMessage({ command: 'deleteAllResolved' }); };
+    window.sendAllToCopilot = function() { vscode.postMessage({ command: 'sendAllToCopilot' }); };
+    window.copyAllToClipboard = function() { vscode.postMessage({ command: 'copyAllToClipboard' }); };
+
+    // --- Badge ---
+    function updateBadge() {
+        var badge = document.getElementById('comment-badge');
+        var span = document.getElementById('badge-count');
+        var unresolved = comments.filter(function(c) { return !c.resolved; });
+        if (comments.length > 0) {
+            badge.style.display = 'block';
+            span.textContent = unresolved.length + ' / ' + comments.length;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    window.updateBadge = updateBadge;
+
+    // --- Sidebar buildList ---
+    // Expects a container: #comment-list (pptx sidebar) or #comment-list-body (md/docx panel)
+    function buildList() {
+        var container = document.getElementById('comment-list-body') || document.getElementById('comment-list');
+        if (!container) return;
+        container.innerHTML = '';
+        var searchInput = document.getElementById('comment-search');
+        var searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        var filtered = comments.filter(function(c) {
+            if (currentFilter === 'open' && c.resolved) return false;
+            if (currentFilter === 'resolved' && !c.resolved) return false;
+            if (currentFilter === 'user') { if (c.role === 'agent' || c._source) return false; }
+            if (currentFilter === 'agent') { if ((c.role || 'user') !== 'agent') return false; }
+            if (searchText) {
+                var haystack = (c.comment + ' ' + (c.blockPreview || '') + ' ' +
+                    (c.replies || []).map(function(r) { return r.text; }).join(' ')).toLowerCase();
+                if (haystack.indexOf(searchText) < 0) return false;
+            }
+            return true;
+        });
+        if (!filtered.length) {
+            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">' +
+                (comments.length === 0 ? 'No comments yet' : 'No matching comments') + '</div>';
+            return;
+        }
+        filtered.forEach(function(c) {
+            var div = document.createElement('div');
+            var isNative = _isNativeComment(c);
+            var sourceClass = c._source === 'word' ? ' word-comment' : c._source === 'pptx' ? ' pptx-comment' : '';
+            div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + sourceClass;
+
+            var authorBadge = _authorBadge(c);
+            var editBtn = isNative ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + c.id + '\\')">edit</button>';
+
+            var repliesHtml = '';
+            if (c.replies && c.replies.length) {
+                repliesHtml = '<div class="item-replies">';
+                c.replies.forEach(function(r) {
+                    var rNative = _isNativeReply(r);
+                    var rEditBtn = rNative ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button>';
+                    var rDelBtn = rNative ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">\u00d7</button>';
+                    repliesHtml += '<div class="item-reply" id="list-reply-item-' + r.id + '"><div class="item-reply-text"><span class="role-badge role-' + (r.role||'user') + '">' + (r.role||'user') + '</span>' + esc(r.text) +
+                        rEditBtn + rDelBtn + '</div>' +
+                        '<div class="item-reply-meta" style="font-size:10px;color:#888;">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
+                });
+                repliesHtml += '</div>';
+            }
+
+            var resolveBtn = c.resolved
+                ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
+                : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
+            var deleteBtn = isNative ? '' : '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button>';
+
+            div.innerHTML =
+                '<div class="item-preview">' + esc(c.blockPreview || '(block)') + '</div>' +
+                '<div class="item-comment" id="list-comment-' + c.id + '">' + authorBadge + esc(c.comment) + editBtn + '</div>' +
+                '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() + (c.resolved ? ' \\u2705' : '') + '</div>' +
+                repliesHtml +
+                '<div class="item-reply-input" onclick="event.stopPropagation()">' +
+                '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
+                '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
+                '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
+                '<div class="item-actions">' + resolveBtn +
+                '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
+                deleteBtn + '</div>';
+
+            // Format-specific click: scroll to element
+            if (typeof __onListItemClick === 'function') {
+                div.addEventListener('click', function() { __onListItemClick(c); });
+            }
+            container.appendChild(div);
+        });
+    }
+    window.buildList = buildList;
+
+    // --- Message handler for comment updates ---
+    // Call this from each format's message listener for shared comment messages.
+    function handleCommentMessage(msg) {
+        switch (msg.command) {
+            case 'commentUpdated': {
+                var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
+                if (idx >= 0) comments[idx] = msg.comment;
+                updateBadge();
+                buildList();
+                if (typeof __onCommentChange === 'function') __onCommentChange();
+                // Update popover if open
+                var pop = document.getElementById('comment-popover');
+                if (pop && pop.style.display === 'block') {
+                    var updated = comments.find(function(x) { return x.id === msg.comment.id; });
+                    if (updated && typeof __findAnchorForComment === 'function') {
+                        var anchor = __findAnchorForComment(updated);
+                        if (anchor) showPopover(updated, anchor);
+                    }
+                }
+                return true;
+            }
+            case 'commentDeleted':
+                comments = comments.filter(function(x) { return x.id !== msg.id; });
+                updateBadge();
+                buildList();
+                if (typeof __onCommentChange === 'function') __onCommentChange();
+                document.getElementById('comment-popover').style.display = 'none';
+                return true;
+            case 'refreshComments':
+                comments = msg.comments || [];
+                updateBadge();
+                buildList();
+                if (typeof __onCommentChange === 'function') __onCommentChange();
+                document.getElementById('comment-popover').style.display = 'none';
+                return true;
+            case 'openPopover': {
+                var oc = comments.find(function(x) { return x.id === msg.commentId; });
+                if (oc && typeof __findAnchorForComment === 'function') {
+                    var anchor = __findAnchorForComment(oc);
+                    if (anchor) showPopover(oc, anchor);
+                }
+                return true;
+            }
+            case 'commentAdded':
+                comments.push(msg.comment);
+                updateBadge();
+                buildList();
+                if (typeof __onCommentChange === 'function') __onCommentChange();
+                return true;
+        }
+        return false;
+    }
+    window.handleCommentMessage = handleCommentMessage;
+`;
+}
+
+// ---------- Sidebar HTML ----------
+
+/** Sidebar + toolbar HTML (search, filters, bulk actions). Used by both PPTX and Markdown/Word. */
+export function sidebarHtml(opts: { containerId: string; toggleFn: string; filters?: string[] }): string {
+    const filters = opts.filters || ['all', 'open', 'resolved'];
+    const filterBtns = filters.map(f => {
+        const label = f.charAt(0).toUpperCase() + f.slice(1);
+        return `<button id="filter-${f}" ${f === 'all' ? 'class="active"' : ''} onclick="setFilter('${f}')">${label}</button>`;
+    }).join('\n            ');
+
+    return `
+<div class="panel-toolbar" style="padding:0 0 8px;">
+    <input type="text" id="comment-search" placeholder="Search comments..." oninput="buildList()" style="width:100%;padding:4px 8px;margin-bottom:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-size:12px;box-sizing:border-box;">
+    <div class="panel-filters" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+        ${filterBtns}
+    </div>
+    <div class="panel-bulk" style="display:flex;gap:4px;flex-wrap:wrap;">
+        <button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>
+        <button onclick="copyAllToClipboard()">&#x1F4CB; Copy All</button>
+        <button onclick="resolveAll()">Resolve All</button>
+        <button onclick="deleteAllResolved()">Delete Resolved</button>
+    </div>
+</div>
+<div id="${opts.containerId}"></div>`;
+}
+
+// ---------- Prompt builder helpers ----------
+
+export interface PromptConfig {
+    format: 'markdown' | 'docx' | 'pptx';
+    filePath: string;
+    fileName: string;
+    toolPrefix: string;
+    docxXmlPath?: string;
+    pptxExtractDir?: string;
+}
+
+const DOCX_XML_RULES = `XML EDITING RULES:
+1. PRESERVE all w14:paraId attributes on <w:p> elements — review comments are anchored to these IDs
+2. When adding NEW <w:p> paragraphs, include w14:paraId with a unique 8-char hex (e.g. w14:paraId="A1B2C3D4" w14:textId="77777777")
+3. Do NOT modify <w:commentRangeStart/> or <w:commentRangeEnd/> — those are existing Word comments`;
+
+const PPTX_XML_RULES = `PPTX XML EDITING GUIDE:
+- Position: <a:off x="EMU" y="EMU"/> (914400 EMU = 1 inch)
+- Size: <a:ext cx="EMU" cy="EMU"/>
+- Font size: <a:rPr sz="N"/> (hundredths of a point, e.g. sz="1600" = 16pt)
+- Bold/Italic: <a:rPr b="1" i="1"/>
+- Text color: <a:solidFill><a:srgbClr val="RRGGBB"/></a:solidFill> inside <a:rPr>
+- Shape fill: <a:solidFill><a:srgbClr val="RRGGBB"/></a:solidFill> inside <p:spPr>
+- Geometry: <a:prstGeom prst="roundRect"/> (rect, roundRect, rightArrow, etc.)
+- Text content: <a:r><a:rPr .../><a:t>text here</a:t></a:r>
+
+XML EDITING RULES:
+1. PRESERVE all <p:cNvPr id="N"> attributes — comments and references depend on these IDs
+2. Do NOT modify or remove <p188:cm> elements or comment marker nodes — those are existing PowerPoint comments
+3. Do NOT modify <mc:AlternateContent> blocks — those contain compatibility fallbacks
+4. When changing text, keep the <a:rPr> attributes (font, size, color) unless explicitly asked to change them`;
+
+function docxToolsText(cfg: PromptConfig): string {
+    const p = cfg.toolPrefix;
+    const xmlInfo = cfg.docxXmlPath ? `\nThe extracted document.xml is at: ${cfg.docxXmlPath}` : '';
+    return `This is a Word (.docx) document stored as XML. You have these tools:\n` +
+        `- ${p}listElements — get a compact text outline of the document (use first for general context)\n` +
+        `- ${p}readElementXml — read raw XML of a specific element\n` +
+        `- ${p}writeElementXml — replace an element's XML\n` +
+        `- ${p}saveDocument — save changes back to .docx\n` +
+        `For substantial edits, you can directly edit the XML file.${xmlInfo}\n` +
+        DOCX_XML_RULES;
+}
+
+function pptxToolsText(cfg: PromptConfig): string {
+    const p = cfg.toolPrefix;
+    const extractInfo = cfg.pptxExtractDir ? `\nExtracted slide XMLs are at: ${cfg.pptxExtractDir}` : '';
+    return `This is a .pptx file (Office Open XML). Slide XMLs have been extracted for editing.${extractInfo}\n` +
+        PPTX_XML_RULES + '\n\n' +
+        `Available tools:\n` +
+        `- ${p}listReviewComments — list all comments\n` +
+        `- ${p}readReviewComment — read full comment with replies\n` +
+        `- ${p}replyToReviewComment — post a reply\n` +
+        `- ${p}resolveReviewComment — mark as resolved`;
+}
+
+function reviewToolsText(cfg: PromptConfig): string {
+    const p = cfg.toolPrefix;
+    return `Please use ${p}readReviewComment to get the full context, ` +
+        `then use ${p}replyToReviewComment to post a helpful response.`;
+}
+
+export function buildSinglePrompt(cfg: PromptConfig, comment: any, mode: 'new' | 'thread'): string {
+    const { format, filePath, fileName, toolPrefix: p } = cfg;
+    const repliesText = (mode === 'thread' && comment.replies?.length)
+        ? '\n- Existing replies:\n' + comment.replies.map((r: any) => `  [${r.role || 'user'}] ${r.text}`).join('\n')
+        : '';
+    const statusText = mode === 'thread' ? `\n- Status: ${comment.resolved ? 'Resolved' : 'Open'}` : '';
+    const action = mode === 'new' ? 'A new review comment was just added' : 'Please respond to this comment thread';
+
+    let header: string;
+    let context: string;
+    let instructions: string;
+
+    if (format === 'docx') {
+        header = `I'm reviewing a Word document "${fileName}" (${filePath}). ${action}:\n\n` +
+            `- Comment #${comment.id}: "${comment.comment}"\n` +
+            `- On element (paraId=${comment.elementId || 'unknown'}): "${comment.blockPreview || '(unknown)'}"${statusText}` +
+            repliesText;
+        context = docxToolsText(cfg);
+        instructions = `To edit this element: use ${p}readElementXml(elementId="${comment.elementId || 'unknown'}") to see its XML, ` +
+            `then ${p}writeElementXml to replace it, then ${p}saveDocument to save.\n` +
+            `In the XML, find the <w:p> tag with w14:paraId="${comment.elementId || 'unknown'}" — that's the target element.\n\n` +
+            `Please use ${p}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") first, ` +
+            `then make the requested changes and use ${p}replyToReviewComment to explain what you did.`;
+    } else if (format === 'pptx') {
+        const slideNum = (comment.elementId || '').match(/slide_(\d+)/)?.[1] || '?';
+        const shapeId = (comment.elementId || '').split('_shape_')[1] || '';
+        header = `I'm reviewing a PowerPoint presentation "${fileName}" (${filePath}). ${action}:\n\n` +
+            `- Comment #${comment.id}: "${comment.comment}"\n` +
+            `- On: "${comment.blockPreview || '(unknown)'}"\n` +
+            `- Slide: ${slideNum}, Shape cNvPr id: ${shapeId || 'N/A'}${statusText}` +
+            repliesText;
+        context = pptxToolsText(cfg) +
+            (shapeId ? `\nTo find this shape, open slide${slideNum}.xml and search for: <p:cNvPr id="${shapeId}"` : '');
+        instructions = `Please use ${p}readReviewComment (commentId="${comment.id}", filePath="${filePath}") first, ` +
+            `then use ${p}replyToReviewComment to respond.`;
+    } else {
+        header = `I'm reviewing "${fileName}" (${filePath}). ${action}:\n\n` +
+            `- Comment #${comment.id}: "${comment.comment}"\n` +
+            `- On block: "${comment.blockPreview || '(unknown)'}"${statusText}` +
+            repliesText;
+        context = '';
+        instructions = `Please use ${p}readReviewComment to get the full context of comment "${comment.id}", ` +
+            `then use ${p}replyToReviewComment to post a helpful response.`;
+    }
+
+    return [header, context, instructions].filter(Boolean).join('\n\n');
+}
+
+export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string {
+    const { format, filePath, fileName, toolPrefix: p } = cfg;
+    const parts: string[] = [];
+
+    if (format === 'docx') {
+        parts.push(`Review comments on Word document "${fileName}" (${filePath}):`);
+        parts.push(docxToolsText(cfg));
+    } else if (format === 'pptx') {
+        const extractInfo = cfg.pptxExtractDir ? ` Extracted slide XMLs at: ${cfg.pptxExtractDir}` : '';
+        parts.push(`Review comments on PowerPoint "${fileName}" (${filePath}):${extractInfo}`);
+        parts.push(`This is a .pptx file. Each shape has <p:cNvPr id="N" name="..."/>. The shapeId in comments matches this id.`);
+        parts.push(`XML EDITING: Position=<a:off x/y EMU>, Size=<a:ext cx/cy>, Font=<a:rPr sz="hundredths-pt">, Color=<a:solidFill><a:srgbClr val="hex"/>`);
+        parts.push(`RULES: 1) PRESERVE <p:cNvPr id> attributes. 2) Do NOT modify <p188:cm> comment elements. 3) Keep <a:rPr> unless asked to change.`);
+        parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment\n`);
+    } else {
+        parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
+    }
+
+    for (const c of comments) {
+        const eidInfo = c.elementId ? ` (paraId=${c.elementId})` : '';
+        let entry = `- Comment #${c.id} [${c.resolved ? 'RESOLVED' : 'OPEN'}]${eidInfo}: "${c.comment}"\n  Block: "${c.blockPreview || '(unknown)'}"`;
+        if (c.replies?.length) {
+            entry += '\n  Replies:\n' + c.replies.map((r: any) => `    [${r.role || 'user'}] ${r.text}`).join('\n');
+        }
+        parts.push(entry);
+    }
+    parts.push(`\nPlease review and respond to each open comment above. For each comment:\n` +
+        `1. Use ${p}readReviewComment (with commentId and filePath="${filePath}") to get the full context\n` +
+        `2. Use ${p}replyToReviewComment (with commentId, text, and filePath="${filePath}") to post your response\n` +
+        `3. Use ${p}resolveReviewComment (with commentId and filePath="${filePath}") to mark it resolved after addressing it`);
+    return parts.join('\n');
+}
+
+// ---------- Native comment merge ----------
+
+export interface NativeCommentConfig {
+    id: string;            // native ID (e.g. the raw comment ID)
+    prefix: string;        // 'word_' or 'pptx_'
+    text: string;
+    author: string;
+    date: string;
+    blockType: string;
+    blockPreview: string;
+    elementId: string;
+    source: 'word' | 'pptx';
+    nativeReplies?: { id: string; role: string; text: string; timestamp: string }[];
+}
+
+export function buildMergedNativeComment(cfg: NativeCommentConfig, sidecarComments: any[]): any {
+    const fullId = cfg.prefix + cfg.id;
+    const sidecar = sidecarComments.find((c: any) => c.id === fullId);
+    const sidecarReplies = sidecar?.replies || [];
+    const nativeReplies = cfg.nativeReplies || [];
+
+    return {
+        id: fullId,
+        anchor: '',
+        startOffset: 0,
+        endOffset: 0,
+        blockType: cfg.blockType,
+        blockPreview: cfg.blockPreview,
+        comment: cfg.text,
+        role: 'user' as const,
+        timestamp: cfg.date || new Date().toISOString(),
+        resolved: sidecar?.resolved || false,
+        elementId: cfg.elementId,
+        replies: [...nativeReplies, ...sidecarReplies],
+        _wordAuthor: cfg.author,
+        _source: cfg.source,
+    };
+}
