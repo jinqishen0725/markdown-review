@@ -318,11 +318,13 @@ export class PreviewPanel {
                     'Delete'
                 );
                 if (delAnswer === 'Delete') {
-                    if (!this.isDocx) {
+                    if (!this.isDocx && !this.isPptx) {
                         await this.removeAnchorViaApi(message.id);
                     }
                     this.commentsManager.deleteComment(message.id);
-                    if (this.isDocx) {
+                    if (this.isPptx) {
+                        this.panel.webview.postMessage({ command: 'commentDeleted', id: message.id });
+                    } else if (this.isDocx) {
                         try { await this.updateDocxContent(); } catch (e: any) { log('deleteComment re-render failed: ' + e.message); }
                     } else {
                         this.immediateRender();
@@ -383,7 +385,11 @@ export class PreviewPanel {
                         if (!c.resolved) { c.resolved = true; }
                     }
                     this.commentsManager.persist();
-                    this.immediateRender();
+                    if (this.isPptx) {
+                        this.panel.webview.postMessage({ command: 'refreshComments', comments: this.getMergedComments() });
+                    } else {
+                        this.immediateRender();
+                    }
                 }
                 return;
             }
@@ -400,10 +406,16 @@ export class PreviewPanel {
                 );
                 if (deleteAnswer === 'Delete All Resolved') {
                     for (const c of resolvedComments) {
-                        await this.removeAnchorViaApi(c.id);
+                        if (!this.isPptx && !this.isDocx) {
+                            await this.removeAnchorViaApi(c.id);
+                        }
                         this.commentsManager.deleteComment(c.id);
                     }
-                    this.immediateRender();
+                    if (this.isPptx) {
+                        this.panel.webview.postMessage({ command: 'refreshComments', comments: this.getMergedComments() });
+                    } else {
+                        this.immediateRender();
+                    }
                 }
                 return;
             }
@@ -524,7 +536,7 @@ export class PreviewPanel {
                 return;
             }
             case 'sendAllToCopilot': {
-                const allComments = this.commentsManager.getComments().filter((c: any) => !c.resolved);
+                const allComments = (this.isPptx ? this.getMergedComments() : this.commentsManager.getComments()).filter((c: any) => !c.resolved);
                 if (allComments.length === 0) {
                     vscode.window.showInformationMessage('No open comments to send.');
                     return;
@@ -534,7 +546,7 @@ export class PreviewPanel {
                 return;
             }
             case 'copyAllToClipboard': {
-                const allOpen = this.commentsManager.getComments().filter((c: any) => !c.resolved);
+                const allOpen = (this.isPptx ? this.getMergedComments() : this.commentsManager.getComments()).filter((c: any) => !c.resolved);
                 if (allOpen.length === 0) {
                     vscode.window.showInformationMessage('No open comments to copy.');
                     return;
@@ -649,12 +661,30 @@ export class PreviewPanel {
                 `then make the requested changes and use ${toolPrefix}replyToReviewComment to explain what you did.`;
         } else if (this.isPptx) {
             const extractInfo = this.pptxModel?.extractDir ? `\nExtracted slide XMLs are at: ${this.pptxModel.extractDir}` : '';
+            const slideNum = (comment.elementId || '').match(/slide_(\d+)/)?.[1] || '?';
+            const shapeId = (comment.elementId || '').split('_shape_')[1] || '';
             prompt = `I'm reviewing a PowerPoint presentation "${fileName}" (${filePath}). Please respond to this comment thread:\n\n` +
                 `- Comment #${comment.id}: "${comment.comment}"\n` +
                 `- On: "${comment.blockPreview || '(unknown)'}"\n` +
+                `- Slide: ${slideNum}, Shape cNvPr id: ${shapeId || 'N/A'}\n` +
                 `- Status: ${comment.resolved ? 'Resolved' : 'Open'}` +
                 repliesText + '\n\n' +
-                `This is a .pptx file. Slide XMLs have been extracted for inspection.${extractInfo}\n` +
+                `This is a .pptx file (Office Open XML). Slide XMLs have been extracted for editing.${extractInfo}\n` +
+                (shapeId ? `To find this shape, open slide${slideNum}.xml and search for: <p:cNvPr id="${shapeId}"\n` : '') +
+                `\nPPTX XML EDITING GUIDE:\n` +
+                `- Position: <a:off x="EMU" y="EMU"/> (914400 EMU = 1 inch)\n` +
+                `- Size: <a:ext cx="EMU" cy="EMU"/>\n` +
+                `- Font size: <a:rPr sz="N"/> (hundredths of a point, e.g. sz="1600" = 16pt)\n` +
+                `- Bold/Italic: <a:rPr b="1" i="1"/>\n` +
+                `- Text color: <a:solidFill><a:srgbClr val="RRGGBB"/></a:solidFill> inside <a:rPr>\n` +
+                `- Shape fill: <a:solidFill><a:srgbClr val="RRGGBB"/></a:solidFill> inside <p:spPr>\n` +
+                `- Geometry: <a:prstGeom prst="roundRect"/> (rect, roundRect, rightArrow, etc.)\n` +
+                `- Text content: <a:r><a:rPr .../><a:t>text here</a:t></a:r>\n\n` +
+                `XML EDITING RULES:\n` +
+                `1. PRESERVE all <p:cNvPr id="N"> attributes — comments and references depend on these IDs\n` +
+                `2. Do NOT modify or remove <p188:cm> elements or comment marker nodes — those are existing PowerPoint comments\n` +
+                `3. Do NOT modify <mc:AlternateContent> blocks — those contain compatibility fallbacks\n` +
+                `4. When changing text, keep the <a:rPr> attributes (font, size, color) unless explicitly asked to change them\n\n` +
                 `Available tools:\n` +
                 `- ${toolPrefix}listReviewComments — list all comments\n` +
                 `- ${toolPrefix}readReviewComment — read full comment with replies\n` +
@@ -696,6 +726,9 @@ export class PreviewPanel {
         } else if (this.isPptx) {
             const extractInfo = this.pptxModel?.extractDir ? ` Extracted slide XMLs at: ${this.pptxModel.extractDir}` : '';
             parts.push(`Review comments on PowerPoint "${fileName}" (${filePath}):${extractInfo}`);
+            parts.push(`This is a .pptx file. Each shape has <p:cNvPr id="N" name="..."/>. The shapeId in comments matches this id.`);
+            parts.push(`XML EDITING: Position=<a:off x/y EMU>, Size=<a:ext cx/cy>, Font=<a:rPr sz="hundredths-pt">, Color=<a:solidFill><a:srgbClr val="hex"/>`);
+            parts.push(`RULES: 1) PRESERVE <p:cNvPr id> attributes. 2) Do NOT modify <p188:cm> comment elements. 3) Keep <a:rPr> unless asked to change.`);
             parts.push(`Available tools: ${toolPrefix}listReviewComments, ${toolPrefix}readReviewComment, ${toolPrefix}replyToReviewComment, ${toolPrefix}resolveReviewComment\n`);
         } else {
             parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
@@ -994,6 +1027,35 @@ export class PreviewPanel {
         }
     }
 
+    private getMergedComments(): any[] {
+        const sidecarComments = this.commentsManager.getComments();
+        if (this.isPptx && this.pptxModel) {
+            const pptxCommentObjs = this.pptxModel.comments.map((c: any) => ({
+                id: `pptx_${c.id}`,
+                blockType: 'slide',
+                blockPreview: `Slide ${c.slideIndex}` + (c.shapeId ? ` (shape ${c.shapeId})` : ''),
+                comment: c.text,
+                role: 'user' as const,
+                timestamp: c.created || new Date().toISOString(),
+                resolved: false,
+                elementId: `slide_${c.slideIndex}`,
+                replies: [] as any[],
+                _wordAuthor: c.authorName,
+                _source: 'pptx',
+            }));
+            for (const pc of pptxCommentObjs) {
+                const sidecar = sidecarComments.find((sc: any) => sc.id === pc.id);
+                if (sidecar) {
+                    if (sidecar.replies) pc.replies = [...pc.replies, ...sidecar.replies];
+                    pc.resolved = sidecar.resolved;
+                }
+            }
+            const reviewOnly = sidecarComments.filter((c: any) => !c.id.startsWith('pptx_'));
+            return [...reviewOnly, ...pptxCommentObjs];
+        }
+        return sidecarComments;
+    }
+
     private async updateDocxContent() {
         if (!this.isDocx || !this.docxPath) return;
         try {
@@ -1239,11 +1301,35 @@ export class PreviewPanel {
             const reviewOnly = sidecarComments.filter((c: any) => !c.id.startsWith('pptx_'));
             const allComments = [...reviewOnly, ...pptxCommentObjs];
 
+            // Build shape layout data for element-level comment targets
+            const EMU = 914400;
+            const slideW = model.dimensions.cx / EMU * 96; // native px width (1280 for 16:9)
+            const shapeLayouts: any[] = [];
+            for (const slide of model.slides) {
+                for (const shape of slide.shapes) {
+                    if (shape.cx <= 0 && shape.cy <= 0) continue; // skip zero-size
+                    const label = shape.text.trim()
+                        ? shape.text.substring(0, 60)
+                        : shape.geometry ? `[${shape.geometry}] ${shape.name}` : shape.name;
+                    shapeLayouts.push({
+                        slideIndex: slide.index,
+                        shapeId: shape.id,
+                        name: shape.name,
+                        text: label,
+                        xPct: shape.x / model.dimensions.cx * 100,
+                        yPct: shape.y / model.dimensions.cy * 100,
+                        wPct: shape.cx / model.dimensions.cx * 100,
+                        hPct: shape.cy / model.dimensions.cy * 100,
+                    });
+                }
+            }
+
             const commentsJson = JSON.stringify(allComments).replace(/</g, '\\u003c');
             const notesJson = JSON.stringify(notesData).replace(/</g, '\\u003c');
             const colorFixesJson = JSON.stringify(colorFixes).replace(/</g, '\\u003c');
+            const shapesJson = JSON.stringify(shapeLayouts).replace(/</g, '\\u003c');
 
-            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, pptxViewerUri, pptxFileUri);
+            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, shapesJson, pptxViewerUri, pptxFileUri);
             this.lastRenderTime = Date.now();
             log(`Pptx preview rendered: ${model.slides.length} slides, ${colorFixes.length} color fixes`);
         } catch (e: any) {
@@ -1252,7 +1338,7 @@ export class PreviewPanel {
         }
     }
 
-    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, pptxViewerUri: string, pptxFileUri: string): string {
+    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, shapesJson: string, pptxViewerUri: string, pptxFileUri: string): string {
         return /*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1276,6 +1362,26 @@ body {
 /* Add comment button on each slide */
 .slide-add-comment { position: absolute; top: 6px; right: 6px; z-index: 10; background: var(--vscode-button-background, #0078D4); color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 18px; cursor: pointer; opacity: 0.6; transition: opacity 0.2s; line-height: 28px; text-align: center; }
 .slide-add-comment:hover { opacity: 1; }
+/* Shape overlay targets for element-level comments */
+.shape-overlay { position: absolute; border: 2px solid transparent; cursor: pointer; z-index: 5; transition: border-color 0.15s, background 0.15s; border-radius: 3px; }
+.shape-overlay:hover { border-color: rgba(0,120,212,0.5); background: rgba(0,120,212,0.08); }
+.shape-overlay .shape-add-btn { display: none; position: absolute; top: 2px; right: 2px; background: #0078D4; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; cursor: pointer; line-height: 20px; text-align: center; }
+.shape-overlay:hover .shape-add-btn { display: block; }
+.shape-overlay.has-comment { border-color: rgba(255,165,0,0.6); background: rgba(255,165,0,0.1); }
+.shape-overlay.has-comment::after { content: '\\1F4AC'; position: absolute; top: 2px; left: 2px; font-size: 14px; }
+.shape-overlay.all-resolved { border-color: rgba(100,100,100,0.4); background: rgba(100,100,100,0.05); }
+.shape-overlay.all-resolved::after { content: '\\2705'; position: absolute; top: 2px; left: 2px; font-size: 14px; }
+/* Popover */
+#comment-popover { display: none; position: absolute; z-index: 100; background: var(--vscode-editor-background, #252526); border: 1px solid var(--vscode-panel-border, #444); border-radius: 8px; padding: 12px; width: 340px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); max-height: 400px; overflow-y: auto; }
+.pop-text { font-size: 13px; margin-bottom: 6px; }
+.pop-meta { font-size: 11px; color: #888; margin-bottom: 8px; }
+.pop-replies { margin: 8px 0; padding-left: 10px; border-left: 2px solid #555; }
+.pop-reply { font-size: 12px; margin-bottom: 4px; }
+.pop-reply-meta { font-size: 10px; color: #888; }
+.pop-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pop-actions button { padding: 3px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); }
+.pop-reply-input { margin-top: 8px; }
+.pop-reply-input textarea { width: 100%; padding: 4px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c); color: var(--vscode-input-foreground, #ccc); border-radius: 3px; font-size: 12px; resize: none; box-sizing: border-box; }
 /* Comment dialog */
 #comment-dialog { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
 #comment-dialog.open { display: flex; }
@@ -1300,8 +1406,13 @@ body {
 .item-comment { font-size: 13px; margin-bottom: 4px; }
 .role-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-right: 6px; font-weight: 600; }
 .role-pptx { background: #2196F3; color: #fff; }
+.role-word { background: #2e7d32; color: #fff; }
 .role-user { background: #0078D4; color: #fff; }
 .role-agent { background: #68217A; color: #fff; }
+.inline-edit-btn { background: none !important; border: none !important; color: #888 !important; cursor: pointer; font-size: 10px !important; padding: 0 2px !important; text-decoration: underline; }
+.inline-edit-btn:hover { color: #ccc !important; }
+.reply-delete-btn { background: none !important; border: none !important; color: #888 !important; cursor: pointer; font-size: 14px !important; padding: 0 2px !important; }
+.reply-delete-btn:hover { color: #f44 !important; }
 .item-meta { font-size: 11px; color: #888; }
 .item-replies { margin-top: 6px; padding-left: 12px; border-left: 2px solid #555; }
 .item-reply { margin-bottom: 4px; font-size: 12px; }
@@ -1314,7 +1425,21 @@ body {
 <div id="comment-badge" onclick="toggleSidebar()">&#x1F4AC; <span id="badge-count">0</span></div>
 <div id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#x00D7;</button>
-    <h3>Comments</h3>
+    <h3>&#x1F4AC; Review Comments</h3>
+    <div class="panel-toolbar">
+        <input type="text" id="comment-search" placeholder="Search comments..." oninput="buildList()" style="width:100%;padding:4px 8px;margin-bottom:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-size:12px;box-sizing:border-box;">
+        <div class="panel-filters" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+            <button id="filter-all" class="active" onclick="setFilter('all')" style="padding:2px 8px;font-size:11px;border:1px solid #555;border-radius:3px;cursor:pointer;background:var(--vscode-button-background,#0078D4);color:#fff;">All</button>
+            <button id="filter-open" onclick="setFilter('open')" style="padding:2px 8px;font-size:11px;border:1px solid #555;border-radius:3px;cursor:pointer;background:transparent;color:#ccc;">Open</button>
+            <button id="filter-resolved" onclick="setFilter('resolved')" style="padding:2px 8px;font-size:11px;border:1px solid #555;border-radius:3px;cursor:pointer;background:transparent;color:#ccc;">Resolved</button>
+        </div>
+        <div class="panel-bulk" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+            <button onclick="sendAllToCopilot()" style="padding:2px 8px;font-size:11px;border:none;border-radius:3px;cursor:pointer;background:var(--vscode-button-background,#0078D4);color:#fff;">&#x2728; Send All to Copilot</button>
+            <button onclick="copyAllToClipboard()" style="padding:2px 8px;font-size:11px;border:none;border-radius:3px;cursor:pointer;background:var(--vscode-button-background,#0078D4);color:#fff;">&#x1F4CB; Copy All</button>
+            <button onclick="resolveAll()" style="padding:2px 8px;font-size:11px;border:none;border-radius:3px;cursor:pointer;background:var(--vscode-button-background,#0078D4);color:#fff;">Resolve All</button>
+            <button onclick="deleteAllResolved()" style="padding:2px 8px;font-size:11px;border:none;border-radius:3px;cursor:pointer;background:var(--vscode-button-background,#0078D4);color:#fff;">Delete Resolved</button>
+        </div>
+    </div>
     <div id="comment-list"></div>
 </div>
 <div id="comment-dialog">
@@ -1330,6 +1455,7 @@ body {
     </div>
 </div>
 <div id="loading"><span class="spinner"></span>Rendering presentation...</div>
+<div id="comment-popover"></div>
 <div id="slides-output"></div>
 <script>
 (function() {
@@ -1349,8 +1475,11 @@ body {
     var comments = ${commentsJson};
     var notesData = ${notesJson};
     var colorFixes = ${colorFixesJson};
+    var shapeLayouts = ${shapesJson};
     setStatus('Loaded ' + comments.length + ' comments, initializing...');
     var pendingSlideIndex = null;
+    var pendingShapeId = null;
+    var pendingShapeName = null;
     function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
     // Build color fix lookup
@@ -1370,9 +1499,18 @@ body {
     }
 
     // === Comment dialog ===
-    window.openCommentDialog = function(slideIndex) {
+    var pendingShapeText = null;
+
+    window.openCommentDialog = function(slideIndex, shapeId, shapeName, shapeText) {
         pendingSlideIndex = slideIndex;
-        document.getElementById('dlg-preview').textContent = 'Slide ' + slideIndex;
+        pendingShapeId = shapeId || null;
+        pendingShapeName = shapeName || null;
+        pendingShapeText = shapeText || null;
+        var preview = 'Slide ' + slideIndex;
+        if (shapeText) preview += ': "' + shapeText.substring(0, 80) + '"';
+        else if (shapeName) preview += ' > ' + shapeName;
+        else if (shapeName) preview += ' > ' + shapeName;
+        document.getElementById('dlg-preview').textContent = preview;
         document.getElementById('dlg-text').value = '';
         document.getElementById('comment-dialog').classList.add('open');
         setTimeout(function() { document.getElementById('dlg-text').focus(); }, 100);
@@ -1384,13 +1522,23 @@ body {
     window.submitComment = function() {
         var text = document.getElementById('dlg-text').value.trim();
         if (!text || !pendingSlideIndex) return;
-        vscode.postMessage({ command: 'addComment', eid: 'slide_' + pendingSlideIndex, blockType: 'slide', blockPreview: 'Slide ' + pendingSlideIndex, comment: text });
+        var eid = pendingShapeId ? 'slide_' + pendingSlideIndex + '_shape_' + pendingShapeId : 'slide_' + pendingSlideIndex;
+        var preview = 'Slide ' + pendingSlideIndex;
+        if (pendingShapeId) preview += ' (shapeId=' + pendingShapeId + ')';
+        if (pendingShapeText) preview += ': "' + pendingShapeText.substring(0, 80) + '"';
+        else if (pendingShapeName) preview += ' > ' + pendingShapeName;
+        vscode.postMessage({ command: 'addComment', eid: eid, blockType: 'slide', blockPreview: preview, comment: text });
         closeDialog();
     };
     window.submitAndAskCopilot = function() {
         var text = document.getElementById('dlg-text').value.trim();
         if (!text || !pendingSlideIndex) return;
-        vscode.postMessage({ command: 'addComment', eid: 'slide_' + pendingSlideIndex, blockType: 'slide', blockPreview: 'Slide ' + pendingSlideIndex, comment: text, askCopilot: true });
+        var eid = pendingShapeId ? 'slide_' + pendingSlideIndex + '_shape_' + pendingShapeId : 'slide_' + pendingSlideIndex;
+        var preview = 'Slide ' + pendingSlideIndex;
+        if (pendingShapeId) preview += ' (shapeId=' + pendingShapeId + ')';
+        if (pendingShapeText) preview += ': "' + pendingShapeText.substring(0, 80) + '"';
+        else if (pendingShapeName) preview += ' > ' + pendingShapeName;
+        vscode.postMessage({ command: 'addComment', eid: eid, blockType: 'slide', blockPreview: preview, comment: text, askCopilot: true });
         closeDialog();
     };
     // Ctrl+Enter to submit
@@ -1405,6 +1553,13 @@ body {
     window.resolveComment = function(id) { vscode.postMessage({ command: 'resolveComment', id: id }); };
     window.unresolveComment = function(id) { vscode.postMessage({ command: 'unresolveComment', id: id }); };
     window.deleteComment = function(id) { vscode.postMessage({ command: 'deleteComment', id: id }); };
+    window.submitReply = function(id) {
+        var inp = document.getElementById('pop-reply-input');
+        var t = inp ? inp.value.trim() : '';
+        if (!t) return;
+        vscode.postMessage({ command: 'replyComment', id: id, text: t });
+        inp.value = '';
+    };
     window.submitListReply = function(id) {
         var inp = document.getElementById('list-reply-' + id);
         var t = inp ? inp.value.trim() : '';
@@ -1413,7 +1568,8 @@ body {
         inp.value = '';
     };
     window.askCopilotThread = function(id) {
-        var inp = document.getElementById('list-reply-' + id);
+        var inp = document.getElementById('pop-reply-input');
+        if (!inp) inp = document.getElementById('list-reply-' + id);
         var replyText = inp ? inp.value.trim() : '';
         if (replyText) {
             vscode.postMessage({ command: 'replyComment', id: id, text: replyText });
@@ -1428,6 +1584,114 @@ body {
         if (c.replies) c.replies.forEach(function(r) { text += '\\n  [' + (r.role||'user') + '] ' + r.text; });
         navigator.clipboard.writeText(text);
     };
+
+    // === Popover ===
+    function showPopover(comment, anchorEl) {
+        var pop = document.getElementById('comment-popover');
+        var isPptx = comment._source === 'pptx';
+        var authorBadge = isPptx
+            ? '<span class="role-badge role-pptx">' + esc(comment._wordAuthor || 'PPT') + '</span>'
+            : '<span class="role-badge role-' + (comment.role||'user') + '">' + (comment.role||'user') + '</span>';
+        var resolveBtn = comment.resolved
+            ? '<button onclick="unresolveComment(\\'' + comment.id + '\\')">Reopen</button>'
+            : '<button onclick="resolveComment(\\'' + comment.id + '\\')">Resolve</button>';
+        var repliesHtml = '';
+        if (comment.replies && comment.replies.length) {
+            repliesHtml = '<div class="pop-replies">';
+            comment.replies.forEach(function(r) {
+                var isNativeReply = r.id && r.id.startsWith('pptx_');
+                var editBtn = isNativeReply ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">edit</button>';
+                var delBtn = isNativeReply ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + comment.id + '\\',\\'' + r.id + '\\')">\u00d7</button>';
+                repliesHtml += '<div class="pop-reply" id="pop-reply-' + r.id + '"><div class="pop-reply-text"><span class="role-badge role-' + (r.role||'user') + '">' + (r.role||'user') + '</span>' + esc(r.text) +
+                    editBtn + delBtn + '</div>' +
+                    '<div class="pop-reply-meta">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
+            });
+            repliesHtml += '</div>';
+        }
+        var editBtn = isPptx ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button>';
+        pop.innerHTML =
+            '<div class="pop-text" id="pop-comment-' + comment.id + '">' + authorBadge + esc(comment.comment) + editBtn + '</div>' +
+            '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() + (comment.resolved ? ' &#x2705;' : '') + '</div>' +
+            repliesHtml +
+            '<div class="pop-reply-input"><textarea id="pop-reply-input" placeholder="Reply..." rows="2"></textarea>' +
+            '<button onclick="submitReply(\\'' + comment.id + '\\')" style="margin-top:4px;">Reply</button>' +
+            '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
+            '<div class="pop-actions">' + resolveBtn +
+            '<button onclick="copyComment(\\'' + comment.id + '\\')">&#x1F4CB; Copy</button>' +
+            (isPptx ? '' : '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button>') + '</div>';
+        var rect = anchorEl.getBoundingClientRect();
+        pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+        pop.style.left = Math.min(rect.left + window.scrollX, window.innerWidth - 360) + 'px';
+        pop.style.display = 'block';
+    }
+    document.addEventListener('click', function(e) {
+        var pop = document.getElementById('comment-popover');
+        if (pop && pop.style.display === 'block' && !pop.contains(e.target) && !e.target.classList.contains('shape-overlay')) {
+            pop.style.display = 'none';
+        }
+    });
+
+    // === Shape overlays ===
+    var allOverlays = []; // {el, slideIdx, shapeId, shapeEid}
+
+    function addShapeOverlays(slideEl, slideIdx) {
+        var slideShapes = shapeLayouts.filter(function(s) { return s.slideIndex === slideIdx; });
+        slideShapes.forEach(function(shape) {
+            if (shape.wPct < 1 || shape.hPct < 1) return;
+            var overlay = document.createElement('div');
+            overlay.className = 'shape-overlay';
+            var shapeEid = 'slide_' + slideIdx + '_shape_' + shape.shapeId;
+            overlay.setAttribute('data-shape-eid', shapeEid);
+
+            overlay.style.left = shape.xPct + '%';
+            overlay.style.top = shape.yPct + '%';
+            overlay.style.width = shape.wPct + '%';
+            overlay.style.height = shape.hPct + '%';
+
+            // "+" button on hover
+            var addBtn = document.createElement('button');
+            addBtn.className = 'shape-add-btn';
+            addBtn.textContent = '+';
+            addBtn.title = shape.name + ': ' + shape.text.substring(0, 30);
+            addBtn.onclick = function(e) { e.stopPropagation(); openCommentDialog(slideIdx, shape.shapeId, shape.name, shape.text); };
+            overlay.appendChild(addBtn);
+
+            // Click overlay to show popover for existing comments or add new
+            (function(eid, si, sid, sname, stext) {
+                overlay.onclick = function(e) {
+                    if (e.target.classList.contains('shape-add-btn')) return;
+                    var sc = comments.filter(function(c) { return c.elementId === eid; });
+                    if (sc.length > 0) {
+                        showPopover(sc[0], overlay);
+                    } else {
+                        openCommentDialog(si, sid, sname, stext);
+                    }
+                };
+            })(shapeEid, slideIdx, shape.shapeId, shape.name, shape.text);
+
+            allOverlays.push({ el: overlay, shapeEid: shapeEid });
+            slideEl.appendChild(overlay);
+        });
+    }
+
+    // Refresh overlay highlighting based on current comments
+    function refreshOverlays() {
+        allOverlays.forEach(function(ov) {
+            var shapeComments = comments.filter(function(c) { return c.elementId === ov.shapeEid; });
+            var hasUnresolved = shapeComments.some(function(c) { return !c.resolved; });
+            var hasResolved = shapeComments.some(function(c) { return c.resolved; });
+            if (hasUnresolved) {
+                ov.el.classList.add('has-comment');
+                ov.el.classList.remove('all-resolved');
+            } else if (hasResolved) {
+                ov.el.classList.remove('has-comment');
+                ov.el.classList.add('all-resolved');
+            } else {
+                ov.el.classList.remove('has-comment');
+                ov.el.classList.remove('all-resolved');
+            }
+        });
+    }
 
     // === Render slides ===
     var output = document.getElementById('slides-output');
@@ -1476,6 +1740,9 @@ body {
                     addBtn.title = 'Add comment on Slide ' + slideIdx;
                     (function(si) { addBtn.onclick = function(e) { e.stopPropagation(); openCommentDialog(si); }; })(slideIdx);
                     wrapper.appendChild(addBtn);
+
+                    // Add shape overlays for element-level comments
+                    (function(el, si) { addShapeOverlays(el, si); })(wrapper, slideIdx);
                 }
 
                 // Add notes after each slide
@@ -1518,11 +1785,99 @@ body {
         if (sidebarOpen) buildList();
     };
 
+    // === Filter & Bulk actions ===
+    var currentFilter = 'all';
+    window.setFilter = function(filter) {
+        currentFilter = filter;
+        var btns = document.querySelectorAll('.panel-filters button');
+        btns.forEach(function(btn) {
+            btn.style.background = 'transparent';
+            btn.style.color = '#ccc';
+        });
+        var active = document.getElementById('filter-' + filter);
+        if (active) { active.style.background = 'var(--vscode-button-background,#0078D4)'; active.style.color = '#fff'; }
+        buildList();
+    };
+    window.resolveAll = function() {
+        vscode.postMessage({ command: 'resolveAll' });
+    };
+    window.deleteAllResolved = function() {
+        vscode.postMessage({ command: 'deleteAllResolved' });
+    };
+    window.sendAllToCopilot = function() {
+        vscode.postMessage({ command: 'sendAllToCopilot' });
+    };
+    window.copyAllToClipboard = function() {
+        vscode.postMessage({ command: 'copyAllToClipboard' });
+    };
+
+    // === Edit/Delete functions ===
+    window.startEditComment = function(id) {
+        var c = comments.find(function(x) { return x.id === id; });
+        if (!c) return;
+        var el = document.getElementById('pop-comment-' + id) || document.getElementById('list-comment-' + id);
+        if (!el) return;
+        el.innerHTML =
+            '<textarea id="edit-input" style="width:100%;min-height:60px;padding:6px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:4px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;">' + esc(c.comment) + '</textarea>' +
+            '<div style="margin-top:6px;display:flex;gap:6px;">' +
+            '<button onclick="saveEditComment(\\'' + id + '\\')">Save</button>' +
+            '<button onclick="cancelEdit()">Cancel</button></div>';
+        var ta = document.getElementById('edit-input');
+        if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    };
+    window.saveEditComment = function(id) {
+        var input = document.getElementById('edit-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'editComment', id: id, text: text });
+    };
+    window.cancelEdit = function() {
+        document.getElementById('comment-popover').style.display = 'none';
+        buildList();
+    };
+    window.startEditReply = function(commentId, replyId) {
+        var c = comments.find(function(x) { return x.id === commentId; });
+        if (!c || !c.replies) return;
+        var r = c.replies.find(function(x) { return x.id === replyId; });
+        if (!r) return;
+        var el = document.getElementById('pop-reply-' + replyId) || document.getElementById('list-reply-item-' + replyId);
+        if (!el) return;
+        var textEl = el.querySelector('.pop-reply-text') || el.querySelector('.item-reply-text') || el;
+        textEl.innerHTML =
+            '<textarea id="edit-reply-input" style="width:100%;min-height:40px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box;">' + esc(r.text) + '</textarea>' +
+            '<div style="margin-top:4px;display:flex;gap:4px;">' +
+            '<button onclick="saveEditReply(\\'' + commentId + '\\',\\'' + replyId + '\\')">Save</button>' +
+            '<button onclick="cancelEdit()">Cancel</button></div>';
+        var ta = document.getElementById('edit-reply-input');
+        if (ta) { ta.focus(); }
+    };
+    window.saveEditReply = function(commentId, replyId) {
+        var input = document.getElementById('edit-reply-input');
+        var text = input ? input.value.trim() : '';
+        if (!text) return;
+        vscode.postMessage({ command: 'editReply', commentId: commentId, replyId: replyId, text: text });
+    };
+    window.deleteReply = function(commentId, replyId) {
+        vscode.postMessage({ command: 'deleteReply', commentId: commentId, replyId: replyId });
+    };
+
     function buildList() {
         var list = document.getElementById('comment-list');
         list.innerHTML = '';
-        if (!comments.length) { list.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">No comments</div>'; return; }
-        comments.forEach(function(c) {
+        var searchInput = document.getElementById('comment-search');
+        var searchText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        var filtered = comments.filter(function(c) {
+            if (currentFilter === 'open' && c.resolved) return false;
+            if (currentFilter === 'resolved' && !c.resolved) return false;
+            if (searchText) {
+                var haystack = (c.comment + ' ' + (c.blockPreview || '') + ' ' +
+                    (c.replies || []).map(function(r) { return r.text; }).join(' ')).toLowerCase();
+                if (haystack.indexOf(searchText) < 0) return false;
+            }
+            return true;
+        });
+        if (!filtered.length) { list.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">' + (comments.length === 0 ? 'No comments' : 'No matching comments') + '</div>'; return; }
+        filtered.forEach(function(c) {
             var div = document.createElement('div');
             var isPptx = c._source === 'pptx';
             div.className = 'clist-item' + (c.resolved ? ' resolved' : '') + (isPptx ? ' pptx-comment' : '');
@@ -1531,11 +1886,18 @@ body {
                 ? '<span class="role-badge role-pptx">' + esc(c._wordAuthor || 'PPT') + '</span>'
                 : '<span class="role-badge role-' + (c.role||'user') + '">' + (c.role||'user') + '</span>';
 
+            var editBtn = isPptx ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + c.id + '\\')">edit</button>';
+
             var repliesHtml = '';
             if (c.replies && c.replies.length) {
                 repliesHtml = '<div class="item-replies">';
                 c.replies.forEach(function(r) {
-                    repliesHtml += '<div class="item-reply"><span class="role-badge role-' + (r.role||'user') + '">' + (r.role||'user') + '</span>' + esc(r.text) + '</div>';
+                    var isNativeReply = r.id && r.id.startsWith('pptx_');
+                    var rEditBtn = isNativeReply ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">edit</button>';
+                    var rDelBtn = isNativeReply ? '' : ' <button class="reply-delete-btn" onclick="event.stopPropagation();deleteReply(\\'' + c.id + '\\',\\'' + r.id + '\\')">\u00d7</button>';
+                    repliesHtml += '<div class="item-reply" id="list-reply-item-' + r.id + '"><div class="item-reply-text"><span class="role-badge role-' + (r.role||'user') + '">' + (r.role||'user') + '</span>' + esc(r.text) +
+                        rEditBtn + rDelBtn + '</div>' +
+                        '<div class="item-reply-meta" style="font-size:10px;color:#888;">' + new Date(r.timestamp).toLocaleString() + '</div></div>';
                 });
                 repliesHtml += '</div>';
             }
@@ -1547,7 +1909,7 @@ body {
 
             div.innerHTML =
                 '<div class="item-preview">' + esc(c.blockPreview) + '</div>' +
-                '<div class="item-comment">' + authorBadge + esc(c.comment) + '</div>' +
+                '<div class="item-comment" id="list-comment-' + c.id + '">' + authorBadge + esc(c.comment) + editBtn + '</div>' +
                 '<div class="item-meta">' + new Date(c.timestamp).toLocaleString() + (c.resolved ? ' &#x2705;' : '') + '</div>' +
                 repliesHtml +
                 '<div class="item-reply-input" onclick="event.stopPropagation()">' +
@@ -1580,25 +1942,60 @@ body {
             case 'commentAdded':
                 comments.push(msg.comment);
                 updateBadge();
-                // Auto-open sidebar to show the new comment
-                if (!sidebarOpen) {
-                    sidebarOpen = true;
-                    document.getElementById('sidebar').classList.add('open');
-                }
+                refreshOverlays();
                 buildList();
+                // Show popover on the shape overlay for the new comment
+                var newC = msg.comment;
+                var anchor = newC.elementId ? document.querySelector('[data-shape-eid="' + newC.elementId + '"]') : null;
+                if (anchor) {
+                    showPopover(newC, anchor);
+                } else {
+                    // Fallback: open sidebar if overlay not found
+                    if (!sidebarOpen) {
+                        sidebarOpen = true;
+                        document.getElementById('sidebar').classList.add('open');
+                    }
+                }
                 break;
             case 'commentUpdated': {
                 var idx = comments.findIndex(function(x) { return x.id === msg.comment.id; });
                 if (idx >= 0) comments[idx] = msg.comment;
                 updateBadge();
+                refreshOverlays();
                 buildList();
+                // Update popover if open for this comment
+                var pop = document.getElementById('comment-popover');
+                if (pop && pop.style.display === 'block') {
+                    var updated = comments.find(function(x) { return x.id === msg.comment.id; });
+                    if (updated) {
+                        var anchor = document.querySelector('[data-shape-eid="' + updated.elementId + '"]');
+                        if (anchor) showPopover(updated, anchor);
+                    }
+                }
                 break;
             }
             case 'commentDeleted':
                 comments = comments.filter(function(x) { return x.id !== msg.id; });
                 updateBadge();
-                if (sidebarOpen) buildList();
+                refreshOverlays();
+                buildList();
+                document.getElementById('comment-popover').style.display = 'none';
                 break;
+            case 'refreshComments':
+                comments = msg.comments || [];
+                updateBadge();
+                refreshOverlays();
+                buildList();
+                document.getElementById('comment-popover').style.display = 'none';
+                break;
+            case 'openPopover': {
+                var oc = comments.find(function(x) { return x.id === msg.commentId; });
+                if (oc) {
+                    var oAnchor = oc.elementId ? document.querySelector('[data-shape-eid="' + oc.elementId + '"]') : null;
+                    if (oAnchor) showPopover(oc, oAnchor);
+                }
+                break;
+            }
         }
     });
 
@@ -1829,10 +2226,11 @@ img { max-width: 100%; }
 .pop-reply, .item-reply { margin-bottom: 6px; }
 .pop-reply-text, .item-reply-text { font-size: 12px; white-space: pre-wrap; }
 .pop-reply-meta, .item-reply-meta { font-size: 10px; color: #888; }
-.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; }
-.role-user { background: #0e639c; color: #fff; }
-.role-agent { background: #6a1b9a; color: #fff; }
+.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; font-weight: 600; }
+.role-user { background: #0078D4; color: #fff; }
+.role-agent { background: #68217A; color: #fff; }
 .role-word { background: #2e7d32; color: #fff; }
+.role-pptx { background: #2196F3; color: #fff; }
 .word-comment { border-left: 3px solid #4caf50 !important; }
 .word-comment .item-preview { color: #4caf50 !important; }
 .pop-reply-input { margin-top: 8px; }
