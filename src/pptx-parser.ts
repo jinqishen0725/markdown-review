@@ -218,6 +218,129 @@ export async function parsePptx(filePath: string): Promise<PptxModel> {
     return { filePath, slides, comments, authors, dimensions, rawZip: zip, extractDir };
 }
 
+// ---------- Re-parse from edited XML ----------
+
+/**
+ * Re-parse slide XML from the extracted directory (after agent edits).
+ * Re-reads slide XMLs from extractDir, re-parses shapes/text, and returns updated model.
+ * The rawZip is updated with the modified XML so saving works correctly.
+ */
+export async function reparseFromExtractedXml(model: PptxModel & { extractDir?: string }): Promise<PptxModel & { extractDir?: string }> {
+    if (!model.extractDir || !fs.existsSync(model.extractDir)) {
+        return model;
+    }
+    const { DOMParser } = require('@xmldom/xmldom');
+    const slidesDir = path.join(model.extractDir, 'slides');
+    if (!fs.existsSync(slidesDir)) return model;
+
+    // Re-parse each slide from extracted XML
+    const newSlides: PptxSlide[] = [];
+    for (const origSlide of model.slides) {
+        const xmlFile = path.join(slidesDir, `slide${origSlide.index}.xml`);
+        if (!fs.existsSync(xmlFile)) {
+            newSlides.push(origSlide); // keep original if no extracted file
+            continue;
+        }
+
+        const xmlContent = fs.readFileSync(xmlFile, 'utf-8');
+        const dom = new DOMParser().parseFromString(xmlContent, 'text/xml');
+
+        // Update rawZip with modified XML
+        model.rawZip.file(`ppt/slides/slide${origSlide.index}.xml`, xmlContent);
+
+        // Re-parse shapes from the modified XML
+        const spTree = dom.getElementsByTagNameNS(P, 'spTree')[0];
+        const shapes = spTree ? parseShapeTree(spTree, dom) : [];
+
+        newSlides.push({
+            index: origSlide.index,
+            slideId: origSlide.slideId,
+            shapes,
+            notes: origSlide.notes,
+            notesHtml: origSlide.notesHtml,
+        });
+    }
+
+    // Also update presentation.xml if modified
+    const presXmlPath = path.join(model.extractDir, 'presentation.xml');
+    if (fs.existsSync(presXmlPath)) {
+        const presXml = fs.readFileSync(presXmlPath, 'utf-8');
+        model.rawZip.file('ppt/presentation.xml', presXml);
+    }
+
+    // Update comment XMLs if modified
+    const commentsDir = path.join(model.extractDir, 'comments');
+    if (fs.existsSync(commentsDir)) {
+        const commentFiles = fs.readdirSync(commentsDir).filter((f: string) => f.endsWith('.xml'));
+        for (const cf of commentFiles) {
+            const content = fs.readFileSync(path.join(commentsDir, cf), 'utf-8');
+            model.rawZip.file(`ppt/comments/${cf}`, content);
+        }
+    }
+
+    return { ...model, slides: newSlides };
+}
+
+// ---------- Save ----------
+
+/**
+ * Save the PPTX model back to a .pptx file.
+ * Reads modified slide XMLs from extractDir, updates the ZIP, and writes the output.
+ */
+export async function savePptx(model: PptxModel & { extractDir?: string }, outputPath: string): Promise<string> {
+    if (!model.rawZip) {
+        throw new Error('No parsed PPTX model available for saving.');
+    }
+    const { DOMParser } = require('@xmldom/xmldom');
+
+    // Update ZIP with any modified extracted XMLs
+    if (model.extractDir && fs.existsSync(model.extractDir)) {
+        const slidesDir = path.join(model.extractDir, 'slides');
+        if (fs.existsSync(slidesDir)) {
+            const slideFiles = fs.readdirSync(slidesDir).filter((f: string) => /^slide\d+\.xml$/.test(f));
+            for (const sf of slideFiles) {
+                const content = fs.readFileSync(path.join(slidesDir, sf), 'utf-8');
+                // Validate XML
+                try {
+                    new DOMParser().parseFromString(content, 'text/xml');
+                } catch (e: any) {
+                    throw new Error(`Invalid XML in ${sf}: ${e.message}. Please fix the XML before saving.`);
+                }
+                model.rawZip.file(`ppt/slides/${sf}`, content);
+            }
+        }
+
+        // Update presentation.xml if modified
+        const presXmlPath = path.join(model.extractDir, 'presentation.xml');
+        if (fs.existsSync(presXmlPath)) {
+            const content = fs.readFileSync(presXmlPath, 'utf-8');
+            model.rawZip.file('ppt/presentation.xml', content);
+        }
+
+        // Update comment XMLs if modified
+        const commentsDir = path.join(model.extractDir, 'comments');
+        if (fs.existsSync(commentsDir)) {
+            const commentFiles = fs.readdirSync(commentsDir).filter((f: string) => f.endsWith('.xml'));
+            for (const cf of commentFiles) {
+                const content = fs.readFileSync(path.join(commentsDir, cf), 'utf-8');
+                model.rawZip.file(`ppt/comments/${cf}`, content);
+            }
+        }
+
+        // Update authors if modified
+        const authorsPath = path.join(model.extractDir, 'authors.xml');
+        if (fs.existsSync(authorsPath)) {
+            model.rawZip.file('ppt/authors.xml', fs.readFileSync(authorsPath, 'utf-8'));
+        }
+    }
+
+    // Generate the output .pptx
+    const outputBuf = await model.rawZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    fs.writeFileSync(outputPath, outputBuf);
+
+    return outputPath;
+}
+
 // ---------- Authors ----------
 
 async function parseAuthors(zip: any, DOMParser: any): Promise<Map<string, string>> {

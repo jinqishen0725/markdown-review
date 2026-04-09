@@ -116,6 +116,8 @@ export class PreviewPanel {
     public isPptx: boolean = false;
     private pptxPath: string = '';
     private pptxModel: any = null; // PptxModel from pptx-parser
+    private pptxXmlWatcher: vscode.FileSystemWatcher | null = null;
+    private pptxXmlDebounce: ReturnType<typeof setTimeout> | null = null;
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -442,6 +444,31 @@ export class PreviewPanel {
 
                     await saveDocx(this.docxModel, saveUri.fsPath);
                     vscode.window.showInformationMessage(`Document saved to: ${path.basename(saveUri.fsPath)}`);
+                } catch (e: any) {
+                    vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
+                }
+                return;
+            }
+            case 'savePptxFile': {
+                if (!this.isPptx || !this.pptxModel) {
+                    vscode.window.showWarningMessage('No PowerPoint presentation open.');
+                    return;
+                }
+                try {
+                    const { savePptx } = require('./pptx-parser');
+                    const ext = path.extname(this.pptxPath);
+                    const defaultName = path.basename(this.pptxPath, ext) + '_reviewed' + ext;
+                    const defaultUri = vscode.Uri.file(path.join(path.dirname(this.pptxPath), defaultName));
+
+                    const saveUri = await vscode.window.showSaveDialog({
+                        defaultUri,
+                        filters: { 'PowerPoint Presentations': ['pptx'] },
+                        title: 'Save PowerPoint Presentation',
+                    });
+                    if (!saveUri) return;
+
+                    await savePptx(this.pptxModel, saveUri.fsPath);
+                    vscode.window.showInformationMessage(`Presentation saved to: ${path.basename(saveUri.fsPath)}`);
                 } catch (e: any) {
                     vscode.window.showErrorMessage(`Failed to save: ${e.message}`);
                 }
@@ -1069,11 +1096,16 @@ export class PreviewPanel {
     private async updatePptxContent() {
         if (!this.isPptx || !this.pptxPath) return;
         try {
-            const { parsePptx } = require('./pptx-parser');
+            const { parsePptx, reparseFromExtractedXml } = require('./pptx-parser');
             const fs = require('fs');
 
             if (!this.pptxModel) {
                 this.pptxModel = await parsePptx(this.pptxPath);
+                // Set up XML file watcher on first load
+                this.setupPptxXmlWatcher();
+            } else if (this.pptxModel.extractDir) {
+                // Re-parse from edited XML files
+                this.pptxModel = await reparseFromExtractedXml(this.pptxModel);
             }
 
             const model = this.pptxModel;
@@ -1215,6 +1247,9 @@ ${commentUiCss()}
 </head>
 <body>
 <div id="comment-badge" onclick="toggleSidebar()">&#x1F4AC; <span id="badge-count">0</span></div>
+<div style="position:fixed;top:10px;right:180px;z-index:999;">
+    <button onclick="savePptx()" style="padding:4px 12px;border-radius:12px;border:1px solid #555;background:#333;color:#ccc;font-size:12px;cursor:pointer;" title="Save changes back to .pptx file">&#x1F4BE; Save .pptx</button>
+</div>
 <div id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#x00D7;</button>
     <h3>&#x1F4AC; Review Comments</h3>
@@ -1274,6 +1309,9 @@ ${commentUiCss()}
             if (fix && fix !== '#FFFFFF' && fix !== '#ffffff') span.style.color = fix;
         }
     }
+
+    // === Save ===
+    window.savePptx = function() { vscode.postMessage({ command: 'savePptxFile' }); };
 
     // === Comment dialog ===
     var pendingShapeText = null;
@@ -2516,6 +2554,13 @@ mermaid.run({ querySelector: '.mermaid' });
         if (this.docxXmlDebounce) {
             clearTimeout(this.docxXmlDebounce);
         }
+        if (this.pptxXmlWatcher) {
+            this.pptxXmlWatcher.dispose();
+            this.pptxXmlWatcher = null;
+        }
+        if (this.pptxXmlDebounce) {
+            clearTimeout(this.pptxXmlDebounce);
+        }
         this.panel.dispose();
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
@@ -2546,6 +2591,41 @@ mermaid.run({ querySelector: '.mermaid' });
         } catch {
             // File may not exist yet — that's OK
         }
+    }
+
+    private setupPptxXmlWatcher() {
+        if (!this.isPptx || !this.pptxModel?.extractDir) return;
+        // Dispose existing watcher
+        if (this.pptxXmlWatcher) {
+            this.pptxXmlWatcher.dispose();
+            this.pptxXmlWatcher = null;
+        }
+        const slidesDir = path.join(this.pptxModel.extractDir, 'slides');
+        if (!require('fs').existsSync(slidesDir)) return;
+
+        // Watch for changes to any XML file in the slides folder
+        const pattern = new vscode.RelativePattern(slidesDir, '*.xml');
+        this.pptxXmlWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        const onChange = (uri: vscode.Uri) => {
+            if (this.pptxXmlDebounce) clearTimeout(this.pptxXmlDebounce);
+            this.pptxXmlDebounce = setTimeout(async () => {
+                this.pptxXmlDebounce = null;
+                if (Date.now() - this.lastRenderTime < 1000) return;
+                log(`[PPTX] Slide XML changed: ${path.basename(uri.fsPath)} — refreshing preview`);
+                // Re-parse from edited XML and re-render
+                try {
+                    const { reparseFromExtractedXml } = require('./pptx-parser');
+                    this.pptxModel = await reparseFromExtractedXml(this.pptxModel);
+                    await this.updatePptxContent();
+                } catch (e: any) {
+                    log(`[PPTX] Re-parse failed: ${e.message}`);
+                }
+            }, 1500);
+        };
+
+        this.pptxXmlWatcher.onDidChange(onChange);
+        this.pptxXmlWatcher.onDidCreate(onChange);
     }
 
     /** Watch .comments.json for external changes and update webview */
