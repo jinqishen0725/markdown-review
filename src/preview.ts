@@ -118,6 +118,7 @@ export class PreviewPanel {
     private pptxModel: any = null; // PptxModel from pptx-parser
     private pptxXmlWatcher: vscode.FileSystemWatcher | null = null;
     private pptxXmlDebounce: ReturnType<typeof setTimeout> | null = null;
+    private pptxTempPath: string = ''; // temp .pptx file for re-rendering after XML edits
 
     private constructor(
         panel: vscode.WebviewPanel,
@@ -265,6 +266,7 @@ export class PreviewPanel {
                 localResourceRoots: [
                     vscode.Uri.joinPath(context.extensionUri, 'media'),
                     vscode.Uri.file(path.dirname(pptxPath)),
+                    vscode.Uri.file(require('os').tmpdir()),
                 ],
             },
         );
@@ -1098,6 +1100,7 @@ export class PreviewPanel {
         try {
             const { parsePptx, reparseFromExtractedXml } = require('./pptx-parser');
             const fs = require('fs');
+            const os = require('os');
 
             if (!this.pptxModel) {
                 this.pptxModel = await parsePptx(this.pptxPath);
@@ -1110,8 +1113,21 @@ export class PreviewPanel {
 
             const model = this.pptxModel;
 
+            // Write a temp .pptx with the current (possibly modified) ZIP contents
+            // so the renderer always shows the latest version
+            const tempDir = os.tmpdir();
+            const tempName = `_mdreview_${path.basename(this.pptxPath, '.pptx')}_${Date.now()}.pptx`;
+            const tempPath = path.join(tempDir, tempName);
+            const zipBuf = await model.rawZip.generateAsync({ type: 'nodebuffer' });
+            fs.writeFileSync(tempPath, zipBuf);
+            // Clean up previous temp file
+            if (this.pptxTempPath && this.pptxTempPath !== tempPath) {
+                try { fs.unlinkSync(this.pptxTempPath); } catch { /* ignore */ }
+            }
+            this.pptxTempPath = tempPath;
+
             const pptxFileUri = this.panel.webview.asWebviewUri(
-                vscode.Uri.file(this.pptxPath)
+                vscode.Uri.file(tempPath)
             ).toString();
             const pptxViewerUri = this.panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this.extensionUri, 'media', 'pptx-viewer.js')
@@ -2560,6 +2576,11 @@ mermaid.run({ querySelector: '.mermaid' });
         }
         if (this.pptxXmlDebounce) {
             clearTimeout(this.pptxXmlDebounce);
+        }
+        // Clean up temp .pptx file
+        if (this.pptxTempPath) {
+            try { require('fs').unlinkSync(this.pptxTempPath); } catch { /* ignore */ }
+            this.pptxTempPath = '';
         }
         this.panel.dispose();
         this.disposables.forEach(d => d.dispose());
