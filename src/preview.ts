@@ -266,7 +266,6 @@ export class PreviewPanel {
                 localResourceRoots: [
                     vscode.Uri.joinPath(context.extensionUri, 'media'),
                     vscode.Uri.file(path.dirname(pptxPath)),
-                    vscode.Uri.file(require('os').tmpdir()),
                 ],
             },
         );
@@ -1100,7 +1099,6 @@ export class PreviewPanel {
         try {
             const { parsePptx, reparseFromExtractedXml } = require('./pptx-parser');
             const fs = require('fs');
-            const os = require('os');
 
             if (!this.pptxModel) {
                 this.pptxModel = await parsePptx(this.pptxPath);
@@ -1114,16 +1112,12 @@ export class PreviewPanel {
             const model = this.pptxModel;
 
             // Write a temp .pptx with the current (possibly modified) ZIP contents
-            // so the renderer always shows the latest version
-            const tempDir = os.tmpdir();
-            const tempName = `_mdreview_${path.basename(this.pptxPath, '.pptx')}_${Date.now()}.pptx`;
-            const tempPath = path.join(tempDir, tempName);
+            // so the renderer always shows the latest version.
+            // Place it next to the original file (already in localResourceRoots).
+            const tempName = `._mdreview_preview.pptx`;
+            const tempPath = path.join(path.dirname(this.pptxPath), tempName);
             const zipBuf = await model.rawZip.generateAsync({ type: 'nodebuffer' });
             fs.writeFileSync(tempPath, zipBuf);
-            // Clean up previous temp file
-            if (this.pptxTempPath && this.pptxTempPath !== tempPath) {
-                try { fs.unlinkSync(this.pptxTempPath); } catch { /* ignore */ }
-            }
             this.pptxTempPath = tempPath;
 
             const pptxFileUri = this.panel.webview.asWebviewUri(
