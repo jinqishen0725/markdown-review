@@ -249,8 +249,8 @@ export async function reparseFromExtractedXml(model: PptxModel & { extractDir?: 
         model.rawZip.file(`ppt/slides/slide${origSlide.index}.xml`, xmlContent);
 
         // Re-parse shapes from the modified XML
-        const spTree = dom.getElementsByTagNameNS(P, 'spTree')[0];
-        const shapes = spTree ? parseShapeTree(spTree, dom) : [];
+        const slideFile = `ppt/slides/slide${origSlide.index}.xml`;
+        const shapes = parseShapeTree(dom, model.rawZip, slideFile);
 
         newSlides.push({
             index: origSlide.index,
