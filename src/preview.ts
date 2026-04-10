@@ -1568,19 +1568,110 @@ ${commentUiCss()}
                     vscode.postMessage({ command: 'captureSlideResult', error: 'Slide ' + slideNum + ' not found' });
                     return;
                 }
-                // Use html2canvas to render the slide element to a canvas, then export as PNG
-                html2canvas(targetSlide, {
-                    backgroundColor: '#1e1e1e',
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
+
+                // Prepare for html2canvas: convert blob URLs and canvas elements
+                function prepareForCapture(el) {
+                    var promises = [];
+
+                    // 1. Convert <canvas> elements to <img> (renderer draws shapes on canvas)
+                    var canvases = el.querySelectorAll('canvas');
+                    for (var i = 0; i < canvases.length; i++) {
+                        (function(canvas) {
+                            try {
+                                var dataUrl = canvas.toDataURL('image/png');
+                                var img = document.createElement('img');
+                                img.src = dataUrl;
+                                img.style.cssText = canvas.style.cssText;
+                                img.style.width = canvas.style.width || (canvas.width + 'px');
+                                img.style.height = canvas.style.height || (canvas.height + 'px');
+                                img.className = canvas.className;
+                                if (canvas.parentNode) {
+                                    canvas.parentNode.insertBefore(img, canvas);
+                                    canvas.style.display = 'none';
+                                    canvas._captureHidden = true;
+                                }
+                            } catch(e) { /* tainted canvas, skip */ }
+                        })(canvases[i]);
+                    }
+
+                    // 2. Convert blob: background-images to data: URLs
+                    var allEls = el.querySelectorAll('*');
+                    for (var j = 0; j < allEls.length; j++) {
+                        var style = window.getComputedStyle(allEls[j]);
+                        var bg = style.backgroundImage;
+                        if (bg && bg.indexOf('blob:') >= 0) {
+                            (function(elem, bgVal) {
+                                var url = bgVal.replace(/url\\(["']?/, '').replace(/["']?\\).*/, '');
+                                promises.push(
+                                    fetch(url).then(function(r) { return r.blob(); })
+                                    .then(function(blob) {
+                                        return new Promise(function(resolve) {
+                                            var reader = new FileReader();
+                                            reader.onloadend = function() { resolve(reader.result); };
+                                            reader.readAsDataURL(blob);
+                                        });
+                                    })
+                                    .then(function(dataUrl) { elem.style.backgroundImage = 'url("' + dataUrl + '")'; })
+                                    .catch(function() {})
+                                );
+                            })(allEls[j], bg);
+                        }
+                    }
+
+                    // 3. Convert blob: img src to data: URLs
+                    var imgs = el.querySelectorAll('img[src^="blob:"]');
+                    for (var m = 0; m < imgs.length; m++) {
+                        (function(img) {
+                            promises.push(
+                                fetch(img.src).then(function(r) { return r.blob(); })
+                                .then(function(blob) {
+                                    return new Promise(function(resolve) {
+                                        var reader = new FileReader();
+                                        reader.onloadend = function() { resolve(reader.result); };
+                                        reader.readAsDataURL(blob);
+                                    });
+                                })
+                                .then(function(dataUrl) { img.src = dataUrl; })
+                                .catch(function() {})
+                            );
+                        })(imgs[m]);
+                    }
+
+                    return Promise.all(promises);
+                }
+
+                // Restore canvas elements after capture
+                function restoreAfterCapture(el) {
+                    var canvases = el.querySelectorAll('canvas');
+                    for (var i = 0; i < canvases.length; i++) {
+                        if (canvases[i]._captureHidden) {
+                            canvases[i].style.display = '';
+                            delete canvases[i]._captureHidden;
+                            // Remove the img we inserted
+                            var prev = canvases[i].previousSibling;
+                            if (prev && prev.tagName === 'IMG') {
+                                prev.parentNode.removeChild(prev);
+                            }
+                        }
+                    }
+                }
+
+                prepareForCapture(targetSlide).then(function() {
+                    return html2canvas(targetSlide, {
+                        backgroundColor: null,
+                        scale: 2,
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: false,
+                    });
                 }).then(function(canvas) {
+                    restoreAfterCapture(targetSlide);
                     var dataUrl = canvas.toDataURL('image/png');
-                    // Strip the data:image/png;base64, prefix to get raw base64
                     var base64 = dataUrl.split(',')[1];
                     vscode.postMessage({ command: 'captureSlideResult', png: base64, slideNumber: slideNum });
                 }).catch(function(err) {
-                    vscode.postMessage({ command: 'captureSlideResult', error: 'html2canvas failed: ' + (err.message || err) });
+                    restoreAfterCapture(targetSlide);
+                    vscode.postMessage({ command: 'captureSlideResult', error: 'Capture failed: ' + (err.message || err) });
                 });
             } catch(err) {
                 vscode.postMessage({ command: 'captureSlideResult', error: err.message || 'Unknown error' });
