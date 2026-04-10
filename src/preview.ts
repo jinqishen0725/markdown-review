@@ -1114,7 +1114,9 @@ export class PreviewPanel {
             // Write a temp .pptx with the current (possibly modified) ZIP contents
             // so the renderer always shows the latest version.
             // Place it next to the original file (already in localResourceRoots).
-            const tempName = `._mdreview_preview.pptx`;
+            // Use original filename to avoid collisions when multiple files are open.
+            const baseName = path.basename(this.pptxPath, '.pptx');
+            const tempName = `._mdreview_${baseName}_preview.pptx`;
             const tempPath = path.join(path.dirname(this.pptxPath), tempName);
             const zipBuf = await model.rawZip.generateAsync({ type: 'nodebuffer' });
             fs.writeFileSync(tempPath, zipBuf);
