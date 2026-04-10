@@ -410,11 +410,11 @@ export class CaptureSlideTool implements vscode.LanguageModelTool<ICaptureSlideP
                 new vscode.LanguageModelTextPart('No PPTX preview panel open. Open the PowerPoint review preview first.')
             ]);
         }
-        const screenshotPath = path.join(path.dirname(filePath), `.review-slide${slideNumber}.html`);
+        const screenshotPath = path.join(path.dirname(filePath), `.review-slide${slideNumber}.png`);
         try {
             await panel.captureSlide(slideNumber, screenshotPath);
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(`Slide ${slideNumber} screenshot saved to: ${screenshotPath}\nOpen this file in a browser to see the rendered slide.`)
+                new vscode.LanguageModelTextPart(`Slide ${slideNumber} captured as PNG: ${screenshotPath}`)
             ]);
         } catch (e: any) {
             return new vscode.LanguageModelToolResult([

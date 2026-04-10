@@ -1129,6 +1129,9 @@ export class PreviewPanel {
             const pptxViewerUri = this.panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this.extensionUri, 'media', 'pptx-viewer.js')
             ).toString();
+            const html2canvasUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this.extensionUri, 'media', 'html2canvas.min.js')
+            ).toString();
 
             // Build notes data
             const notesData = model.slides
@@ -1205,7 +1208,7 @@ export class PreviewPanel {
             const colorFixesJson = JSON.stringify(colorFixes).replace(/</g, '\\u003c');
             const shapesJson = JSON.stringify(shapeLayouts).replace(/</g, '\\u003c');
 
-            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, shapesJson, pptxViewerUri, pptxFileUri);
+            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, shapesJson, pptxViewerUri, pptxFileUri, html2canvasUri);
             this.lastRenderTime = Date.now();
             log(`Pptx preview rendered: ${model.slides.length} slides, ${colorFixes.length} color fixes`);
         } catch (e: any) {
@@ -1214,7 +1217,7 @@ export class PreviewPanel {
         }
     }
 
-    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, shapesJson: string, pptxViewerUri: string, pptxFileUri: string): string {
+    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, shapesJson: string, pptxViewerUri: string, pptxFileUri: string, html2canvasUri: string): string {
         return /*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1257,6 +1260,7 @@ ${commentUiCss()}
 .panel-bulk button { padding: 2px 8px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; background: var(--vscode-button-background,#0078D4); color: #fff; }
 </style>
 <script src="${pptxViewerUri}"></script>
+<script src="${html2canvasUri}"></script>
 </head>
 <body>
 <div id="comment-badge" onclick="toggleSidebar()">&#x1F4AC; <span id="badge-count">0</span></div>
@@ -1548,7 +1552,7 @@ ${commentUiCss()}
             }
             return;
         }
-        // Capture a specific slide as HTML screenshot
+        // Capture a specific slide as PNG using html2canvas
         if (msg.command === 'captureSlide') {
             try {
                 var slideNum = msg.slideNumber || 1;
@@ -1564,10 +1568,20 @@ ${commentUiCss()}
                     vscode.postMessage({ command: 'captureSlideResult', error: 'Slide ' + slideNum + ' not found' });
                     return;
                 }
-                var styles = Array.from(document.querySelectorAll('style')).map(function(s){return s.outerHTML;}).join('\\n');
-                var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' + styles + '</head><body style="padding:20px;background:#1e1e1e;">' +
-                    '<h2 style="color:#ccc;">Slide ' + slideNum + '</h2>' + targetSlide.outerHTML + '</body></html>';
-                vscode.postMessage({ command: 'captureSlideResult', html: html, slideNumber: slideNum });
+                // Use html2canvas to render the slide element to a canvas, then export as PNG
+                html2canvas(targetSlide, {
+                    backgroundColor: '#1e1e1e',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                }).then(function(canvas) {
+                    var dataUrl = canvas.toDataURL('image/png');
+                    // Strip the data:image/png;base64, prefix to get raw base64
+                    var base64 = dataUrl.split(',')[1];
+                    vscode.postMessage({ command: 'captureSlideResult', png: base64, slideNumber: slideNum });
+                }).catch(function(err) {
+                    vscode.postMessage({ command: 'captureSlideResult', error: 'html2canvas failed: ' + (err.message || err) });
+                });
             } catch(err) {
                 vscode.postMessage({ command: 'captureSlideResult', error: err.message || 'Unknown error' });
             }
@@ -2534,10 +2548,10 @@ mermaid.run({ querySelector: '.mermaid' });
         });
     }
 
-    /** Capture a specific PPTX slide as an HTML file */
+    /** Capture a specific PPTX slide as a PNG image */
     public captureSlide(slideNumber: number, savePath: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Slide capture timed out')), 10000);
+            const timeout = setTimeout(() => reject(new Error('Slide capture timed out')), 15000);
             const disposable = this.panel.webview.onDidReceiveMessage((msg) => {
                 if (msg.command === 'captureSlideResult') {
                     clearTimeout(timeout);
@@ -2548,7 +2562,8 @@ mermaid.run({ querySelector: '.mermaid' });
                     }
                     try {
                         const fs = require('fs');
-                        fs.writeFileSync(savePath, msg.html, 'utf-8');
+                        const buf = Buffer.from(msg.png, 'base64');
+                        fs.writeFileSync(savePath, buf);
                         resolve();
                     } catch (e: any) {
                         reject(e);
