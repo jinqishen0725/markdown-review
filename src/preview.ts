@@ -1552,7 +1552,7 @@ ${commentUiCss()}
             }
             return;
         }
-        // Capture a specific slide as PNG using html2canvas
+        // Capture a specific slide as PNG
         if (msg.command === 'captureSlide') {
             try {
                 var slideNum = msg.slideNumber || 1;
@@ -1569,110 +1569,98 @@ ${commentUiCss()}
                     return;
                 }
 
-                // Prepare for html2canvas: convert blob URLs and canvas elements
-                function prepareForCapture(el) {
-                    var promises = [];
+                // Scroll slide into view and wait for lazy rendering to complete
+                targetSlide.scrollIntoView({ block: 'center' });
 
-                    // 1. Convert <canvas> elements to <img> (renderer draws shapes on canvas)
-                    var canvases = el.querySelectorAll('canvas');
-                    for (var i = 0; i < canvases.length; i++) {
-                        (function(canvas) {
-                            try {
-                                var dataUrl = canvas.toDataURL('image/png');
-                                var img = document.createElement('img');
-                                img.src = dataUrl;
-                                img.style.cssText = canvas.style.cssText;
-                                img.style.width = canvas.style.width || (canvas.width + 'px');
-                                img.style.height = canvas.style.height || (canvas.height + 'px');
-                                img.className = canvas.className;
-                                if (canvas.parentNode) {
-                                    canvas.parentNode.insertBefore(img, canvas);
-                                    canvas.style.display = 'none';
-                                    canvas._captureHidden = true;
-                                }
-                            } catch(e) { /* tainted canvas, skip */ }
-                        })(canvases[i]);
+                setTimeout(function() {
+                    // Step 1: Convert canvas elements to images
+                    var canvases = targetSlide.querySelectorAll('canvas');
+                    var canvasRestores = [];
+                    for (var ci = 0; ci < canvases.length; ci++) {
+                        try {
+                            var cvs = canvases[ci];
+                            var dataUrl = cvs.toDataURL('image/png');
+                            var img = document.createElement('img');
+                            img.src = dataUrl;
+                            img.style.cssText = window.getComputedStyle(cvs).cssText;
+                            img.style.position = cvs.style.position;
+                            img.style.left = cvs.style.left;
+                            img.style.top = cvs.style.top;
+                            img.style.width = (cvs.offsetWidth || cvs.width) + 'px';
+                            img.style.height = (cvs.offsetHeight || cvs.height) + 'px';
+                            cvs.parentNode.insertBefore(img, cvs);
+                            cvs.style.display = 'none';
+                            canvasRestores.push({ canvas: cvs, img: img });
+                        } catch(e) {}
                     }
 
-                    // 2. Convert blob: background-images to data: URLs
-                    var allEls = el.querySelectorAll('*');
-                    for (var j = 0; j < allEls.length; j++) {
-                        var style = window.getComputedStyle(allEls[j]);
-                        var bg = style.backgroundImage;
-                        if (bg && bg.indexOf('blob:') >= 0) {
-                            (function(elem, bgVal) {
-                                var url = bgVal.replace(/url\\(["']?/, '').replace(/["']?\\).*/, '');
-                                promises.push(
-                                    fetch(url).then(function(r) { return r.blob(); })
-                                    .then(function(blob) {
-                                        return new Promise(function(resolve) {
-                                            var reader = new FileReader();
-                                            reader.onloadend = function() { resolve(reader.result); };
-                                            reader.readAsDataURL(blob);
-                                        });
-                                    })
-                                    .then(function(dataUrl) { elem.style.backgroundImage = 'url("' + dataUrl + '")'; })
-                                    .catch(function() {})
+                    // Step 2: Convert blob URLs to data URLs
+                    var blobPromises = [];
+                    var allEls = targetSlide.querySelectorAll('*');
+                    for (var bi = 0; bi < allEls.length; bi++) {
+                        var computed = window.getComputedStyle(allEls[bi]);
+                        var bgImg = computed.backgroundImage;
+                        if (bgImg && bgImg.indexOf('blob:') !== -1) {
+                            (function(el, bg) {
+                                var match = bg.match(/url\\(["']?(blob:[^"')]+)/);
+                                if (!match) return;
+                                blobPromises.push(
+                                    fetch(match[1]).then(function(r){return r.blob();})
+                                    .then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onloadend=function(){res(fr.result);};fr.readAsDataURL(b);});})
+                                    .then(function(du){el.style.backgroundImage='url('+du+')';})
+                                    .catch(function(){})
                                 );
-                            })(allEls[j], bg);
+                            })(allEls[bi], bgImg);
+                        }
+                    }
+                    var blobImgs = targetSlide.querySelectorAll('img');
+                    for (var ii = 0; ii < blobImgs.length; ii++) {
+                        if (blobImgs[ii].src && blobImgs[ii].src.indexOf('blob:') === 0) {
+                            (function(im) {
+                                blobPromises.push(
+                                    fetch(im.src).then(function(r){return r.blob();})
+                                    .then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onloadend=function(){res(fr.result);};fr.readAsDataURL(b);});})
+                                    .then(function(du){im.src=du;})
+                                    .catch(function(){})
+                                );
+                            })(blobImgs[ii]);
                         }
                     }
 
-                    // 3. Convert blob: img src to data: URLs
-                    var imgs = el.querySelectorAll('img[src^="blob:"]');
-                    for (var m = 0; m < imgs.length; m++) {
-                        (function(img) {
-                            promises.push(
-                                fetch(img.src).then(function(r) { return r.blob(); })
-                                .then(function(blob) {
-                                    return new Promise(function(resolve) {
-                                        var reader = new FileReader();
-                                        reader.onloadend = function() { resolve(reader.result); };
-                                        reader.readAsDataURL(blob);
-                                    });
-                                })
-                                .then(function(dataUrl) { img.src = dataUrl; })
-                                .catch(function() {})
-                            );
-                        })(imgs[m]);
-                    }
-
-                    return Promise.all(promises);
-                }
-
-                // Restore canvas elements after capture
-                function restoreAfterCapture(el) {
-                    var canvases = el.querySelectorAll('canvas');
-                    for (var i = 0; i < canvases.length; i++) {
-                        if (canvases[i]._captureHidden) {
-                            canvases[i].style.display = '';
-                            delete canvases[i]._captureHidden;
-                            // Remove the img we inserted
-                            var prev = canvases[i].previousSibling;
-                            if (prev && prev.tagName === 'IMG') {
-                                prev.parentNode.removeChild(prev);
-                            }
-                        }
-                    }
-                }
-
-                prepareForCapture(targetSlide).then(function() {
-                    return html2canvas(targetSlide, {
-                        backgroundColor: null,
-                        scale: 2,
-                        useCORS: true,
-                        allowTaint: true,
-                        logging: false,
+                    Promise.all(blobPromises).then(function() {
+                        // Step 3: Use html2canvas
+                        return html2canvas(targetSlide, {
+                            backgroundColor: null,
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            logging: false,
+                            width: targetSlide.offsetWidth,
+                            height: targetSlide.offsetHeight,
+                        });
+                    }).then(function(canvas) {
+                        // Restore canvases
+                        canvasRestores.forEach(function(r) {
+                            r.canvas.style.display = '';
+                            if (r.img.parentNode) r.img.parentNode.removeChild(r.img);
+                        });
+                        var dataUrl = canvas.toDataURL('image/png');
+                        var base64 = dataUrl.split(',')[1];
+                        vscode.postMessage({ command: 'captureSlideResult', png: base64, slideNumber: slideNum });
+                    }).catch(function(err) {
+                        canvasRestores.forEach(function(r) {
+                            r.canvas.style.display = '';
+                            if (r.img.parentNode) r.img.parentNode.removeChild(r.img);
+                        });
+                        // Fallback: send diagnostic info so we can debug
+                        var diagInfo = 'html2canvas error: ' + (err.message || err) +
+                            '\\nSlide element: ' + targetSlide.tagName + '.' + targetSlide.className +
+                            '\\nSize: ' + targetSlide.offsetWidth + 'x' + targetSlide.offsetHeight +
+                            '\\nChildren: ' + targetSlide.children.length +
+                            '\\nChild tags: ' + Array.from(targetSlide.children).map(function(c){return c.tagName;}).join(',');
+                        vscode.postMessage({ command: 'captureSlideResult', error: diagInfo });
                     });
-                }).then(function(canvas) {
-                    restoreAfterCapture(targetSlide);
-                    var dataUrl = canvas.toDataURL('image/png');
-                    var base64 = dataUrl.split(',')[1];
-                    vscode.postMessage({ command: 'captureSlideResult', png: base64, slideNumber: slideNum });
-                }).catch(function(err) {
-                    restoreAfterCapture(targetSlide);
-                    vscode.postMessage({ command: 'captureSlideResult', error: 'Capture failed: ' + (err.message || err) });
-                });
+                }, 1000); // Wait 1s for lazy rendering after scroll
             } catch(err) {
                 vscode.postMessage({ command: 'captureSlideResult', error: err.message || 'Unknown error' });
             }
