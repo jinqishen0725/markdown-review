@@ -383,6 +383,47 @@ export class CaptureScreenshotTool implements vscode.LanguageModelTool<ICaptureP
     }
 }
 
+// ---------- Capture Slide (PPTX) ----------
+
+interface ICaptureSlideParams { slideNumber: number; filePath?: string; }
+
+export class CaptureSlideTool implements vscode.LanguageModelTool<ICaptureSlideParams> {
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<ICaptureSlideParams>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const slideNumber = options.input?.slideNumber;
+        if (!slideNumber || slideNumber < 1) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('Please provide a valid slideNumber (1-based).')
+            ]);
+        }
+        const filePath = resolveDocumentPath(options.input?.filePath);
+        if (!filePath) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('No active PowerPoint document found.')
+            ]);
+        }
+        const panel = PreviewPanel.currentPanels.get(filePath);
+        if (!panel || !panel.isPptx) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart('No PPTX preview panel open. Open the PowerPoint review preview first.')
+            ]);
+        }
+        const screenshotPath = path.join(path.dirname(filePath), `.review-slide${slideNumber}.html`);
+        try {
+            await panel.captureSlide(slideNumber, screenshotPath);
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Slide ${slideNumber} screenshot saved to: ${screenshotPath}\nOpen this file in a browser to see the rendered slide.`)
+            ]);
+        } catch (e: any) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(`Failed to capture slide ${slideNumber}: ${e.message}`)
+            ]);
+        }
+    }
+}
+
 // ---------- Word Document: Read Element XML ----------
 
 interface IReadElementXmlParams { elementId: string; filePath?: string; }
@@ -625,6 +666,7 @@ export function registerTools(context: vscode.ExtensionContext) {
         vscode.lm.registerTool('docReview_delete_comment', new DeleteCommentTool()),
         vscode.lm.registerTool('docReview_scroll_to_comment', new ScrollToCommentTool()),
         vscode.lm.registerTool('docReview_capture_screenshot', new CaptureScreenshotTool()),
+        vscode.lm.registerTool('docReview_capture_slide', new CaptureSlideTool()),
         vscode.lm.registerTool('docReview_read_element_xml', new ReadElementXmlTool()),
         vscode.lm.registerTool('docReview_write_element_xml', new WriteElementXmlTool()),
         vscode.lm.registerTool('docReview_save_document', new SaveDocumentTool()),

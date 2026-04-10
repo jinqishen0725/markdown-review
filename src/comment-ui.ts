@@ -473,6 +473,8 @@ XML EDITING RULES:
 3. Do NOT modify <mc:AlternateContent> blocks — those contain compatibility fallbacks
 4. When changing text, keep the <a:rPr> attributes (font, size, color) unless explicitly asked to change them`;
 
+const NO_AUTO_RESOLVE = `IMPORTANT: Do NOT resolve or close comments automatically. Only resolve a comment when the user explicitly asks you to. After making changes, reply to the comment explaining what you did, but leave it open for the user to verify and resolve.`;
+
 function docxToolsText(cfg: PromptConfig): string {
     const p = cfg.toolPrefix;
     const xmlInfo = cfg.docxXmlPath ? `\nThe extracted document.xml is at: ${cfg.docxXmlPath}` : '';
@@ -494,7 +496,8 @@ function pptxToolsText(cfg: PromptConfig): string {
         `- ${p}listReviewComments — list all comments\n` +
         `- ${p}readReviewComment — read full comment with replies\n` +
         `- ${p}replyToReviewComment — post a reply\n` +
-        `- ${p}resolveReviewComment — mark as resolved`;
+        `- ${p}resolveReviewComment — mark as resolved\n` +
+        `- ${p}captureSlide — capture a specific slide as a rendered screenshot (provide slideNumber)`;
 }
 
 function reviewToolsText(cfg: PromptConfig): string {
@@ -548,7 +551,7 @@ export function buildSinglePrompt(cfg: PromptConfig, comment: any, mode: 'new' |
             `then use ${p}replyToReviewComment to post a helpful response.`;
     }
 
-    return [header, context, instructions].filter(Boolean).join('\n\n');
+    return [header, context, instructions, NO_AUTO_RESOLVE].filter(Boolean).join('\n\n');
 }
 
 export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string {
@@ -564,7 +567,7 @@ export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string
         parts.push(`This is a .pptx file. Each shape has <p:cNvPr id="N" name="..."/>. The shapeId in comments matches this id.`);
         parts.push(`XML EDITING: Position=<a:off x/y EMU>, Size=<a:ext cx/cy>, Font=<a:rPr sz="hundredths-pt">, Color=<a:solidFill><a:srgbClr val="hex"/>`);
         parts.push(`RULES: 1) PRESERVE <p:cNvPr id> attributes. 2) Do NOT modify <p188:cm> comment elements. 3) Keep <a:rPr> unless asked to change.`);
-        parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment\n`);
+        parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment, ${p}captureSlide\n`);
     } else {
         parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
     }
@@ -579,8 +582,9 @@ export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string
     }
     parts.push(`\nPlease review and respond to each open comment above. For each comment:\n` +
         `1. Use ${p}readReviewComment (with commentId and filePath="${filePath}") to get the full context\n` +
-        `2. Use ${p}replyToReviewComment (with commentId, text, and filePath="${filePath}") to post your response\n` +
-        `3. Use ${p}resolveReviewComment (with commentId and filePath="${filePath}") to mark it resolved after addressing it`);
+        `2. Make the requested changes if applicable\n` +
+        `3. Use ${p}replyToReviewComment (with commentId, text, and filePath="${filePath}") to explain what you did\n` +
+        `IMPORTANT: Do NOT resolve comments automatically. Leave them open for the user to verify and resolve.`);
     return parts.join('\n');
 }
 

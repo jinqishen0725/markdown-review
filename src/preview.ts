@@ -1384,7 +1384,9 @@ ${commentUiCss()}
 
     // === PPTX-specific hooks for shared UI ===
     window.__onListItemClick = function(c) {
-        var slideNum = (c.elementId || '').replace('slide_', '');
+        var match = (c.elementId || '').match(/slide_(\d+)/);
+        var slideNum = match ? match[1] : '';
+        if (!slideNum) return;
         var labels = output.querySelectorAll('.slide-label');
         for (var j = 0; j < labels.length; j++) {
             if (labels[j].textContent === 'Slide ' + slideNum) {
@@ -1543,6 +1545,31 @@ ${commentUiCss()}
                 var anchor = __findAnchorForComment(newC);
                 if (anchor) { showPopover(newC, anchor); }
                 else if (!sidebarOpen) { sidebarOpen = true; document.getElementById('sidebar').classList.add('open'); }
+            }
+            return;
+        }
+        // Capture a specific slide as HTML screenshot
+        if (msg.command === 'captureSlide') {
+            try {
+                var slideNum = msg.slideNumber || 1;
+                var labels = output.querySelectorAll('.slide-label');
+                var targetSlide = null;
+                for (var k = 0; k < labels.length; k++) {
+                    if (labels[k].textContent === 'Slide ' + slideNum) {
+                        targetSlide = labels[k].nextElementSibling;
+                        break;
+                    }
+                }
+                if (!targetSlide) {
+                    vscode.postMessage({ command: 'captureSlideResult', error: 'Slide ' + slideNum + ' not found' });
+                    return;
+                }
+                var styles = Array.from(document.querySelectorAll('style')).map(function(s){return s.outerHTML;}).join('\\n');
+                var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' + styles + '</head><body style="padding:20px;background:#1e1e1e;">' +
+                    '<h2 style="color:#ccc;">Slide ' + slideNum + '</h2>' + targetSlide.outerHTML + '</body></html>';
+                vscode.postMessage({ command: 'captureSlideResult', html: html, slideNumber: slideNum });
+            } catch(err) {
+                vscode.postMessage({ command: 'captureSlideResult', error: err.message || 'Unknown error' });
             }
             return;
         }
@@ -2504,6 +2531,31 @@ mermaid.run({ querySelector: '.mermaid' });
                 }
             });
             this.panel.webview.postMessage({ command: 'captureScreenshot' });
+        });
+    }
+
+    /** Capture a specific PPTX slide as an HTML file */
+    public captureSlide(slideNumber: number, savePath: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Slide capture timed out')), 10000);
+            const disposable = this.panel.webview.onDidReceiveMessage((msg) => {
+                if (msg.command === 'captureSlideResult') {
+                    clearTimeout(timeout);
+                    disposable.dispose();
+                    if (msg.error) {
+                        reject(new Error(msg.error));
+                        return;
+                    }
+                    try {
+                        const fs = require('fs');
+                        fs.writeFileSync(savePath, msg.html, 'utf-8');
+                        resolve();
+                    } catch (e: any) {
+                        reject(e);
+                    }
+                }
+            });
+            this.panel.webview.postMessage({ command: 'captureSlide', slideNumber });
         });
     }
 

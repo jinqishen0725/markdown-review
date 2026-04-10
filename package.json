@@ -280,6 +280,30 @@
         }
       },
       {
+        "name": "docReview_capture_slide",
+        "displayName": "Capture PPTX Slide Screenshot",
+        "toolReferenceName": "captureSlide",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(device-camera)",
+        "modelDescription": "Captures a specific PowerPoint slide as a rendered HTML screenshot. Provide the 1-based slide number. Saves to .review-slideN.html next to the .pptx file. Use this to visually verify slide changes. IMPORTANT: Always pass both slideNumber and filePath.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "slideNumber": {
+              "type": "number",
+              "description": "The 1-based slide number to capture (e.g. 1 for the first slide)."
+            },
+            "filePath": {
+              "type": "string",
+              "description": "Optional. Absolute or workspace-relative path to the .pptx file."
+            }
+          },
+          "required": [
+            "slideNumber"
+          ]
+        }
+      },
+      {
         "name": "docReview_read_element_xml",
         "displayName": "Read Word Element XML",
         "toolReferenceName": "readElementXml",
