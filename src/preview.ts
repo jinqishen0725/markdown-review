@@ -1122,9 +1122,10 @@ export class PreviewPanel {
             fs.writeFileSync(tempPath, zipBuf);
             this.pptxTempPath = tempPath;
 
+            // Add cache-buster so the webview doesn't serve stale data after re-render
             const pptxFileUri = this.panel.webview.asWebviewUri(
                 vscode.Uri.file(tempPath)
-            ).toString();
+            ).toString() + '?t=' + Date.now();
             const pptxViewerUri = this.panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this.extensionUri, 'media', 'pptx-viewer.js')
             ).toString();
@@ -2630,13 +2631,10 @@ mermaid.run({ querySelector: '.mermaid' });
                 this.pptxXmlDebounce = null;
                 if (Date.now() - this.lastRenderTime < 1000) return;
                 log(`[PPTX] Slide XML changed: ${path.basename(uri.fsPath)} — refreshing preview`);
-                // Re-parse from edited XML and re-render
                 try {
-                    const { reparseFromExtractedXml } = require('./pptx-parser');
-                    this.pptxModel = await reparseFromExtractedXml(this.pptxModel);
                     await this.updatePptxContent();
                 } catch (e: any) {
-                    log(`[PPTX] Re-parse failed: ${e.message}`);
+                    log(`[PPTX] Re-render failed: ${e.message}`);
                 }
             }, 1500);
         };
