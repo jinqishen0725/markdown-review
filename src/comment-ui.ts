@@ -165,6 +165,7 @@ export function commentUiJs(): string {
 
     function showPopover(comment, anchorEl) {
         var pop = document.getElementById('comment-popover');
+        if (!pop) return;
         var isNative = _isNativeComment(comment);
         var authorBadge = _authorBadge(comment);
         var resolveBtn = comment.resolved
@@ -222,7 +223,8 @@ export function commentUiJs(): string {
         vscode.postMessage({ command: 'editComment', id: id, text: text });
     };
     window.cancelEdit = function() {
-        document.getElementById('comment-popover').style.display = 'none';
+        var pop = document.getElementById('comment-popover');
+        if (pop) pop.style.display = 'none';
         if (typeof buildList === 'function') buildList();
     };
     window.startEditReply = function(commentId, replyId) {
@@ -274,6 +276,7 @@ export function commentUiJs(): string {
     function updateBadge() {
         var badge = document.getElementById('comment-badge');
         var span = document.getElementById('badge-count');
+        if (!badge || !span) return;
         var unresolved = comments.filter(function(c) { return !c.resolved; });
         if (comments.length > 0) {
             badge.style.display = 'block';
@@ -385,14 +388,16 @@ export function commentUiJs(): string {
                 updateBadge();
                 buildList();
                 if (typeof __onCommentChange === 'function') __onCommentChange();
-                document.getElementById('comment-popover').style.display = 'none';
+                var _pop1 = document.getElementById('comment-popover');
+                if (_pop1) _pop1.style.display = 'none';
                 return true;
             case 'refreshComments':
                 comments = msg.comments || [];
                 updateBadge();
                 buildList();
                 if (typeof __onCommentChange === 'function') __onCommentChange();
-                document.getElementById('comment-popover').style.display = 'none';
+                var _pop2 = document.getElementById('comment-popover');
+                if (_pop2) _pop2.style.display = 'none';
                 return true;
             case 'openPopover': {
                 var oc = comments.find(function(x) { return x.id === msg.commentId; });
@@ -479,6 +484,10 @@ function docxToolsText(cfg: PromptConfig): string {
     const p = cfg.toolPrefix;
     const xmlInfo = cfg.docxXmlPath ? `\nThe extracted document.xml is at: ${cfg.docxXmlPath}` : '';
     return `This is a Word (.docx) document stored as XML. You have these tools:\n` +
+        `- ${p}listReviewComments — list all review comments\n` +
+        `- ${p}readReviewComment — read full comment with replies\n` +
+        `- ${p}replyToReviewComment — post a reply to a comment\n` +
+        `- ${p}resolveReviewComment — mark a comment as resolved\n` +
         `- ${p}listElements — get a compact text outline of the document (use first for general context)\n` +
         `- ${p}readElementXml — read raw XML of a specific element\n` +
         `- ${p}writeElementXml — replace an element's XML\n` +
@@ -546,7 +555,11 @@ export function buildSinglePrompt(cfg: PromptConfig, comment: any, mode: 'new' |
             `- Comment #${comment.id}: "${comment.comment}"\n` +
             `- On block: "${comment.blockPreview || '(unknown)'}"${statusText}` +
             repliesText;
-        context = '';
+        context = `Available tools:\n` +
+            `- ${p}listReviewComments — list all review comments\n` +
+            `- ${p}readReviewComment — read full comment with replies\n` +
+            `- ${p}replyToReviewComment — post a reply\n` +
+            `- ${p}resolveReviewComment — mark as resolved`;
         instructions = `Please use ${p}readReviewComment to get the full context of comment "${comment.id}", ` +
             `then use ${p}replyToReviewComment to post a helpful response.`;
     }
@@ -569,7 +582,8 @@ export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string
         parts.push(`RULES: 1) PRESERVE <p:cNvPr id> attributes. 2) Do NOT modify <p188:cm> comment elements. 3) Keep <a:rPr> unless asked to change.`);
         parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment, ${p}captureSlide\n`);
     } else {
-        parts.push(`Review comments on "${fileName}" (${filePath}):\n`);
+        parts.push(`Review comments on "${fileName}" (${filePath}):`);
+        parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment\n`);
     }
 
     for (const c of comments) {

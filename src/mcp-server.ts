@@ -336,6 +336,23 @@ server.tool(
     }
 );
 
+// Tool 7b: Capture Slide (PPTX)
+server.tool(
+    'docReview_capture_slide',
+    'Capture a specific PowerPoint slide as a PNG image. Requires the PPTX preview panel to be open in VS Code.',
+    {
+        slideNumber: z.number().describe('The 1-based slide number to capture'),
+        filePath: z.string().optional().describe('Path to the .pptx file'),
+    },
+    async ({ slideNumber, filePath }) => {
+        const docPath = filePath || findDocumentPath();
+        if (!docPath) {
+            return { content: [{ type: 'text', text: 'No PPTX file found.' }] };
+        }
+        return { content: [{ type: 'text', text: `Slide capture requires the VS Code PPTX preview panel. Open the file in VS Code and use #captureSlide to capture slide ${slideNumber}. File: ${docPath}` }] };
+    }
+);
+
 // Tool 8: Read Element XML (Word .docx)
 server.tool(
     'docReview_read_element_xml',
