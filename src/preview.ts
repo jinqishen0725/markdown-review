@@ -1394,7 +1394,16 @@ ${commentUiCss()}
         var labels = output.querySelectorAll('.slide-label');
         for (var j = 0; j < labels.length; j++) {
             if (labels[j].textContent === 'Slide ' + slideNum) {
-                labels[j].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Use scrollIntoView on the SLIDE element (not the label) for better visibility
+                var slideEl = labels[j].nextElementSibling;
+                if (slideEl) {
+                    slideEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    labels[j].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                // Also try window.scrollTo as fallback for VS Code webview
+                var rect = labels[j].getBoundingClientRect();
+                window.scrollTo({ top: rect.top + window.scrollY - 10, behavior: 'smooth' });
                 break;
             }
         }
