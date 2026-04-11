@@ -1291,7 +1291,8 @@ ${commentUiCss()}
 (function() {
     window.onerror = function(msg, url, line, col, err) {
         document.getElementById('loading').innerHTML = '<b>Error:</b> ' + msg + '<br><pre>' + (err && err.stack || '') + '</pre>';
-        return true;
+        console.error('[PPTX]', msg, err && err.stack);
+        return false; // Don't swallow — let errors show in DevTools
     };
     window.addEventListener('unhandledrejection', function(e) {
         document.getElementById('loading').innerHTML = '<b>Promise Error:</b><pre>' + (e.reason && e.reason.stack || e.reason || '') + '</pre>';
@@ -1388,25 +1389,24 @@ ${commentUiCss()}
 
     // === PPTX-specific hooks for shared UI ===
     window.__onListItemClick = function(c) {
+        console.log('[PPTX] click item:', c.id, 'elementId:', c.elementId);
         var match = (c.elementId || '').match(/slide_(\d+)/);
         var slideNum = match ? match[1] : '';
-        if (!slideNum) return;
+        if (!slideNum) { console.log('[PPTX] no slide number from elementId'); return; }
         var labels = output.querySelectorAll('.slide-label');
+        console.log('[PPTX] searching', labels.length, 'labels for Slide', slideNum);
         for (var j = 0; j < labels.length; j++) {
             if (labels[j].textContent === 'Slide ' + slideNum) {
-                // Use scrollIntoView on the SLIDE element (not the label) for better visibility
                 var slideEl = labels[j].nextElementSibling;
-                if (slideEl) {
-                    slideEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else {
-                    labels[j].scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-                // Also try window.scrollTo as fallback for VS Code webview
-                var rect = labels[j].getBoundingClientRect();
+                var target = slideEl || labels[j];
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var rect = target.getBoundingClientRect();
                 window.scrollTo({ top: rect.top + window.scrollY - 10, behavior: 'smooth' });
-                break;
+                console.log('[PPTX] scrolled to Slide', slideNum);
+                return;
             }
         }
+        console.log('[PPTX] Slide', slideNum, 'label not found');
     };
     window.__findAnchorForComment = function(c) {
         return c.elementId ? document.querySelector('[data-shape-eid="' + c.elementId + '"]') : null;
@@ -1530,6 +1530,9 @@ ${commentUiCss()}
 
                 setTimeout(function() { fixColors(output); }, 1000);
                 setTimeout(function() { fixColors(output); }, 3000);
+
+                // Refresh overlays AFTER they've been created
+                refreshOverlays();
             }, 500);
 
             updateBadge();
