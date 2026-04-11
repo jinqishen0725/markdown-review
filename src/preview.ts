@@ -1208,7 +1208,7 @@ export class PreviewPanel {
             const colorFixesJson = JSON.stringify(colorFixes).replace(/</g, '\\u003c');
             const shapesJson = JSON.stringify(shapeLayouts).replace(/</g, '\\u003c');
 
-            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, shapesJson, pptxViewerUri, pptxFileUri, html2canvasUri);
+            this.panel.webview.html = this.getPptxHtml(commentsJson, notesJson, colorFixesJson, shapesJson, pptxViewerUri, pptxFileUri, htmlToImageUri);
             this.lastRenderTime = Date.now();
             log(`Pptx preview rendered: ${model.slides.length} slides, ${colorFixes.length} color fixes`);
         } catch (e: any) {
@@ -1217,7 +1217,7 @@ export class PreviewPanel {
         }
     }
 
-    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, shapesJson: string, pptxViewerUri: string, pptxFileUri: string, html2canvasUri: string): string {
+    private getPptxHtml(commentsJson: string, notesJson: string, colorFixesJson: string, shapesJson: string, pptxViewerUri: string, pptxFileUri: string, htmlToImageUri: string): string {
         return /*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>
