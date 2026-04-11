@@ -1390,8 +1390,9 @@ ${commentUiCss()}
     // === PPTX-specific hooks for shared UI ===
     window.__onListItemClick = function(c) {
         console.log('[PPTX] click item:', c.id, 'elementId:', c.elementId);
-        var match = (c.elementId || '').match(/slide_(\d+)/);
-        var slideNum = match ? match[1] : '';
+        // Extract slide number from elementId like "slide_3" or "slide_3_shape_28"
+        var parts = (c.elementId || '').split('_');
+        var slideNum = (parts[0] === 'slide' && parts[1]) ? parts[1] : '';
         if (!slideNum) { console.log('[PPTX] no slide number from elementId'); return; }
         var labels = output.querySelectorAll('.slide-label');
         console.log('[PPTX] searching', labels.length, 'labels for Slide', slideNum);
