@@ -1129,8 +1129,8 @@ export class PreviewPanel {
             const pptxViewerUri = this.panel.webview.asWebviewUri(
                 vscode.Uri.joinPath(this.extensionUri, 'media', 'pptx-viewer.js')
             ).toString();
-            const html2canvasUri = this.panel.webview.asWebviewUri(
-                vscode.Uri.joinPath(this.extensionUri, 'media', 'html2canvas.min.js')
+            const htmlToImageUri = this.panel.webview.asWebviewUri(
+                vscode.Uri.joinPath(this.extensionUri, 'media', 'html-to-image.min.js')
             ).toString();
 
             // Build notes data
@@ -1260,7 +1260,7 @@ ${commentUiCss()}
 .panel-bulk button { padding: 2px 8px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; background: var(--vscode-button-background,#0078D4); color: #fff; }
 </style>
 <script src="${pptxViewerUri}"></script>
-<script src="${html2canvasUri}"></script>
+<script src="${htmlToImageUri}"></script>
 </head>
 <body>
 <div id="comment-badge" onclick="toggleSidebar()">&#x1F4AC; <span id="badge-count">0</span></div>
@@ -1552,7 +1552,7 @@ ${commentUiCss()}
             }
             return;
         }
-        // Capture a specific slide as PNG
+        // Capture a specific slide as PNG using html-to-image
         if (msg.command === 'captureSlide') {
             try {
                 var slideNum = msg.slideNumber || 1;
@@ -1569,98 +1569,21 @@ ${commentUiCss()}
                     return;
                 }
 
-                // Scroll slide into view and wait for lazy rendering to complete
+                // Scroll slide into view to trigger lazy rendering
                 targetSlide.scrollIntoView({ block: 'center' });
 
                 setTimeout(function() {
-                    // Step 1: Convert canvas elements to images
-                    var canvases = targetSlide.querySelectorAll('canvas');
-                    var canvasRestores = [];
-                    for (var ci = 0; ci < canvases.length; ci++) {
-                        try {
-                            var cvs = canvases[ci];
-                            var dataUrl = cvs.toDataURL('image/png');
-                            var img = document.createElement('img');
-                            img.src = dataUrl;
-                            img.style.cssText = window.getComputedStyle(cvs).cssText;
-                            img.style.position = cvs.style.position;
-                            img.style.left = cvs.style.left;
-                            img.style.top = cvs.style.top;
-                            img.style.width = (cvs.offsetWidth || cvs.width) + 'px';
-                            img.style.height = (cvs.offsetHeight || cvs.height) + 'px';
-                            cvs.parentNode.insertBefore(img, cvs);
-                            cvs.style.display = 'none';
-                            canvasRestores.push({ canvas: cvs, img: img });
-                        } catch(e) {}
-                    }
-
-                    // Step 2: Convert blob URLs to data URLs
-                    var blobPromises = [];
-                    var allEls = targetSlide.querySelectorAll('*');
-                    for (var bi = 0; bi < allEls.length; bi++) {
-                        var computed = window.getComputedStyle(allEls[bi]);
-                        var bgImg = computed.backgroundImage;
-                        if (bgImg && bgImg.indexOf('blob:') !== -1) {
-                            (function(el, bg) {
-                                var match = bg.match(/url\\(["']?(blob:[^"')]+)/);
-                                if (!match) return;
-                                blobPromises.push(
-                                    fetch(match[1]).then(function(r){return r.blob();})
-                                    .then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onloadend=function(){res(fr.result);};fr.readAsDataURL(b);});})
-                                    .then(function(du){el.style.backgroundImage='url('+du+')';})
-                                    .catch(function(){})
-                                );
-                            })(allEls[bi], bgImg);
-                        }
-                    }
-                    var blobImgs = targetSlide.querySelectorAll('img');
-                    for (var ii = 0; ii < blobImgs.length; ii++) {
-                        if (blobImgs[ii].src && blobImgs[ii].src.indexOf('blob:') === 0) {
-                            (function(im) {
-                                blobPromises.push(
-                                    fetch(im.src).then(function(r){return r.blob();})
-                                    .then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onloadend=function(){res(fr.result);};fr.readAsDataURL(b);});})
-                                    .then(function(du){im.src=du;})
-                                    .catch(function(){})
-                                );
-                            })(blobImgs[ii]);
-                        }
-                    }
-
-                    Promise.all(blobPromises).then(function() {
-                        // Step 3: Use html2canvas
-                        return html2canvas(targetSlide, {
-                            backgroundColor: null,
-                            scale: 2,
-                            useCORS: true,
-                            allowTaint: true,
-                            logging: false,
-                            width: targetSlide.offsetWidth,
-                            height: targetSlide.offsetHeight,
-                        });
-                    }).then(function(canvas) {
-                        // Restore canvases
-                        canvasRestores.forEach(function(r) {
-                            r.canvas.style.display = '';
-                            if (r.img.parentNode) r.img.parentNode.removeChild(r.img);
-                        });
-                        var dataUrl = canvas.toDataURL('image/png');
+                    htmlToImage.toPng(targetSlide, {
+                        pixelRatio: 2,
+                        cacheBust: true,
+                        backgroundColor: null,
+                    }).then(function(dataUrl) {
                         var base64 = dataUrl.split(',')[1];
                         vscode.postMessage({ command: 'captureSlideResult', png: base64, slideNumber: slideNum });
                     }).catch(function(err) {
-                        canvasRestores.forEach(function(r) {
-                            r.canvas.style.display = '';
-                            if (r.img.parentNode) r.img.parentNode.removeChild(r.img);
-                        });
-                        // Fallback: send diagnostic info so we can debug
-                        var diagInfo = 'html2canvas error: ' + (err.message || err) +
-                            '\\nSlide element: ' + targetSlide.tagName + '.' + targetSlide.className +
-                            '\\nSize: ' + targetSlide.offsetWidth + 'x' + targetSlide.offsetHeight +
-                            '\\nChildren: ' + targetSlide.children.length +
-                            '\\nChild tags: ' + Array.from(targetSlide.children).map(function(c){return c.tagName;}).join(',');
-                        vscode.postMessage({ command: 'captureSlideResult', error: diagInfo });
+                        vscode.postMessage({ command: 'captureSlideResult', error: 'Capture failed: ' + (err.message || err) });
                     });
-                }, 1000); // Wait 1s for lazy rendering after scroll
+                }, 1500); // Wait for lazy rendering after scroll
             } catch(err) {
                 vscode.postMessage({ command: 'captureSlideResult', error: err.message || 'Unknown error' });
             }
