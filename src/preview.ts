@@ -1652,6 +1652,8 @@ ${commentUiCss()}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown Review</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script src="${mermaidUri}"></script>
 <style>
 /* ---------- layout ---------- */
@@ -2119,6 +2121,17 @@ ${commentUiCss()}
         pre.parentElement.replaceChild(container, pre);
     });
     mermaid.run({ querySelector: '.mermaid' });
+
+    // ========== KaTeX math rendering (for Word documents with LaTeX formulas) ==========
+    if (typeof renderMathInElement === 'function') {
+        renderMathInElement(document.getElementById('content'), {
+            delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$', right: '$', display: false },
+            ],
+            throwOnError: false,
+        });
+    }
 
     // ========== Preview → Source: double-click to jump ==========
     document.getElementById('content').addEventListener('dblclick', function(e) {
