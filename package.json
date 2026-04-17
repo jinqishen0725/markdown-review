@@ -1,8 +1,8 @@
 {
   "name": "markdown-review",
-  "displayName": "Markdown Reader with Copilot",
-  "description": "Markdown reader and reviewer with inline commenting, AI agent tools, and one-click Copilot integration",
-  "version": "4.5.0",
+  "displayName": "Document Review",
+  "description": "Review and comment on Markdown, Word (.docx), and PowerPoint (.pptx) documents with inline commenting, AI agent tools, and Copilot integration",
+  "version": "5.0.0",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -20,6 +20,10 @@
   ],
   "keywords": [
     "markdown",
+    "word",
+    "docx",
+    "powerpoint",
+    "pptx",
     "review",
     "copilot",
     "preview",
@@ -28,12 +32,12 @@
     "katex",
     "latex",
     "pdf",
-    "docx",
     "mcp",
     "cursor",
     "agent",
     "inline-comments",
-    "document-review"
+    "document-review",
+    "presentation"
   ],
   "activationEvents": [
     "onCommand:markdownReview.openPreview",
@@ -47,30 +51,30 @@
     "commands": [
       {
         "command": "markdownReview.openPreview",
-        "title": "Markdown Review: Open Preview with Comments",
+        "title": "Document Review: Open Markdown Preview",
         "icon": "$(open-preview)"
       },
       {
         "command": "markdownReview.openWordPreview",
-        "title": "Markdown Review: Open Word Document Preview",
+        "title": "Document Review: Open Word Document Preview",
         "icon": "$(file-text)"
       },
       {
         "command": "markdownReview.openPptxPreview",
-        "title": "Markdown Review: Open PowerPoint Preview",
+        "title": "Document Review: Open PowerPoint Preview",
         "icon": "$(file-media)"
       },
       {
         "command": "markdownReview.exportComments",
-        "title": "Markdown Review: Export Comments"
+        "title": "Document Review: Export Comments"
       },
       {
         "command": "markdownReview.jumpToPreview",
-        "title": "Markdown Review: Jump to Preview"
+        "title": "Document Review: Jump to Preview"
       },
       {
         "command": "markdownReview.jumpToSource",
-        "title": "Markdown Review: Jump to Source"
+        "title": "Document Review: Jump to Source"
       }
     ],
     "menus": {

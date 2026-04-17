@@ -1,3 +1,166 @@
+# Document Review
+
+**The most agent-friendly document review extension for VS Code and Cursor.**
+
+Review and comment on **Markdown**, **Word (.docx)**, and **PowerPoint (.pptx)** documents — directly inside VS Code and Cursor. Add inline comments, reply in threads, resolve discussions, and let AI agents participate via 12 built-in Copilot tools, MCP server integration, and one-click ✨ Ask Copilot buttons.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## Supported Formats
+
+| Format | Preview | Comments | AI Tools | Save |
+|--------|---------|----------|----------|------|
+| **Markdown** (.md) | ✅ Rich rendering (KaTeX, Mermaid, GFM) | ✅ Block-level anchored | ✅ Full | PDF, DOCX export |
+| **Word** (.docx) | ✅ Full document with styles | ✅ Native Word comments + review | ✅ Full + XML editing | ✅ Save .docx |
+| **PowerPoint** (.pptx) | ✅ Slide rendering with shapes | ✅ Shape-level overlays | ✅ Full + XML editing + slide capture | ✅ Save .pptx |
+
+---
+
+## Quick Start
+
+### 1. Open a Preview
+- **Markdown**: Open any `.md` file → press **`Ctrl+Shift+R`** (Mac: `Cmd+Shift+R`), or right-click → **"Document Review: Open Markdown Preview"**
+- **Word**: Right-click a `.docx` file in Explorer → **"Document Review: Open Word Document Preview"**
+- **PowerPoint**: Right-click a `.pptx` file in Explorer → **"Document Review: Open PowerPoint Preview"**
+
+### 2. Add Review Comments
+- **Markdown**: Click the **`+`** gutter button next to any block
+- **Word**: Click the **`+`** gutter button next to any paragraph
+- **PowerPoint**: Hover over any shape and click **`+`**, or click **`+`** on slide corner
+
+### 3. Enable AI Agent Tools
+In **Copilot Agent Mode**, click **Tools** and enable the Document Review tools (prefixed with `#`). Then ask:
+> *"Review this document and respond to all open comments"*
+
+---
+
+## Features
+
+### Rich Rendering
+- **Markdown**: KaTeX math, Mermaid diagrams, GFM tables, syntax highlighting
+- **Word**: Full document rendering with styles, images, tables, lists, math formulas (OMML → KaTeX)
+- **PowerPoint**: Slide-by-slide rendering with shapes, text, colors, speaker notes
+
+### Inline Commenting
+- **"+" buttons** — Add comments on any block (markdown), paragraph (Word), or shape (PowerPoint)
+- **Comment highlighting** — Commented elements are highlighted (yellow for review, green for Word native, blue for PPTX)
+- **Popover details** — Click to see comment, replies, and actions (Reply, Resolve, Edit, Delete, ✨ Ask Copilot)
+- **Sidebar panel** — Search, filter (All/Open/Resolved/User/Agent), and bulk actions
+
+### Native Comment Integration
+- **Word**: Reads existing Word comments with author names and threading
+- **PowerPoint**: Reads existing PPTX comments with author names
+- Reply to native comments via sidecar — original document comments are preserved
+
+### Document Editing (Word & PowerPoint)
+- XML files are extracted for agent editing
+- **File watcher** detects changes → auto-refreshes preview
+- **Save button** repacks modified XML back into .docx/.pptx
+- Copilot prompts include XML editing rules and format-specific guidance
+
+### 12 AI Agent Tools
+
+| Tool | Description | Formats |
+|------|-------------|---------|
+| `#listReviewComments` | List all comments with status and context | All |
+| `#readReviewComment` | Read comment with replies and surrounding context | All |
+| `#replyToReviewComment` | Reply to a comment as agent | All |
+| `#resolveReviewComment` | Mark a comment as resolved | All |
+| `#deleteReviewComment` | Delete a comment and its anchor | All |
+| `#scrollToReviewComment` | Scroll preview/editor to a comment | All |
+| `#captureReviewScreenshot` | Capture rendered preview as HTML | MD, Word |
+| `#captureSlide` | Capture a slide as PNG image | PPTX |
+| `#listElements` | List document elements with IDs | Word |
+| `#readElementXml` | Read raw XML of a document element | Word |
+| `#writeElementXml` | Replace an element's XML | Word |
+| `#saveDocument` | Save changes back to .docx | Word |
+
+### Export
+- **PDF** — One-click export via Chrome headless (markdown)
+- **DOCX** — One-click export via Pandoc with native Word equations (markdown)
+- **Save .docx** — Save modified Word document back to file
+- **Save .pptx** — Save modified PowerPoint back to file
+
+### Cross-Reference Navigation (Markdown)
+- **Preview → Source**: Double-click any block to jump to source
+- **Source → Preview**: Cursor movement syncs preview scroll
+
+---
+
+## Cursor Support
+
+Full support in **Cursor IDE** via an embedded MCP server that registers automatically.
+
+- All preview, commenting, and export features work natively
+- AI tools delivered via MCP server (12 tools registered in `~/.cursor/mcp.json`)
+- **✨ Ask Copilot** copies prompt to clipboard → paste in Composer
+
+---
+
+## Architecture
+
+```
+src/
+  extension.ts    — Commands, editor detection, tool/MCP registration
+  preview.ts      — Webview panel for all 3 formats
+  comment-ui.ts   — Shared comment UI (CSS, JS, prompts) for all formats
+  comments.ts     — CommentsManager for JSON sidecar CRUD
+  tools.ts        — 12 Copilot tool implementations
+  mcp-server.ts   — MCP server (12 tools for Cursor & MCP clients)
+  docx-parser.ts  — Word document parser (OOXML → HTML)
+  pptx-parser.ts  — PowerPoint parser (OOXML → slide model)
+media/
+  pptx-viewer.js  — PPTX renderer (browser-native slide rendering)
+  html-to-image.min.js — DOM-to-PNG capture (for slide screenshots)
+  mermaid.min.js  — Mermaid diagram renderer
+```
+
+---
+
+## Development
+
+```bash
+npm install
+npx esbuild src/extension.ts --bundle --outfile=out/extension.js --format=cjs --platform=node --external:vscode
+npx vsce package --no-dependencies --allow-missing-repository
+```
+
+### Run tests
+```bash
+node test/test-comment-ui.js        # Unit tests for shared comment UI
+node test/test-slide-capture.js     # E2E slide capture (requires Playwright)
+node test/test-scroll-exact.js      # E2E click-to-scroll
+```
+
+---
+
+## Requirements
+
+- **VS Code** 1.93.0+ or **Cursor** (latest)
+- **Chrome** (optional) — for PDF export
+- **Pandoc** (optional) — for DOCX export from markdown
+
+---
+
+## Version History
+
+| Version | Highlights |
+|---------|-----------|
+| **5.0.0** | 🎉 PowerPoint (.pptx) support: slide rendering, shape-level commenting, XML editing, slide capture as PNG, save .pptx. Shared comment UI module. KaTeX math in Word preview. 12 tools (was 7). |
+| **4.5.x** | Word (.docx) support: preview, native comments, XML editing, save .docx |
+| **4.1.x** | Cursor IDE support via MCP server |
+| **4.0.0** | ✨ Ask Copilot buttons, popover persistence, DOCX table borders |
+| **3.7.x** | Mermaid diagrams, Ctrl+Shift+R keybinding |
+| **3.0.x** | 7 Copilot tools for agent mode |
+| **2.1.0** | First stable release — anchor-based commenting |
+
+---
+
+## License
+
+[MIT](LICENSE)
 # Markdown Reader with Copilot
 
 **The most agent-friendly markdown reader and review extension for VS Code and Cursor.**

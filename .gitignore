@@ -2,3 +2,10 @@ node_modules/
 out/
 *.vsix
 KNOWLEDGE.md
+.review-screenshot.html
+.review-slide*.png
+._mdreview_*_preview.pptx
+.playwright-mcp/
+test/._*
+test/.UMS_Experiment_Proposal_xml/
+poster.md
