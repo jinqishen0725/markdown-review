@@ -1,4 +1,4 @@
-# Document Review
+# Markdown Reader with Copilot
 
 **The most agent-friendly document review extension for VS Code and Cursor.**
 

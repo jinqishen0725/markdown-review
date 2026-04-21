@@ -1,7 +1,7 @@
 {
   "name": "markdown-review",
-  "displayName": "Document Review",
-  "description": "Review and comment on Markdown, Word (.docx), and PowerPoint (.pptx) documents with inline commenting, AI agent tools, and Copilot integration",
+  "displayName": "Markdown Reader with Copilot",
+  "description": "Review Markdown, Word (.docx), and PowerPoint (.pptx) with inline commenting, AI agent tools, and Copilot integration",
   "version": "5.0.0",
   "publisher": "JinqiShen",
   "icon": "icon.png",
@@ -51,30 +51,30 @@
     "commands": [
       {
         "command": "markdownReview.openPreview",
-        "title": "Document Review: Open Markdown Preview",
+        "title": "Markdown Review: Open Markdown Preview",
         "icon": "$(open-preview)"
       },
       {
         "command": "markdownReview.openWordPreview",
-        "title": "Document Review: Open Word Document Preview",
+        "title": "Markdown Review: Open Word Document Preview",
         "icon": "$(file-text)"
       },
       {
         "command": "markdownReview.openPptxPreview",
-        "title": "Document Review: Open PowerPoint Preview",
+        "title": "Markdown Review: Open PowerPoint Preview",
         "icon": "$(file-media)"
       },
       {
         "command": "markdownReview.exportComments",
-        "title": "Document Review: Export Comments"
+        "title": "Markdown Review: Export Comments"
       },
       {
         "command": "markdownReview.jumpToPreview",
-        "title": "Document Review: Jump to Preview"
+        "title": "Markdown Review: Jump to Preview"
       },
       {
         "command": "markdownReview.jumpToSource",
-        "title": "Document Review: Jump to Source"
+        "title": "Markdown Review: Jump to Source"
       }
     ],
     "menus": {
