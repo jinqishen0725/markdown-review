@@ -417,6 +417,77 @@ export function commentUiJs(): string {
         return false;
     }
     window.handleCommentMessage = handleCommentMessage;
+
+    // --- State persistence across re-renders ---
+    // Save UI state so it can be restored after webview.html is replaced
+    function _saveState() {
+        try {
+            var state = vscode.getState() || {};
+            state.scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+            state.filter = currentFilter;
+            // Check if sidebar/panel is open
+            var sidebar = document.getElementById('sidebar');
+            var panel = document.getElementById('comment-list-panel');
+            if (sidebar) state.sidebarOpen = sidebar.classList.contains('open');
+            if (panel) state.panelVisible = panel.style.display !== 'none';
+            vscode.setState(state);
+        } catch(e) {}
+    }
+
+    // Restore state on init
+    function _restoreState() {
+        try {
+            var state = vscode.getState();
+            if (!state) return;
+            // Restore scroll position after a brief delay (DOM needs to render)
+            if (state.scrollTop > 0) {
+                setTimeout(function() { window.scrollTo(0, state.scrollTop); }, 100);
+                // Second attempt for lazy-loaded content
+                setTimeout(function() { window.scrollTo(0, state.scrollTop); }, 500);
+            }
+            // Restore filter
+            if (state.filter && state.filter !== 'all') {
+                currentFilter = state.filter;
+                var filterBtn = document.getElementById('filter-' + state.filter);
+                if (filterBtn) {
+                    document.querySelectorAll('.panel-filters button').forEach(function(btn) {
+                        btn.classList.remove('active');
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#ccc';
+                    });
+                    filterBtn.classList.add('active');
+                    filterBtn.style.background = 'var(--vscode-button-background,#0078D4)';
+                    filterBtn.style.color = '#fff';
+                }
+            }
+            // Restore sidebar/panel visibility
+            if (state.sidebarOpen) {
+                var sidebar = document.getElementById('sidebar');
+                if (sidebar) sidebar.classList.add('open');
+                if (typeof window.toggleSidebar === 'function' && sidebar && !sidebar.classList.contains('open')) {
+                    // Already handled above
+                }
+                buildList();
+            }
+            if (state.panelVisible) {
+                var panel = document.getElementById('comment-list-panel');
+                if (panel) panel.style.display = 'block';
+                buildList();
+            }
+        } catch(e) {}
+    }
+    window._restoreState = _restoreState;
+    window._saveState = _saveState;
+
+    // Auto-save state on scroll (debounced)
+    var _scrollSaveTimer = null;
+    window.addEventListener('scroll', function() {
+        if (_scrollSaveTimer) clearTimeout(_scrollSaveTimer);
+        _scrollSaveTimer = setTimeout(_saveState, 300);
+    }, { passive: true });
+
+    // Save state before page unload (webview.html replacement)
+    window.addEventListener('beforeunload', function() { _saveState(); });
 `;
 }
 

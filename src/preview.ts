@@ -1548,6 +1548,7 @@ ${commentUiCss()}
         sidebarOpen = !sidebarOpen;
         document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
         if (sidebarOpen) buildList();
+        _saveState();
     };
 
     // === Message handler (delegates to shared handleCommentMessage) ===
@@ -1606,6 +1607,7 @@ ${commentUiCss()}
 
     updateBadge();
     refreshOverlays();
+    _restoreState();
 })();
 </script>
 </body>
@@ -2083,6 +2085,7 @@ ${commentUiCss()}
         panelVisible = !panelVisible;
         document.getElementById('comment-list-panel').style.display = panelVisible ? 'block' : 'none';
         if (panelVisible) buildList();
+        _saveState();
     };
 
     // ========== optimistic UI from extension host ==========
@@ -2106,6 +2109,7 @@ ${commentUiCss()}
     placeGutterButtons();
     highlightCommentedBlocks();
     attachBlockClickHandlers();
+    _restoreState();
 
     // ========== Mermaid rendering ==========
     var mermaidSources = []; // stores { index, source } for SVG collection
