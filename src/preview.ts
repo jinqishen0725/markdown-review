@@ -2243,16 +2243,88 @@ ${commentUiCss()}
         });
     }
 
-    /** Find Chrome or Edge path */
+    /** Find Chrome or Edge path.
+     *  IMPORTANT: On Windows, the top-level `msedge.exe` in
+     *  `C:\Program Files (x86)\Microsoft\Edge\Application\` is a launcher stub that
+     *  forwards CLI invocations to a running Edge session ("Opening in existing browser
+     *  session"), silently dropping `--screenshot=` / `--print-to-pdf=` flags. To work
+     *  around this we prefer the versioned binary in the `<version>\msedge.exe`
+     *  subdirectory, which behaves as a normal Chromium binary regardless of any
+     *  running Edge session. Same workaround applies to Chrome (`<version>\chrome.exe`).
+     */
     private findChrome(): string | undefined {
         const fs = require('fs');
-        const browserPaths = [
+        const pathMod = require('path');
+
+        // Prefer a versioned subdir binary over the top-level launcher stub on Windows
+        const resolveWindowsBrowser = (topLevelExe: string): string | undefined => {
+            if (!fs.existsSync(topLevelExe)) { return undefined; }
+            try {
+                const appDir = pathMod.dirname(topLevelExe);
+                const exeName = pathMod.basename(topLevelExe);
+                // Versioned subdirs look like "148.0.3967.54". Pick the highest.
+                const versionDirs = fs.readdirSync(appDir, { withFileTypes: true })
+                    .filter((d: any) => d.isDirectory() && /^\d+\.\d+\.\d+\.\d+$/.test(d.name))
+                    .map((d: any) => d.name)
+                    .sort((a: string, b: string) => {
+                        const pa = a.split('.').map(Number);
+                        const pb = b.split('.').map(Number);
+                        for (let i = 0; i < 4; i++) {
+                            if (pa[i] !== pb[i]) { return pb[i] - pa[i]; }
+                        }
+                        return 0;
+                    });
+                for (const v of versionDirs) {
+                    const candidate = pathMod.join(appDir, v, exeName);
+                    if (fs.existsSync(candidate)) { return candidate; }
+                }
+            } catch { /* fall through to top-level */ }
+            return topLevelExe;
+        };
+
+        const windowsTopLevel = [
             // Chrome
             'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
             // Edge
             'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
             'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        ];
+        for (const top of windowsTopLevel) {
+            const resolved = resolveWindowsBrowser(top);
+            if (resolved) { return resolved; }
+        }
+
+        // Fallback for Windows: registry App Paths lookup. Picks up installs in
+        // non-standard locations (per-user installs in %LocalAppData%, custom Program
+        // Files paths, etc.). Reads HKCU first (per-user install wins), then HKLM.
+        if (process.platform === 'win32') {
+            const { execFileSync } = require('child_process');
+            const exeNames = ['chrome.exe', 'msedge.exe'];
+            const hives = ['HKCU', 'HKLM'];
+            for (const exe of exeNames) {
+                for (const hive of hives) {
+                    try {
+                        const out = execFileSync('reg', [
+                            'query',
+                            `${hive}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${exe}`,
+                            '/ve',
+                        ], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 });
+                        // Output looks like: "    (Default)    REG_SZ    C:\Path\To\exe"
+                        const m = out.match(/REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/m);
+                        if (m && m[1]) {
+                            const exePath = m[1].trim().replace(/^"|"$/g, '');
+                            if (fs.existsSync(exePath)) {
+                                const resolved = resolveWindowsBrowser(exePath);
+                                if (resolved) { return resolved; }
+                            }
+                        }
+                    } catch { /* reg query failed or key missing, try next */ }
+                }
+            }
+        }
+
+        const otherPaths = [
             // macOS
             '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
             '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
@@ -2265,7 +2337,26 @@ ${commentUiCss()}
             '/usr/bin/microsoft-edge-stable',
             process.env.CHROME_PATH || '',
         ];
-        return browserPaths.find(p => p && fs.existsSync(p));
+        return otherPaths.find(p => p && fs.existsSync(p));
+    }
+
+    /** Poll for a file to appear and have stable size (used after Chrome/Edge --screenshot
+     *  because --headless=new on Windows writes the PNG asynchronously after the launcher
+     *  process exits). Returns when the file exists and its size hasn't changed for one
+     *  poll interval, or when timeoutMs elapses. */
+    private async waitForFile(filePath: string, timeoutMs: number): Promise<void> {
+        const fs = require('fs');
+        const start = Date.now();
+        const pollMs = 150;
+        let lastSize = -1;
+        while (Date.now() - start < timeoutMs) {
+            if (fs.existsSync(filePath)) {
+                const sz = fs.statSync(filePath).size;
+                if (sz > 0 && sz === lastSize) { return; }
+                lastSize = sz;
+            }
+            await new Promise(r => setTimeout(r, pollMs));
+        }
     }
 
     /**
@@ -2322,15 +2413,33 @@ mermaid.run({ querySelector: '.mermaid' }).then(function() {
             log(`Diagram ${i}: Rendering with Chrome...`);
             try {
                 // Use a large window so the diagram isn't clipped during render,
-                // but body is inline-block so Chrome screenshots only the content area
+                // but body is inline-block so Chrome screenshots only the content area.
+                // --user-data-dir forces a dedicated profile so we never get hijacked
+                // by a running Edge/Chrome session (the top-level msedge.exe launcher
+                // stub silently drops --screenshot when an Edge session is already open).
                 execFileSync(chromePath, [
                     '--headless=new', '--disable-gpu',
                     `--screenshot=${pngPath}`,
                     '--window-size=1600,4000',
                     '--force-device-scale-factor=2',
                     '--virtual-time-budget=8000',
+                    `--user-data-dir=${path.join(tempDir, `profile-${i}`)}`,
+                    '--no-first-run', '--no-default-browser-check',
                     pathToFileURL(tempHtmlPath).href
                 ], { timeout: 25000 });
+                // Edge --headless=new on Windows writes the PNG asynchronously: the
+                // launcher process exits as soon as it has spawned the render helper,
+                // so the file may not exist yet when execFileSync returns. Poll up to
+                // 10s for the PNG to appear and stabilize before failing.
+                await this.waitForFile(pngPath, 10000);
+                if (!fs.existsSync(pngPath)) {
+                    logError(`Diagram ${i}: Chrome/Edge exited cleanly but produced no PNG at ${pngPath} ` +
+                        `(waited 10s). Browser used: ${chromePath}. This usually means the browser's ` +
+                        `top-level launcher forwarded the command to a running session and dropped ` +
+                        `--screenshot=. Try closing all Edge/Chrome windows, or install a separate Chromium.`);
+                    try { fs.unlinkSync(tempHtmlPath); } catch {}
+                    continue;
+                }
                 const rawSize = fs.statSync(pngPath).size;
                 log(`Diagram ${i}: Raw PNG ${rawSize} bytes`);
 
@@ -2452,17 +2561,25 @@ mermaid.run({ querySelector: '.mermaid' });
         const chromePath = this.findChrome();
 
         if (chromePath) {
+            const os = require('os');
+            const profileDir = path.join(os.tmpdir(), `md-review-pdf-profile-${Date.now()}`);
             const args = [
                 '--headless=new', '--disable-gpu',
                 `--print-to-pdf=${pdfPath}`,
                 '--no-pdf-header-footer',
                 '--virtual-time-budget=15000',
+                `--user-data-dir=${profileDir}`,
+                '--no-first-run', '--no-default-browser-check',
                 htmlPath,
             ];
-            execFile(chromePath, args, { timeout: 30000 }, (err: any) => {
+            execFile(chromePath, args, { timeout: 30000 }, async (err: any) => {
                 // Clean up temp HTML
                 try { fs.unlinkSync(htmlPath); } catch {}
-                if (err) {
+                // Edge --headless=new on Windows writes the PDF asynchronously after
+                // the launcher exits, so poll for it before deciding success/failure.
+                if (!err) { await this.waitForFile(pdfPath, 15000); }
+                const pdfReady = fs.existsSync(pdfPath) && fs.statSync(pdfPath).size > 0;
+                if (err || !pdfReady) {
                     // Fallback: open in browser for manual print
                     vscode.env.openExternal(vscode.Uri.file(htmlPath));
                     vscode.window.showWarningMessage(

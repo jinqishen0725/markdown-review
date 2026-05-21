@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Reader with Copilot",
   "description": "Review Markdown, Word (.docx), and PowerPoint (.pptx) with inline commenting, AI agent tools, and Copilot integration",
-  "version": "5.1.2",
+  "version": "5.1.4",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
