@@ -2243,15 +2243,29 @@ ${commentUiCss()}
         });
     }
 
-    /** Find Chrome path */
+    /** Find Chrome or Edge path */
     private findChrome(): string | undefined {
         const fs = require('fs');
-        const chromePaths = [
+        const browserPaths = [
+            // Chrome
             'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            // Edge
+            'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+            // macOS
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+            // Linux
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/usr/bin/microsoft-edge',
+            '/usr/bin/microsoft-edge-stable',
             process.env.CHROME_PATH || '',
         ];
-        return chromePaths.find(p => p && fs.existsSync(p));
+        return browserPaths.find(p => p && fs.existsSync(p));
     }
 
     /**
@@ -2264,7 +2278,7 @@ ${commentUiCss()}
         const { execFileSync } = require('child_process');
         const chromePath = this.findChrome();
         if (!chromePath) {
-            logError('Chrome not found — cannot render Mermaid diagrams');
+            logError('Chrome/Edge not found — cannot render Mermaid diagrams. Install Chrome or Edge, or set CHROME_PATH env variable.');
             return [];
         }
 
@@ -2428,14 +2442,9 @@ mermaid.run({ querySelector: '.mermaid' });
         const htmlPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.html';
         fs.writeFileSync(htmlPath, fullHtml, 'utf-8');
 
-        // Try Chrome headless for direct PDF generation
+        // Try Chrome/Edge headless for direct PDF generation
         const pdfPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.pdf';
-        const chromePaths = [
-            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-            process.env.CHROME_PATH || '',
-        ];
-        const chromePath = chromePaths.find(p => p && fs.existsSync(p));
+        const chromePath = this.findChrome();
 
         if (chromePath) {
             const args = [
