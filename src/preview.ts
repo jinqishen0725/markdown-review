@@ -2648,7 +2648,12 @@ mermaid.run({ querySelector: '.mermaid' });
         const args = [
             cleanMdPath,
             '-o', docxPath,
-            '--from=markdown+tex_math_dollars',
+            // +lists_without_preceding_blankline matches GFM / our webview preview:
+            //   a list immediately following a paragraph (no blank line) is still a
+            //   list, not paragraph continuation. Without this, pandoc's default
+            //   `markdown` dialect renders "intro:\n1. item\n2. item" as one jammed
+            //   paragraph in the DOCX, while the preview shows it correctly.
+            '--from=markdown+tex_math_dollars+lists_without_preceding_blankline',
             '--to=docx',
             '--resource-path=' + path.dirname(this.document.uri.fsPath),
         ];
