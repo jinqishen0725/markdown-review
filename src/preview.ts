@@ -2669,7 +2669,24 @@ mermaid.run({ querySelector: '.mermaid' });
             try { fs.rmdirSync(tempDir); } catch {}
 
             if (err) {
-                vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);
+                // Detect "file in use" errors from pandoc (Word has the file open).
+                // Pandoc reports these as `permission denied` / `withBinaryFile` on
+                // Windows, and the message may appear in err.message or err.stderr.
+                const msg = (err.message || '') + ' ' + (err.stderr ? err.stderr.toString() : '');
+                const lockedByWord =
+                    /permission denied/i.test(msg) ||
+                    /withBinaryFile/i.test(msg) ||
+                    /EBUSY/i.test(msg) ||
+                    /being used by another process/i.test(msg) ||
+                    /sharing violation/i.test(msg);
+                if (lockedByWord) {
+                    vscode.window.showErrorMessage(
+                        `Cannot write ${path.basename(docxPath)} — the file appears to be open in Word ` +
+                        `(or another app holds a lock). Close it and try Export again.`
+                    );
+                } else {
+                    vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);
+                }
             } else {
                 vscode.window.showInformationMessage(`DOCX exported: ${path.basename(docxPath)}`);
                 vscode.env.openExternal(vscode.Uri.file(docxPath));
