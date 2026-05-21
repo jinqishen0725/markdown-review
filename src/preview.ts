@@ -2364,7 +2364,11 @@ ${commentUiCss()}
      * Each mermaid block gets its own temp HTML with CDN Mermaid, rendered by Chrome.
      * Returns array of { source, pngPath } for replacement.
      */
-    private async renderMermaidToPng(mermaidBlocks: Array<{ source: string }>, tempDir: string): Promise<Array<{ source: string; pngPath: string }>> {
+    private async renderMermaidToPng(
+        mermaidBlocks: Array<{ source: string }>,
+        tempDir: string,
+        onProgress?: (current: number, total: number) => void,
+    ): Promise<Array<{ source: string; pngPath: string }>> {
         const fs = require('fs');
         const { execFileSync } = require('child_process');
         const { pathToFileURL } = require('url');
@@ -2464,6 +2468,7 @@ mermaid.run({ querySelector: '.mermaid' }).then(function() {
                 logError(`Diagram ${i}: Chrome failed`, chromeErr);
             }
             try { fs.unlinkSync(tempHtmlPath); } catch {}
+            if (onProgress) { onProgress(i + 1, mermaidBlocks.length); }
         }
         log(`Rendered ${results.length}/${mermaidBlocks.length} diagrams`);
         return results;
@@ -2614,22 +2619,16 @@ mermaid.run({ querySelector: '.mermaid' });
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mermaid-'));
         const mermaidBlocks = this.extractMermaidBlocks(cleanText);
         log(`DOCX Export: Found ${mermaidBlocks.length} mermaid block(s)`);
-        const pngFiles = await this.renderMermaidToPng(mermaidBlocks, tempDir);
-        cleanText = this.replaceMermaidInMarkdown(cleanText, pngFiles);
-        log(`DOCX Export: Replaced ${pngFiles.length} diagram(s) in markdown`);
 
-        // Write clean markdown to temp file
-        const cleanMdPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_clean.md';
         const docxPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.docx';
-        fs.writeFileSync(cleanMdPath, cleanText, 'utf-8');
+        const cleanMdPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_clean.md';
 
-        // Find Pandoc
+        // Find Pandoc up-front so we can fail fast before showing progress
         const { execFileSync } = require('child_process');
         let pandocPath = 'pandoc';
         try {
             execFileSync('pandoc', ['--version'], { stdio: 'ignore' });
         } catch {
-            // Pandoc not in PATH
             const installUrl = 'https://pandoc.org/installing.html';
             vscode.window.showErrorMessage(
                 `Pandoc is required for DOCX export but was not found. [Install Pandoc](${installUrl})`,
@@ -2639,40 +2638,82 @@ mermaid.run({ querySelector: '.mermaid' });
                     vscode.env.openExternal(vscode.Uri.parse(installUrl));
                 }
             });
-            // Clean up temp file
-            try { fs.unlinkSync(cleanMdPath); } catch {}
+            try { fs.rmdirSync(tempDir); } catch {}
             return;
         }
 
-        const refDocPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'reference.docx').fsPath;
-        const args = [
-            cleanMdPath,
-            '-o', docxPath,
-            // +lists_without_preceding_blankline matches GFM / our webview preview:
-            //   a list immediately following a paragraph (no blank line) is still a
-            //   list, not paragraph continuation. Without this, pandoc's default
-            //   `markdown` dialect renders "intro:\n1. item\n2. item" as one jammed
-            //   paragraph in the DOCX, while the preview shows it correctly.
-            '--from=markdown+tex_math_dollars+lists_without_preceding_blankline',
-            '--to=docx',
-            '--resource-path=' + path.dirname(this.document.uri.fsPath),
-        ];
-        if (fs.existsSync(refDocPath)) {
-            args.push('--reference-doc=' + refDocPath);
-        }
+        // Progress allocation:
+        //   10%  start
+        //   10% .. 70%  rendering mermaid diagrams (proportional to count)
+        //   70% .. 95%  pandoc conversion
+        //   95% .. 100% finalize / open
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Exporting ${path.basename(this.document.uri.fsPath, '.md')} to DOCX`,
+            cancellable: false,
+        }, async (progress) => {
+            const renderShare = 60; // percent budget for rendering mermaid
+            progress.report({ increment: 10, message: 'Preparing...' });
 
-        const docDir = path.dirname(this.document.uri.fsPath);
-        execFile(pandocPath, args, { timeout: 30000, cwd: docDir }, (err: any) => {
-            // Clean up temp files
+            let pngFiles: Array<{ source: string; pngPath: string }> = [];
+            if (mermaidBlocks.length > 0) {
+                progress.report({ message: `Rendering 0/${mermaidBlocks.length} diagrams...` });
+                let lastReported = 0;
+                pngFiles = await this.renderMermaidToPng(mermaidBlocks, tempDir, (current, total) => {
+                    const pct = Math.round((current / total) * renderShare);
+                    const delta = pct - lastReported;
+                    lastReported = pct;
+                    progress.report({
+                        increment: delta,
+                        message: `Rendered ${current}/${total} diagrams`,
+                    });
+                });
+                cleanText = this.replaceMermaidInMarkdown(cleanText, pngFiles);
+                log(`DOCX Export: Replaced ${pngFiles.length} diagram(s) in markdown`);
+            } else {
+                // No diagrams: skip straight to pandoc, consume the rendering budget
+                progress.report({ increment: renderShare, message: 'No diagrams to render' });
+            }
+
+            // Write clean markdown to temp file
+            fs.writeFileSync(cleanMdPath, cleanText, 'utf-8');
+
+            const refDocPath = vscode.Uri.joinPath(this.extensionUri, 'media', 'reference.docx').fsPath;
+            const args = [
+                cleanMdPath,
+                '-o', docxPath,
+                // +lists_without_preceding_blankline matches GFM / our webview preview:
+                //   a list immediately following a paragraph (no blank line) is still a
+                //   list, not paragraph continuation. Without this, pandoc's default
+                //   `markdown` dialect renders "intro:\n1. item\n2. item" as one jammed
+                //   paragraph in the DOCX, while the preview shows it correctly.
+                '--from=markdown+tex_math_dollars+lists_without_preceding_blankline',
+                '--to=docx',
+                '--resource-path=' + path.dirname(this.document.uri.fsPath),
+            ];
+            if (fs.existsSync(refDocPath)) {
+                args.push('--reference-doc=' + refDocPath);
+            }
+
+            progress.report({ increment: 10, message: 'Converting to DOCX via Pandoc...' });
+
+            // Promisify execFile so withProgress only resolves when pandoc finishes.
+            // Increase the timeout to 120s — large docs with many images can be slow.
+            const docDir = path.dirname(this.document.uri.fsPath);
+            const pandocErr: any = await new Promise((resolve) => {
+                execFile(pandocPath, args, { timeout: 120000, cwd: docDir }, (err: any) => resolve(err));
+            });
+
+            // Clean up temp files regardless of outcome
             try { fs.unlinkSync(cleanMdPath); } catch {}
             for (const pf of pngFiles) { try { fs.unlinkSync(pf.pngPath); } catch {} }
             try { fs.rmdirSync(tempDir); } catch {}
 
-            if (err) {
+            progress.report({ increment: 25, message: 'Finalizing...' });
+
+            if (pandocErr) {
                 // Detect "file in use" errors from pandoc (Word has the file open).
-                // Pandoc reports these as `permission denied` / `withBinaryFile` on
-                // Windows, and the message may appear in err.message or err.stderr.
-                const msg = (err.message || '') + ' ' + (err.stderr ? err.stderr.toString() : '');
+                const msg = (pandocErr.message || '') + ' ' + (pandocErr.stderr ? pandocErr.stderr.toString() : '');
                 const lockedByWord =
                     /permission denied/i.test(msg) ||
                     /withBinaryFile/i.test(msg) ||
@@ -2685,9 +2726,10 @@ mermaid.run({ querySelector: '.mermaid' });
                         `(or another app holds a lock). Close it and try Export again.`
                     );
                 } else {
-                    vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);
+                    vscode.window.showErrorMessage(`DOCX export failed: ${pandocErr.message}`);
                 }
             } else {
+                progress.report({ increment: 5, message: 'Done' });
                 vscode.window.showInformationMessage(`DOCX exported: ${path.basename(docxPath)}`);
                 vscode.env.openExternal(vscode.Uri.file(docxPath));
             }
