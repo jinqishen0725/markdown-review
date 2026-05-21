@@ -2276,11 +2276,16 @@ ${commentUiCss()}
     private async renderMermaidToPng(mermaidBlocks: Array<{ source: string }>, tempDir: string): Promise<Array<{ source: string; pngPath: string }>> {
         const fs = require('fs');
         const { execFileSync } = require('child_process');
+        const { pathToFileURL } = require('url');
         const chromePath = this.findChrome();
         if (!chromePath) {
             logError('Chrome/Edge not found — cannot render Mermaid diagrams. Install Chrome or Edge, or set CHROME_PATH env variable.');
             return [];
         }
+
+        // Use local mermaid.min.js to avoid CDN dependency in headless browser
+        const mermaidJsPath = path.join(this.extensionUri.fsPath, 'media', 'mermaid.min.js');
+        const mermaidJsUrl = pathToFileURL(mermaidJsPath).href;
 
         log(`Rendering ${mermaidBlocks.length} Mermaid diagram(s) to PNG`);
         const results: Array<{ source: string; pngPath: string }> = [];
@@ -2292,7 +2297,7 @@ ${commentUiCss()}
             // HTML that renders mermaid with same layout as PDF export (max-width:860px)
             const tempHtml = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="${mermaidJsUrl}"></script>
 <style>
 html { margin: 0; padding: 0; background: white; }
 body { margin: 0; padding: 20px 40px; background: white; max-width: 860px; }
@@ -2324,7 +2329,7 @@ mermaid.run({ querySelector: '.mermaid' }).then(function() {
                     '--window-size=1600,4000',
                     '--force-device-scale-factor=2',
                     '--virtual-time-budget=8000',
-                    `file:///${tempHtmlPath.replace(/\\/g, '/')}`
+                    pathToFileURL(tempHtmlPath).href
                 ], { timeout: 25000 });
                 const rawSize = fs.statSync(pngPath).size;
                 log(`Diagram ${i}: Raw PNG ${rawSize} bytes`);
@@ -2487,7 +2492,9 @@ mermaid.run({ querySelector: '.mermaid' });
         let cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
 
         // Render Mermaid blocks to PNGs via Chrome headless and replace in markdown
-        const tempDir = path.dirname(this.document.uri.fsPath);
+        // Use os.tmpdir() to avoid spaces in paths (Chrome --screenshot fails with spaces)
+        const os = require('os');
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mermaid-'));
         const mermaidBlocks = this.extractMermaidBlocks(cleanText);
         log(`DOCX Export: Found ${mermaidBlocks.length} mermaid block(s)`);
         const pngFiles = await this.renderMermaidToPng(mermaidBlocks, tempDir);
@@ -2537,6 +2544,7 @@ mermaid.run({ querySelector: '.mermaid' });
             // Clean up temp files
             try { fs.unlinkSync(cleanMdPath); } catch {}
             for (const pf of pngFiles) { try { fs.unlinkSync(pf.pngPath); } catch {} }
+            try { fs.rmdirSync(tempDir); } catch {}
 
             if (err) {
                 vscode.window.showErrorMessage(`DOCX export failed: ${err.message}`);
