@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Reader with Copilot",
   "description": "Review Markdown, Word (.docx), and PowerPoint (.pptx) with inline commenting, AI agent tools, and Copilot integration",
-  "version": "5.1.7",
+  "version": "5.1.8",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -403,7 +403,9 @@
   "scripts": {
     "postinstall": "node patches/apply-pptx-renderer-patches.js",
     "compile": "tsc -p ./",
-    "bundle": "npx esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "bundle": "npm run bundle:extension && npm run bundle:mcp",
+    "bundle:extension": "npx esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "bundle:mcp": "npx esbuild src/mcp-server.ts --bundle --outfile=out/mcp-server.js --format=cjs --platform=node --target=node18",
     "bundle:pptx-viewer": "npx esbuild src/pptx-viewer-webview.ts --bundle --outfile=media/pptx-viewer.js --format=iife --global-name=PptxLib --platform=browser --target=es2020",
     "watch": "tsc -watch -p ./",
     "package": "npm run bundle && vsce package"
