@@ -432,6 +432,7 @@ export class PreviewPanel {
                 }
                 try {
                     const { saveDocx } = require('./docx-parser');
+                    const fs = require('fs');
                     const ext = path.extname(this.docxPath);
                     const defaultName = path.basename(this.docxPath, ext) + '_reviewed' + ext;
                     const defaultUri = vscode.Uri.file(path.join(path.dirname(this.docxPath), defaultName));
@@ -442,6 +443,17 @@ export class PreviewPanel {
                         title: 'Save Word Document',
                     });
                     if (!saveUri) return;
+                    
+                    // Check if file exists and ask for confirmation
+                    if (fs.existsSync(saveUri.fsPath)) {
+                        const choice = await vscode.window.showWarningMessage(
+                            `File "${path.basename(saveUri.fsPath)}" already exists. Do you want to replace it?`,
+                            { modal: true },
+                            'Replace',
+                            'Cancel'
+                        );
+                        if (choice !== 'Replace') return;
+                    }
 
                     await saveDocx(this.docxModel, saveUri.fsPath);
                     vscode.window.showInformationMessage(`Document saved to: ${path.basename(saveUri.fsPath)}`);
@@ -457,6 +469,7 @@ export class PreviewPanel {
                 }
                 try {
                     const { savePptx } = require('./pptx-parser');
+                    const fs = require('fs');
                     const ext = path.extname(this.pptxPath);
                     const defaultName = path.basename(this.pptxPath, ext) + '_reviewed' + ext;
                     const defaultUri = vscode.Uri.file(path.join(path.dirname(this.pptxPath), defaultName));
@@ -467,6 +480,17 @@ export class PreviewPanel {
                         title: 'Save PowerPoint Presentation',
                     });
                     if (!saveUri) return;
+                    
+                    // Check if file exists and ask for confirmation
+                    if (fs.existsSync(saveUri.fsPath)) {
+                        const choice = await vscode.window.showWarningMessage(
+                            `File "${path.basename(saveUri.fsPath)}" already exists. Do you want to replace it?`,
+                            { modal: true },
+                            'Replace',
+                            'Cancel'
+                        );
+                        if (choice !== 'Replace') return;
+                    }
 
                     await savePptx(this.pptxModel, saveUri.fsPath);
                     vscode.window.showInformationMessage(`Presentation saved to: ${path.basename(saveUri.fsPath)}`);
@@ -1557,12 +1581,11 @@ ${commentUiCss()}
         if (!msg || !msg.command) return;
         if (handleCommentMessage(msg)) {
             refreshOverlays();
-            // Show popover for newly added comments
+            // Show popover for newly added comments (but don't auto-open sidebar)
             if (msg.command === 'commentAdded') {
                 var newC = msg.comment;
                 var anchor = __findAnchorForComment(newC);
                 if (anchor) { showPopover(newC, anchor); }
-                else if (!sidebarOpen) { sidebarOpen = true; document.getElementById('sidebar').classList.add('open'); }
             }
             return;
         }
@@ -2137,19 +2160,9 @@ ${commentUiCss()}
         });
     }
 
-    // ========== Preview → Source: double-click to jump ==========
-    document.getElementById('content').addEventListener('dblclick', function(e) {
-        // Find the closest element with data-start-offset
-        var target = e.target;
-        while (target && target !== this) {
-            if (target.getAttribute && target.getAttribute('data-start-offset') !== null) {
-                var offset = parseInt(target.getAttribute('data-start-offset'));
-                vscode.postMessage({ command: 'jumpToSource', cleanOffset: offset });
-                return;
-            }
-            target = target.parentElement;
-        }
-    });
+    // ========== Preview → Source: double-click to jump (DISABLED) ==========
+    // Removed: double-click is too common for text selection and was interfering
+    // with normal selection behavior. Users can use right-click context menu instead.
 
     // ========== Source → Preview: scroll to matching block ==========
     window.addEventListener('message', function(event) {
@@ -2496,6 +2509,21 @@ mermaid.run({ querySelector: '.mermaid' }).then(function() {
     }
 
     /** Export clean rendered HTML (no comments/anchors) and open in browser for PDF printing */
+    /** Check if file exists and ask user for confirmation */
+    private async confirmFileOverwrite(filePath: string): Promise<boolean> {
+        const fs = require('fs');
+        if (fs.existsSync(filePath)) {
+            const choice = await vscode.window.showWarningMessage(
+                `File "${path.basename(filePath)}" already exists. Do you want to replace it?`,
+                { modal: true },
+                'Replace',
+                'Cancel'
+            );
+            return choice === 'Replace';
+        }
+        return true;
+    }
+
     private async exportAsHtml() {
         log('PDF Export: Starting...');
         const text = this.document.getText();
@@ -2559,10 +2587,16 @@ mermaid.run({ querySelector: '.mermaid' });
         const fs = require('fs');
         const { execFile } = require('child_process');
         const htmlPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.html';
+        
+        // Check if PDF file exists and ask for confirmation
+        const pdfPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.pdf';
+        if (!await this.confirmFileOverwrite(pdfPath)) {
+            return;
+        }
+        
         fs.writeFileSync(htmlPath, fullHtml, 'utf-8');
 
         // Try Chrome/Edge headless for direct PDF generation
-        const pdfPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.pdf';
         const chromePath = this.findChrome();
 
         if (chromePath) {
@@ -2613,14 +2647,19 @@ mermaid.run({ querySelector: '.mermaid' });
         const text = this.document.getText();
         let cleanText = text.replace(/<!--@c\d+-->\r?\n?/g, '');
 
+        const docxPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.docx';
+        
+        // Check if DOCX file exists and ask for confirmation
+        if (!await this.confirmFileOverwrite(docxPath)) {
+            return;
+        }
+
         // Render Mermaid blocks to PNGs via Chrome headless and replace in markdown
         // Use os.tmpdir() to avoid spaces in paths (Chrome --screenshot fails with spaces)
         const os = require('os');
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mermaid-'));
         const mermaidBlocks = this.extractMermaidBlocks(cleanText);
         log(`DOCX Export: Found ${mermaidBlocks.length} mermaid block(s)`);
-
-        const docxPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_export.docx';
         const cleanMdPath = this.document.uri.fsPath.replace(/\.md$/i, '') + '_clean.md';
 
         // Find Pandoc up-front so we can fail fast before showing progress
