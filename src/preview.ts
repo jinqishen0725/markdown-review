@@ -103,6 +103,11 @@ export class PreviewPanel {
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     private commentsWatcher: ReturnType<typeof import('fs').watch> | null = null;
     private commentsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    // Timestamp of our own programmatic anchor edits (insert/remove). Used to skip
+    // the debounced re-render that onDidChangeTextDocument would otherwise trigger,
+    // so adding/deleting a comment doesn't reload the whole webview (which would
+    // re-run _restoreState and make the comment panel pop open).
+    private lastInternalEditTime: number = 0;
 
     // Word-specific fields
     public isDocx: boolean = false;
@@ -151,11 +156,15 @@ export class PreviewPanel {
                 if (e.document.uri.fsPath === this.document.uri.fsPath) {
                     if (this.debounceTimer) { clearTimeout(this.debounceTimer); }
                     this.debounceTimer = setTimeout(() => {
+                        this.debounceTimer = null;
+                        // Skip re-render for our own anchor insert/remove edits — the
+                        // webview is already updated via messages, and a full reload
+                        // would pop the comment panel open.
+                        if (Date.now() - this.lastInternalEditTime < 1500) { return; }
                         if (Date.now() - this.lastRenderTime > 800) {
                             this.commentsManager.reload();
                             this.updateContent();
                         }
-                        this.debounceTimer = null;
                     }, 1000);
                 }
             },
@@ -310,8 +319,9 @@ export class PreviewPanel {
                     message.comment,
                 );
                 this.insertAnchorViaApi(c.id, message.startOffset).then(() => {
-                    this.immediateRender();
-                    this.panel.webview.postMessage({ command: 'openPopover', commentId: c.id });
+                    // Update the webview in place instead of reloading the whole panel
+                    // (a full re-render re-runs _restoreState and pops the panel open).
+                    this.panel.webview.postMessage({ command: 'commentAdded', comment: c });
                 });
                 return;
             }
@@ -332,10 +342,12 @@ export class PreviewPanel {
                         await this.removeAnchorViaApi(message.id);
                     }
                     this.commentsManager.deleteComment(message.id);
-                    if (this.isPptx) {
-                        this.panel.webview.postMessage({ command: 'commentDeleted', id: message.id });
-                    } else {
+                    if (this.isDocx) {
+                        // Docx re-parses from XML; keep the full refresh path.
                         this.renderAfterChange();
+                    } else {
+                        // Markdown & PPTX: update in place, no webview reload.
+                        this.panel.webview.postMessage({ command: 'commentDeleted', id: message.id });
                     }
                 }
                 return;
@@ -690,7 +702,9 @@ export class PreviewPanel {
         const eol = this.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
         const edit = new vscode.WorkspaceEdit();
         edit.insert(this.document.uri, pos, `<!--@${id}-->${eol}`);
+        this.lastInternalEditTime = Date.now();
         await vscode.workspace.applyEdit(edit);
+        this.lastInternalEditTime = Date.now();
     }
 
     /** Map clean-text offset (anchor-free) to document offset (with anchors). */
@@ -759,7 +773,9 @@ export class PreviewPanel {
         const endPos = this.document.positionAt(endIdx);
         const edit = new vscode.WorkspaceEdit();
         edit.delete(this.document.uri, new vscode.Range(startPos, endPos));
+        this.lastInternalEditTime = Date.now();
         await vscode.workspace.applyEdit(edit);
+        this.lastInternalEditTime = Date.now();
     }
 
     // ---------- rendering ----------

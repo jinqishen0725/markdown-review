@@ -431,11 +431,15 @@ export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
             var state = vscode.getState() || {};
             state.scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
             state.filter = currentFilter;
-            // Check if sidebar/panel is open
+            // Check if sidebar/panel is open. Use the COMPUTED style, not the inline
+            // style: the panel's default hidden state comes from a CSS stylesheet rule
+            // (display:none), so panel.style.display is '' on first load and would be
+            // wrongly read as "open" — causing the panel to spuriously appear after a
+            // re-render (e.g. when adding/replying to a comment).
             var sidebar = document.getElementById('sidebar');
             var panel = document.getElementById('comment-list-panel');
             if (sidebar) state.sidebarOpen = sidebar.classList.contains('open');
-            if (panel) state.panelVisible = panel.style.display !== 'none';
+            if (panel) state.panelVisible = getComputedStyle(panel).display !== 'none';
             vscode.setState(state);
         } catch(e) {}
     }
