@@ -90,7 +90,8 @@ assertIncludes(js, 'window.deleteComment', 'includes deleteComment');
 assertIncludes(js, 'window.submitReply', 'includes submitReply');
 assertIncludes(js, 'window.submitListReply', 'includes submitListReply');
 assertIncludes(js, 'window.askCopilotThread', 'includes askCopilotThread');
-assertIncludes(js, 'window.copyComment', 'includes copyComment');
+assertIncludes(js, 'window.copyPromptThread', 'includes copyPromptThread');
+assertNotIncludes(js, 'window.copyComment', 'does not include unrequested raw comment copy');
 assertIncludes(js, 'function showPopover', 'includes showPopover');
 assertIncludes(js, 'window.startEditComment', 'includes startEditComment');
 assertIncludes(js, 'window.startEditReply', 'includes startEditReply');
@@ -113,6 +114,12 @@ assertIncludes(js, '__onCommentChange', 'references __onCommentChange hook');
 
 // Verify the JS uses esc() helper
 assertIncludes(js, 'function esc(s)', 'includes esc() html escaper');
+assertIncludes(js, 'var __canSendPrompt = true', 'direct prompt actions enabled by default');
+assertIncludes(js, 'Copy Prompt', 'includes per-comment Copy Prompt actions');
+assertNotIncludes(js, 'Copy Comment', 'does not render Copy Comment actions');
+
+const copyOnlyJs = commentUiJs({ canSendPrompt: false });
+assertIncludes(copyOnlyJs, 'var __canSendPrompt = false', 'supports copy-only capability mode');
 
 // Verify message handler returns boolean
 assertIncludes(js, 'return true', 'handleCommentMessage returns true for handled messages');
@@ -130,6 +137,7 @@ assertIncludes(sidebar, 'id="filter-open"', 'includes Open filter');
 assertIncludes(sidebar, 'id="filter-resolved"', 'includes Resolved filter');
 assertIncludes(sidebar, 'sendAllToCopilot()', 'includes Send All to Copilot');
 assertIncludes(sidebar, 'copyAllToClipboard()', 'includes Copy All');
+assertIncludes(sidebar, 'Copy Prompt', 'labels batch prompt copy explicitly');
 assertIncludes(sidebar, 'resolveAll()', 'includes Resolve All');
 assertIncludes(sidebar, 'deleteAllResolved()', 'includes Delete Resolved');
 assertIncludes(sidebar, 'id="comment-list"', 'includes container with correct ID');
@@ -139,6 +147,10 @@ const sidebar2 = sidebarHtml({ containerId: 'my-list', toggleFn: 'toggle', filte
 assertIncludes(sidebar2, 'id="filter-user"', 'custom filters include user');
 assertIncludes(sidebar2, 'id="filter-agent"', 'custom filters include agent');
 assertIncludes(sidebar2, 'id="my-list"', 'custom container ID works');
+
+const copyOnlySidebar = sidebarHtml({ containerId: 'copy-list', toggleFn: 'toggle', canSendPrompt: false });
+assertNotIncludes(copyOnlySidebar, 'sendAllToCopilot()', 'copy-only sidebar hides direct send');
+assertIncludes(copyOnlySidebar, 'copyAllToClipboard()', 'copy-only sidebar retains Copy Prompt');
 
 // ============================================================
 // 4. buildSinglePrompt() — Markdown
@@ -167,6 +179,7 @@ assertIncludes(mdNew, 'c123', 'markdown prompt includes comment id');
 assertIncludes(mdNew, 'Fix this typo', 'markdown prompt includes comment text');
 assertIncludes(mdNew, '#readReviewComment', 'markdown prompt includes tool reference');
 assertIncludes(mdNew, '#replyToReviewComment', 'markdown prompt includes reply tool');
+assertNotIncludes(mdNew, 'docReview_read_comment', 'native markdown prompt stays concise');
 assertNotIncludes(mdNew, 'XML EDITING', 'markdown prompt does NOT include XML rules');
 assertNotIncludes(mdNew, 'w14:paraId', 'markdown prompt does NOT include Word terms');
 assertIncludes(mdNew, 'A new review comment', 'new mode uses correct action text');
@@ -175,6 +188,11 @@ const mdThread = buildSinglePrompt(mdConfig, { ...mdComment, resolved: false, re
 assertIncludes(mdThread, 'Please respond to this comment thread', 'thread mode uses correct action text');
 assertIncludes(mdThread, 'Status: Open', 'thread prompt includes status');
 assertIncludes(mdThread, '[agent] I will fix it', 'thread prompt includes replies');
+
+const copiedMdConfig = { ...mdConfig, toolStyle: 'both' };
+const copiedMdPrompt = buildSinglePrompt(copiedMdConfig, mdComment, 'thread');
+assertIncludes(copiedMdPrompt, '#readReviewComment (VS Code) or docReview_read_comment (MCP)', 'copied markdown prompt unions read tool names');
+assertIncludes(copiedMdPrompt, '#replyToReviewComment (VS Code) or docReview_reply_to_comment (MCP)', 'copied markdown prompt unions reply tool names');
 
 // ============================================================
 // 5. buildSinglePrompt() — Word
@@ -208,6 +226,10 @@ assertIncludes(docxPrompt, '#writeElementXml', 'docx prompt includes writeElemen
 assertIncludes(docxPrompt, '#saveDocument', 'docx prompt includes saveDocument tool');
 assertIncludes(docxPrompt, 'document.xml', 'docx prompt includes XML path');
 assertIncludes(docxPrompt, 'commentRangeStart', 'docx prompt warns about comment markers');
+
+const copiedDocxPrompt = buildSinglePrompt({ ...docxConfig, toolStyle: 'both' }, docxComment, 'thread');
+assertIncludes(copiedDocxPrompt, '#readElementXml (VS Code) or docReview_read_element_xml (MCP)', 'copied docx prompt unions XML read tool names');
+assertIncludes(copiedDocxPrompt, '#saveDocument (VS Code) or docReview_save_document (MCP)', 'copied docx prompt unions save tool names');
 
 // ============================================================
 // 6. buildSinglePrompt() — PPTX
@@ -243,11 +265,13 @@ assertIncludes(pptxPrompt, '#readReviewComment', 'pptx prompt includes review to
 assertIncludes(pptxPrompt, 'slide2.xml', 'pptx prompt includes shape search instruction');
 assertIncludes(pptxPrompt, 'deck.pptx_xml', 'pptx prompt includes extract dir');
 
-// Cursor mode (no # prefix)
-const cursorConfig = { ...pptxConfig, toolPrefix: '' };
-const cursorPrompt = buildSinglePrompt(cursorConfig, pptxComment, 'thread');
-assertNotIncludes(cursorPrompt, '#readReviewComment', 'cursor mode does NOT use # prefix');
-assertIncludes(cursorPrompt, 'readReviewComment', 'cursor mode still includes tool name');
+const mcpConfig = { ...pptxConfig, toolPrefix: '', toolStyle: 'mcp' };
+const mcpPrompt = buildSinglePrompt(mcpConfig, pptxComment, 'thread');
+assertNotIncludes(mcpPrompt, '#readReviewComment', 'MCP mode does not use VS Code tool aliases');
+assertIncludes(mcpPrompt, 'docReview_read_comment', 'MCP mode uses canonical MCP tool name');
+
+const copiedPptxPrompt = buildSinglePrompt({ ...pptxConfig, toolStyle: 'both' }, pptxComment, 'thread');
+assertIncludes(copiedPptxPrompt, '#captureSlide (VS Code) or docReview_capture_slide (MCP)', 'copied pptx prompt unions capture tool names');
 
 // ============================================================
 // 7. buildBatchPromptText()
@@ -268,6 +292,10 @@ assertIncludes(mdBatch, 'Add image', 'batch includes second comment');
 assertIncludes(mdBatch, '[agent] Done', 'batch includes replies');
 assertIncludes(mdBatch, '#readReviewComment', 'batch includes instructions');
 assertIncludes(mdBatch, '#resolveReviewComment', 'batch includes resolve instruction');
+
+const copiedMdBatch = buildBatchPromptText({ ...mdConfig, toolStyle: 'both' }, comments);
+assertIncludes(copiedMdBatch, '#listReviewComments (VS Code) or docReview_list_comments (MCP)', 'copied batch unions list tool names');
+assertIncludes(copiedMdBatch, '#resolveReviewComment (VS Code) or docReview_resolve_comment (MCP)', 'copied batch unions resolve tool names');
 
 const docxBatch = buildBatchPromptText(docxConfig, comments);
 assertIncludes(docxBatch, 'Word document', 'docx batch mentions Word');
@@ -407,6 +435,20 @@ const noShapeComment = { id: 'c5', comment: 'Note', blockPreview: 'Slide 1', ele
 const noShapePrompt = buildSinglePrompt(pptxConfig, noShapeComment, 'thread');
 assertIncludes(noShapePrompt, 'Slide: 1', 'slide-only comment extracts slide number');
 assertIncludes(noShapePrompt, 'Shape cNvPr id: N/A', 'no shape id shown as N/A');
+
+// ============================================================
+// 13. Existing extension prompt-action routes
+// ============================================================
+console.log('\n--- Existing extension prompt actions ---');
+
+const previewSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'preview.ts'), 'utf8');
+assertIncludes(previewSource, "case 'copyPromptThread'", 'routes per-thread Copy Prompt');
+assertIncludes(previewSource, "case 'addCommentAndCopyPrompt'", 'routes add-comment Copy Prompt');
+assertIncludes(previewSource, 'submitAndCopyPrompt', 'PowerPoint dialog exposes Copy Prompt');
+assertIncludes(previewSource, 'submitCommentAndCopyPrompt', 'Markdown/Word dialog exposes Copy Prompt');
+assertIncludes(previewSource, 'canSendPrompt: this.canSendPrompt()', 'shared UI receives direct-send capability');
+assertIncludes(previewSource, "getPromptConfig('both')", 'copied prompts request both native and MCP tool names');
+assertNotIncludes(previewSource, 'Review prompt copied to clipboard — paste in Cursor Agent', 'Cursor no longer disguises copy as direct send');
 
 // ============================================================
 // Summary

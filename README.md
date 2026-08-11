@@ -2,7 +2,7 @@
 
 **The most agent-friendly document review extension for VS Code and Cursor.**
 
-Review and comment on **Markdown**, **Word (.docx)**, and **PowerPoint (.pptx)** documents — directly inside VS Code and Cursor. Add inline comments, reply in threads, resolve discussions, and let AI agents participate via 12 built-in Copilot tools, MCP server integration, and one-click ✨ Ask Copilot buttons.
+Review and comment on **Markdown**, **Word (.docx)**, and **PowerPoint (.pptx)** documents — directly inside VS Code and Cursor. Add inline comments, reply in threads, resolve discussions, and let AI agents participate via 12 built-in Copilot tools, MCP server integration, direct Ask Copilot actions, and explicit Copy Prompt actions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -34,6 +34,11 @@ Review and comment on **Markdown**, **Word (.docx)**, and **PowerPoint (.pptx)**
 In **Copilot Agent Mode**, click **Tools** and enable the Document Review tools (prefixed with `#`). Then ask:
 > *"Review this document and respond to all open comments"*
 
+### 4. Send or Copy a Review Prompt
+- **VS Code**: Select **Ask Copilot** to open the generated review prompt directly in Copilot Chat, or **Copy Prompt** to copy it.
+- **Cursor and hosts without direct chat integration**: Use **Copy Prompt**, then paste the generated prompt into the agent composer.
+- **Copy Prompt** is available when adding a comment, viewing a comment thread, reviewing a sidebar item, and sending all open comments.
+
 ---
 
 ## Features
@@ -46,8 +51,14 @@ In **Copilot Agent Mode**, click **Tools** and enable the Document Review tools 
 ### Inline Commenting
 - **"+" buttons** — Add comments on any block (markdown), paragraph (Word), or shape (PowerPoint)
 - **Comment highlighting** — Commented elements are highlighted (yellow for review, green for Word native, blue for PPTX)
-- **Popover details** — Click to see comment, replies, and actions (Reply, Resolve, Edit, Delete, ✨ Ask Copilot)
+- **Popover details** — Click to see comment, replies, and actions (Reply, Resolve, Edit, Delete, Ask Copilot, Copy Prompt)
 - **Sidebar panel** — Search, filter (All/Open/Resolved/User/Agent), and bulk actions
+
+### Prompt Actions
+- **Ask Copilot** — Available in VS Code when direct chat integration is supported. It sends the complete format-specific prompt to Copilot Chat.
+- **Copy Prompt** — Copies the same complete prompt without opening or focusing chat. It does not copy only the visible comment text.
+- **Portable tool references** — Because a copied prompt may be pasted into VS Code or an MCP-based agent, it includes both tool identifiers where they differ. For example: `#readReviewComment` (VS Code) or `docReview_read_comment` (MCP).
+- **Host-aware controls** — Cursor and unknown hosts hide **Ask Copilot** and show the explicit **Copy Prompt** action instead.
 
 ### Native Comment Integration
 - **Word**: Reads existing Word comments with author names and threading
@@ -95,7 +106,8 @@ Full support in **Cursor IDE** via an embedded MCP server that registers automat
 
 - All preview, commenting, and export features work natively
 - AI tools delivered via MCP server (12 tools registered in `~/.cursor/mcp.json`)
-- **✨ Ask Copilot** copies prompt to clipboard → paste in Composer
+- **Copy Prompt** copies the complete format-specific review prompt for pasting into Composer
+- Copied prompts include canonical MCP names such as `docReview_read_comment` alongside VS Code aliases, so the receiving agent can use the tools available in its host
 
 ---
 
@@ -155,6 +167,8 @@ node test/test-mermaid-edge-fix.js  # E2E mermaid rendering via Chrome/Edge head
 
 | Version | Highlights |
 |---------|-----------|
+| **5.2.3** | Remove the unintended Copy Comment action and include both VS Code and MCP tool identifiers in copied prompts |
+| **5.2.2** | Add explicit Copy Prompt actions across comment dialogs, threads, and bulk review; Cursor now uses copy-only prompt handoff |
 | **5.1.8** | Bundle MCP server with esbuild so it loads in Cursor without `node_modules` (fixes `MODULE_NOT_FOUND` for `@modelcontextprotocol/sdk`) |
 | **5.1.7** | DOCX export progress notification |
 | **5.1.6** | Friendly error when DOCX export is blocked by Word holding the file |

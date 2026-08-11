@@ -4,7 +4,7 @@
     {
       "id": "c1773552062764",
       "anchor": "<!--@c1773552062764-->",
-      "startOffset": 654,
+      "startOffset": 7697,
       "endOffset": 682,
       "blockType": "heading",
       "blockPreview": "### 1. Open a Review Preview",
@@ -24,13 +24,25 @@
     {
       "id": "c1773552169188",
       "anchor": "<!--@c1773552169188-->",
-      "startOffset": 854,
+      "startOffset": 7897,
       "endOffset": 1265,
       "blockType": "paragraph",
       "blockPreview": "In the preview, click the **`+`** button in the gutter next to any block (headin",
       "comment": "test2",
       "role": "user",
       "timestamp": "2026-03-15T05:22:49.188Z",
+      "resolved": false
+    },
+    {
+      "id": "c1780700756633",
+      "anchor": "<!--@c1780700756633-->",
+      "startOffset": 571,
+      "endOffset": 1052,
+      "blockType": "table",
+      "blockPreview": "| Format | Preview | Comments | AI Tools | Save |\r |--------|---------|---------",
+      "comment": "test comment",
+      "role": "user",
+      "timestamp": "2026-06-05T23:05:56.633Z",
       "resolved": false
     }
   ]

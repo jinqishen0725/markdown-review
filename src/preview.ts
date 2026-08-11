@@ -293,6 +293,8 @@ export class PreviewPanel {
                         this.panel.webview.postMessage({ command: 'commentAdded', comment: c });
                         if (message.askCopilot) {
                             this.openCopilotForThread(c);
+                        } else if (message.copyPrompt) {
+                            await this.copyPrompt(buildSinglePrompt(this.getPromptConfig('both'), c, 'new'));
                         }
                     } else {
                         this.updateDocxContent();
@@ -511,7 +513,9 @@ export class PreviewPanel {
                 });
                 return;
             }
-            case 'addCommentAndAsk': {
+            case 'addCommentAndAsk':
+            case 'addCommentAndCopyPrompt': {
+                const shouldSend = message.command === 'addCommentAndAsk';
                 let ca: Comment;
                 if (this.isDocx && message.eid) {
                     ca = this.commentsManager.addDocxComment(
@@ -522,7 +526,11 @@ export class PreviewPanel {
                     );
                     this.updateDocxContent();
                     this.panel.webview.postMessage({ command: 'openPopover', commentId: ca.id });
-                    this.openCopilotForComment(ca);
+                    if (shouldSend) {
+                        this.openCopilotForComment(ca);
+                    } else {
+                        await this.copyPrompt(buildSinglePrompt(this.getPromptConfig('both'), ca, 'new'));
+                    }
                 } else {
                     ca = this.commentsManager.addComment(
                         message.startOffset,
@@ -531,10 +539,14 @@ export class PreviewPanel {
                         message.blockPreview || '',
                         message.comment,
                     );
-                    this.insertAnchorViaApi(ca.id, message.startOffset).then(() => {
+                    this.insertAnchorViaApi(ca.id, message.startOffset).then(async () => {
                         this.immediateRender();
                         this.panel.webview.postMessage({ command: 'openPopover', commentId: ca.id });
-                        this.openCopilotForComment(ca);
+                        if (shouldSend) {
+                            this.openCopilotForComment(ca);
+                        } else {
+                            await this.copyPrompt(buildSinglePrompt(this.getPromptConfig('both'), ca, 'new'));
+                        }
                     });
                 }
                 return;
@@ -544,41 +556,19 @@ export class PreviewPanel {
                 if (message.pendingReply) {
                     this.commentsManager.reload();
                 }
-                let comment = this.commentsManager.getComments().find((c: any) => c.id === message.id);
-                // For Word comments, build a compatible comment object from the Word model
-                if (!comment && message.id.startsWith('word_') && this.docxModel) {
-                    const wcId = message.id.replace('word_', '');
-                    const wc = this.docxModel.comments.find((w: any) => w.id === wcId);
-                    if (wc) {
-                        const sidecar = this.commentsManager.getComments().find((c: any) => c.id === message.id);
-                        comment = {
-                            id: message.id,
-                            comment: wc.text,
-                            blockPreview: (wc as any)._anchorText || wc.text.substring(0, 60),
-                            resolved: sidecar?.resolved || false,
-                            replies: sidecar?.replies || [],
-                            elementId: wc.elementId,
-                        };
-                    }
-                }
-                // For PPTX comments, build from pptx model
-                if (!comment && message.id.startsWith('pptx_') && this.pptxModel) {
-                    const pcId = message.id.replace('pptx_', '');
-                    const pc = this.pptxModel.comments.find((c: any) => c.id === pcId);
-                    if (pc) {
-                        const sidecar = this.commentsManager.getComments().find((c: any) => c.id === message.id);
-                        comment = {
-                            id: message.id,
-                            comment: pc.text,
-                            blockPreview: `Slide ${pc.slideIndex}`,
-                            resolved: sidecar?.resolved || false,
-                            replies: sidecar?.replies || [],
-                            elementId: `slide_${pc.slideIndex}`,
-                        };
-                    }
-                }
+                const comment = this.getPromptComment(message.id);
                 if (comment) {
                     this.openCopilotForThread(comment);
+                }
+                return;
+            }
+            case 'copyPromptThread': {
+                if (message.pendingReply) {
+                    this.commentsManager.reload();
+                }
+                const comment = this.getPromptComment(message.id);
+                if (comment) {
+                    await this.copyPrompt(buildSinglePrompt(this.getPromptConfig('both'), comment, 'thread'));
                 }
                 return;
             }
@@ -588,7 +578,7 @@ export class PreviewPanel {
                     vscode.window.showInformationMessage('No open comments to send.');
                     return;
                 }
-                const prompt = this.buildBatchPrompt(allComments);
+                const prompt = this.buildBatchPrompt(allComments, 'native');
                 this.sendToChat(prompt);
                 return;
             }
@@ -598,18 +588,8 @@ export class PreviewPanel {
                     vscode.window.showInformationMessage('No open comments to copy.');
                     return;
                 }
-                const batchPrompt = this.buildBatchPrompt(allOpen);
-                vscode.env.clipboard.writeText(batchPrompt);
-                vscode.window.showInformationMessage(`${allOpen.length} comment(s) copied to clipboard.`);
-                return;
-            }
-            case 'copyComment': {
-                const cmt = this.commentsManager.getComments().find((c: any) => c.id === message.id);
-                if (cmt) {
-                    const singlePrompt = this.buildBatchPrompt([cmt]);
-                    vscode.env.clipboard.writeText(singlePrompt);
-                    vscode.window.showInformationMessage('Comment copied to clipboard.');
-                }
+                const batchPrompt = this.buildBatchPrompt(allOpen, 'both');
+                await this.copyPrompt(batchPrompt);
                 return;
             }
         }
@@ -617,48 +597,79 @@ export class PreviewPanel {
 
     // ---------- Ask Copilot helpers ----------
 
-    private isCursor(): boolean {
-        return vscode.env.appName?.toLowerCase().includes('cursor') || false;
+    private canSendPrompt(): boolean {
+        return vscode.env.appName?.toLowerCase().includes('visual studio code') || false;
     }
 
-    private getPromptConfig(): PromptConfig {
+    private getPromptConfig(toolStyle: 'native' | 'mcp' | 'both' = 'native'): PromptConfig {
         const filePath = this.isPptx ? this.pptxPath : this.isDocx ? this.docxPath : this.document.uri.fsPath;
         return {
             format: this.isPptx ? 'pptx' : this.isDocx ? 'docx' : 'markdown',
             filePath,
             fileName: path.basename(filePath),
-            toolPrefix: this.isCursor() ? '' : '#',
+            toolPrefix: '#',
+            toolStyle,
             docxXmlPath: this.docxModel?.documentXmlPath,
             pptxExtractDir: this.pptxModel?.extractDir,
         };
     }
 
     private async sendToChat(prompt: string) {
-        if (this.isCursor()) {
-            await vscode.env.clipboard.writeText(prompt);
-            const commands = await vscode.commands.getCommands(true);
-            if (commands.includes('composer.focusComposer')) {
-                await vscode.commands.executeCommand('composer.focusComposer');
-            }
-            vscode.window.showInformationMessage(
-                'Review prompt copied to clipboard — paste in Cursor Agent (Ctrl+V) and press Enter',
-                { modal: true }
-            );
-        } else {
-            vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+        if (!this.canSendPrompt()) {
+            vscode.window.showWarningMessage('Direct chat is unavailable in this host. Use Copy Prompt instead.');
+            return;
         }
+        await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+    }
+
+    private async copyPrompt(prompt: string): Promise<void> {
+        await vscode.env.clipboard.writeText(prompt);
+        vscode.window.showInformationMessage('Prompt copied to clipboard.');
+    }
+
+    private getPromptComment(commentId: string): any | undefined {
+        let comment: any | undefined = this.commentsManager.getComments().find((c: any) => c.id === commentId);
+        if (!comment && commentId.startsWith('word_') && this.docxModel) {
+            const wordComment = this.docxModel.comments.find((candidate: any) => candidate.id === commentId.replace('word_', ''));
+            if (wordComment) {
+                const sidecar = this.commentsManager.getComments().find((c: any) => c.id === commentId);
+                comment = {
+                    id: commentId,
+                    comment: wordComment.text,
+                    blockPreview: wordComment._anchorText || wordComment.text.substring(0, 60),
+                    resolved: sidecar?.resolved || false,
+                    replies: sidecar?.replies || [],
+                    elementId: wordComment.elementId,
+                };
+            }
+        }
+        if (!comment && commentId.startsWith('pptx_') && this.pptxModel) {
+            const pptxComment = this.pptxModel.comments.find((candidate: any) => candidate.id === commentId.replace('pptx_', ''));
+            if (pptxComment) {
+                const sidecar = this.commentsManager.getComments().find((c: any) => c.id === commentId);
+                comment = {
+                    id: commentId,
+                    comment: pptxComment.text,
+                    blockPreview: `Slide ${pptxComment.slideIndex}`,
+                    resolved: sidecar?.resolved || false,
+                    replies: sidecar?.replies || [],
+                    elementId: `slide_${pptxComment.slideIndex}`,
+                };
+            }
+        }
+        return comment;
     }
 
     private openCopilotForComment(comment: any) {
-        this.sendToChat(buildSinglePrompt(this.getPromptConfig(), comment, 'new'));
+        this.sendToChat(buildSinglePrompt(this.getPromptConfig('native'), comment, 'new'));
     }
 
     private openCopilotForThread(comment: any) {
-        this.sendToChat(buildSinglePrompt(this.getPromptConfig(), comment, 'thread'));
+        this.sendToChat(buildSinglePrompt(this.getPromptConfig('native'), comment, 'thread'));
     }
 
-    private buildBatchPrompt(comments: any[]): string {
-        return buildBatchPromptText(this.getPromptConfig(), comments);
+    private buildBatchPrompt(comments: any[], toolStyle: 'native' | 'mcp' | 'both'): string {
+        return buildBatchPromptText(this.getPromptConfig(toolStyle), comments);
     }
 
     // ---------- anchor operations via VS Code API ----------
@@ -1294,7 +1305,7 @@ ${commentUiCss()}
 <div id="sidebar">
     <button class="sidebar-close" onclick="toggleSidebar()">&#x00D7;</button>
     <h3>&#x1F4AC; Review Comments</h3>
-    ${sidebarHtml({ containerId: 'comment-list', toggleFn: 'toggleSidebar', filters: ['all', 'open', 'resolved'] })}
+    ${sidebarHtml({ containerId: 'comment-list', toggleFn: 'toggleSidebar', filters: ['all', 'open', 'resolved'], canSendPrompt: this.canSendPrompt() })}
 </div>
 <div id="comment-dialog">
     <div class="dlg-box">
@@ -1304,7 +1315,8 @@ ${commentUiCss()}
         <div class="dlg-actions">
             <button class="btn-cancel" onclick="closeDialog()">Cancel</button>
             <button class="btn-primary" onclick="submitComment()">Add Comment</button>
-            <button class="btn-copilot" onclick="submitAndAskCopilot()">&#x2728; Ask Copilot</button>
+            ${this.canSendPrompt() ? '<button class="btn-copilot" onclick="submitAndAskCopilot()">&#x2728; Ask Copilot</button>' : ''}
+            <button onclick="submitAndCopyPrompt()">&#x1F4CB; Copy Prompt</button>
         </div>
     </div>
 </div>
@@ -1398,6 +1410,17 @@ ${commentUiCss()}
         vscode.postMessage({ command: 'addComment', eid: eid, blockType: 'slide', blockPreview: preview, comment: text, askCopilot: true });
         closeDialog();
     };
+    window.submitAndCopyPrompt = function() {
+        var text = document.getElementById('dlg-text').value.trim();
+        if (!text || !pendingSlideIndex) return;
+        var eid = pendingShapeId ? 'slide_' + pendingSlideIndex + '_shape_' + pendingShapeId : 'slide_' + pendingSlideIndex;
+        var preview = 'Slide ' + pendingSlideIndex;
+        if (pendingShapeId) preview += ' (shapeId=' + pendingShapeId + ')';
+        if (pendingShapeText) preview += ': "' + pendingShapeText.substring(0, 80) + '"';
+        else if (pendingShapeName) preview += ' > ' + pendingShapeName;
+        vscode.postMessage({ command: 'addComment', eid: eid, blockType: 'slide', blockPreview: preview, comment: text, copyPrompt: true });
+        closeDialog();
+    };
     // Ctrl+Enter to submit
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'Enter' && document.getElementById('comment-dialog').classList.contains('open')) {
@@ -1409,7 +1432,7 @@ ${commentUiCss()}
     // === Shared comment UI (from comment-ui.ts) ===
     var __nativePrefix = 'pptx_';
     var __nativeSource = 'pptx';
-    ${commentUiJs()}
+    ${commentUiJs({ canSendPrompt: this.canSendPrompt() })}
 
     // === PPTX-specific hooks for shared UI ===
     window.__onListItemClick = function(c) {
@@ -1864,8 +1887,8 @@ ${commentUiCss()}
             <button id="filter-agent" onclick="setFilter('agent')">Agent</button>
         </div>
         <div class="panel-bulk">
-            <button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>
-            <button onclick="copyAllToClipboard()">&#x1F4CB; Copy All</button>
+            ${this.canSendPrompt() ? '<button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>' : ''}
+            <button onclick="copyAllToClipboard()">&#x1F4CB; Copy Prompt</button>
             <button onclick="resolveAll()">Resolve All</button>
             <button onclick="deleteAllResolved()">Delete Resolved</button>
         </div>
@@ -1881,7 +1904,8 @@ ${commentUiCss()}
     <div class="dlg-actions">
         <button class="btn-cancel" onclick="hideDialog()">Cancel</button>
         <button class="btn-primary" onclick="submitComment()">Add Comment</button>
-        <button class="btn-primary btn-copilot" onclick="submitCommentAndAsk()">&#x2728; Ask Copilot</button>
+        ${this.canSendPrompt() ? '<button class="btn-primary btn-copilot" onclick="submitCommentAndAsk()">&#x2728; Ask Copilot</button>' : ''}
+        <button class="btn-primary" onclick="submitCommentAndCopyPrompt()">&#x1F4CB; Copy Prompt</button>
     </div>
 </div>
 
@@ -2060,6 +2084,22 @@ ${commentUiCss()}
         var el = findElement(pendingBlock);
         if (el) { el.classList.add('commented-block'); }
     };
+    window.submitCommentAndCopyPrompt = function() {
+        var text = document.getElementById('dlg-input').value.trim();
+        if (!text || !pendingBlock) return;
+        vscode.postMessage({
+            command: 'addCommentAndCopyPrompt',
+            startOffset: pendingBlock.startOffset,
+            endOffset: pendingBlock.endOffset,
+            blockType: pendingBlock.blockType,
+            blockPreview: pendingBlock.blockPreview,
+            comment: text,
+            eid: pendingBlock.eid || null
+        });
+        hideDialog();
+        var el = findElement(pendingBlock);
+        if (el) { el.classList.add('commented-block'); }
+    };
 
     // ========== export actions ==========
     window.jumpToSource = function() {
@@ -2080,7 +2120,7 @@ ${commentUiCss()}
     // ========== Shared comment UI (from comment-ui.ts) ==========
     var __nativePrefix = '${this.isDocx ? 'word_' : ''}';
     var __nativeSource = '${this.isDocx ? 'word' : ''}';
-    ${commentUiJs()}
+    ${commentUiJs({ canSendPrompt: this.canSendPrompt() })}
 
     // ========== Markdown/Word-specific hooks for shared UI ==========
     window.__onListItemClick = function(c) {

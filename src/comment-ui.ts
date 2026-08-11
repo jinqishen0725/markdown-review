@@ -107,13 +107,15 @@ export function commentUiCss(): string {
  *
  * The generated code defines these on `window`:
  *   resolveComment, unresolveComment, deleteComment, submitReply, submitListReply,
- *   askCopilotThread, copyComment, showPopover, startEditComment, saveEditComment,
+ *   askCopilotThread, copyPromptThread, showPopover, startEditComment, saveEditComment,
  *   cancelEdit, startEditReply, saveEditReply, deleteReply, setFilter, resolveAll,
  *   deleteAllResolved, sendAllToCopilot, copyAllToClipboard, buildList, updateBadge
  */
-export function commentUiJs(): string {
+export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
+    const canSendPrompt = opts.canSendPrompt !== false;
     return `
     // ======== Shared Comment UI ========
+    var __canSendPrompt = ${canSendPrompt ? 'true' : 'false'};
     function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
     // --- Comment actions ---
@@ -136,7 +138,7 @@ export function commentUiJs(): string {
         vscode.postMessage({ command: 'replyComment', id: id, text: t });
         inp.value = '';
     };
-    window.askCopilotThread = function(id) {
+    function dispatchThreadPrompt(id, command) {
         var inp = document.getElementById('pop-reply-input') || document.getElementById('reply-input');
         if (!inp) inp = document.getElementById('list-reply-' + id);
         var replyText = inp ? inp.value.trim() : '';
@@ -144,16 +146,14 @@ export function commentUiJs(): string {
             vscode.postMessage({ command: 'replyComment', id: id, text: replyText });
             inp.value = '';
         }
-        vscode.postMessage({ command: 'askCopilotThread', id: id, pendingReply: replyText });
+        vscode.postMessage({ command: command, id: id, pendingReply: replyText });
+    }
+    window.askCopilotThread = function(id) {
+        dispatchThreadPrompt(id, 'askCopilotThread');
     };
-    window.copyComment = function(id) {
-        var c = comments.find(function(x) { return x.id === id; });
-        if (!c) return;
-        var text = c.blockPreview + '\\n' + c.comment;
-        if (c.replies) c.replies.forEach(function(r) { text += '\\n  [' + (r.role||'user') + '] ' + r.text; });
-        navigator.clipboard.writeText(text);
+    window.copyPromptThread = function(id) {
+        dispatchThreadPrompt(id, 'copyPromptThread');
     };
-
     // --- Popover ---
     function _isNativeComment(c) { return c._source === __nativeSource && __nativeSource; }
     function _isNativeReply(r) { return r.id && __nativePrefix && r.id.startsWith(__nativePrefix); }
@@ -185,15 +185,18 @@ export function commentUiJs(): string {
             repliesHtml += '</div>';
         }
         var editBtn = isNative ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button>';
+        var directPromptBtn = __canSendPrompt
+            ? '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button>'
+            : '';
         pop.innerHTML =
             '<div class="pop-text" id="pop-comment-' + comment.id + '">' + authorBadge + esc(comment.comment) + editBtn + '</div>' +
             '<div class="pop-meta">' + new Date(comment.timestamp).toLocaleString() + (comment.resolved ? ' \\u2705 Resolved' : '') + '</div>' +
             repliesHtml +
             '<div class="pop-reply-input"><textarea id="pop-reply-input" placeholder="Reply..." rows="2"></textarea>' +
             '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button>' +
-            '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button></div>' +
+            directPromptBtn +
+            '<button onclick="copyPromptThread(\\'' + comment.id + '\\')">&#x1F4CB; Copy Prompt</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
-            '<button onclick="copyComment(\\'' + comment.id + '\\')">&#x1F4CB; Copy</button>' +
             (isNative ? '' : '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button>') + '</div>';
         var rect = anchorEl.getBoundingClientRect();
         pop.style.top = (rect.bottom + window.scrollY + 5) + 'px';
@@ -339,6 +342,9 @@ export function commentUiJs(): string {
                 ? '<button onclick="event.stopPropagation();unresolveComment(\\'' + c.id + '\\')">Reopen</button>'
                 : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
             var deleteBtn = isNative ? '' : '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button>';
+            var directPromptBtn = __canSendPrompt
+                ? '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button>'
+                : '';
 
             div.innerHTML =
                 '<div class="item-preview">' + esc(c.blockPreview || '(block)') + '</div>' +
@@ -348,9 +354,9 @@ export function commentUiJs(): string {
                 '<div class="item-reply-input" onclick="event.stopPropagation()">' +
                 '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
                 '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
-                '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button></div>' +
+                directPromptBtn +
+                '<button onclick="event.stopPropagation();copyPromptThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x1F4CB; Copy Prompt</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
-                '<button onclick="event.stopPropagation();copyComment(\\'' + c.id + '\\')">&#x1F4CB; Copy</button>' +
                 deleteBtn + '</div>';
 
             // Format-specific click: scroll to element
@@ -494,12 +500,15 @@ export function commentUiJs(): string {
 // ---------- Sidebar HTML ----------
 
 /** Sidebar + toolbar HTML (search, filters, bulk actions). Used by both PPTX and Markdown/Word. */
-export function sidebarHtml(opts: { containerId: string; toggleFn: string; filters?: string[] }): string {
+export function sidebarHtml(opts: { containerId: string; toggleFn: string; filters?: string[]; canSendPrompt?: boolean }): string {
     const filters = opts.filters || ['all', 'open', 'resolved'];
     const filterBtns = filters.map(f => {
         const label = f.charAt(0).toUpperCase() + f.slice(1);
         return `<button id="filter-${f}" ${f === 'all' ? 'class="active"' : ''} onclick="setFilter('${f}')">${label}</button>`;
     }).join('\n            ');
+    const directPromptButton = opts.canSendPrompt !== false
+        ? '<button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>'
+        : '';
 
     return `
 <div class="panel-toolbar" style="padding:0 0 8px;">
@@ -508,8 +517,8 @@ export function sidebarHtml(opts: { containerId: string; toggleFn: string; filte
         ${filterBtns}
     </div>
     <div class="panel-bulk" style="display:flex;gap:4px;flex-wrap:wrap;">
-        <button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>
-        <button onclick="copyAllToClipboard()">&#x1F4CB; Copy All</button>
+        ${directPromptButton}
+        <button onclick="copyAllToClipboard()">&#x1F4CB; Copy Prompt</button>
         <button onclick="resolveAll()">Resolve All</button>
         <button onclick="deleteAllResolved()">Delete Resolved</button>
     </div>
@@ -524,8 +533,40 @@ export interface PromptConfig {
     filePath: string;
     fileName: string;
     toolPrefix: string;
+    toolStyle?: 'native' | 'mcp' | 'both';
     docxXmlPath?: string;
     pptxExtractDir?: string;
+}
+
+type PromptTool =
+    | 'listComments'
+    | 'readComment'
+    | 'replyComment'
+    | 'resolveComment'
+    | 'captureSlide'
+    | 'listElements'
+    | 'readElementXml'
+    | 'writeElementXml'
+    | 'saveDocument';
+
+const PROMPT_TOOLS: Record<PromptTool, { native: string; mcp: string }> = {
+    listComments: { native: 'listReviewComments', mcp: 'docReview_list_comments' },
+    readComment: { native: 'readReviewComment', mcp: 'docReview_read_comment' },
+    replyComment: { native: 'replyToReviewComment', mcp: 'docReview_reply_to_comment' },
+    resolveComment: { native: 'resolveReviewComment', mcp: 'docReview_resolve_comment' },
+    captureSlide: { native: 'captureSlide', mcp: 'docReview_capture_slide' },
+    listElements: { native: 'listElements', mcp: 'docReview_list_elements' },
+    readElementXml: { native: 'readElementXml', mcp: 'docReview_read_element_xml' },
+    writeElementXml: { native: 'writeElementXml', mcp: 'docReview_write_element_xml' },
+    saveDocument: { native: 'saveDocument', mcp: 'docReview_save_document' },
+};
+
+function toolRef(cfg: PromptConfig, tool: PromptTool): string {
+    const names = PROMPT_TOOLS[tool];
+    const native = `${cfg.toolPrefix}${names.native}`;
+    if (cfg.toolStyle === 'mcp') return names.mcp;
+    if (cfg.toolStyle === 'both') return `${native} (VS Code) or ${names.mcp} (MCP)`;
+    return native;
 }
 
 const DOCX_XML_RULES = `XML EDITING RULES:
@@ -552,42 +593,39 @@ XML EDITING RULES:
 const NO_AUTO_RESOLVE = `IMPORTANT: Do NOT resolve or close comments automatically. Only resolve a comment when the user explicitly asks you to. After making changes, reply to the comment explaining what you did, but leave it open for the user to verify and resolve.`;
 
 function docxToolsText(cfg: PromptConfig): string {
-    const p = cfg.toolPrefix;
     const xmlInfo = cfg.docxXmlPath ? `\nThe extracted document.xml is at: ${cfg.docxXmlPath}` : '';
     return `This is a Word (.docx) document stored as XML. You have these tools:\n` +
-        `- ${p}listReviewComments — list all review comments\n` +
-        `- ${p}readReviewComment — read full comment with replies\n` +
-        `- ${p}replyToReviewComment — post a reply to a comment\n` +
-        `- ${p}resolveReviewComment — mark a comment as resolved\n` +
-        `- ${p}listElements — get a compact text outline of the document (use first for general context)\n` +
-        `- ${p}readElementXml — read raw XML of a specific element\n` +
-        `- ${p}writeElementXml — replace an element's XML\n` +
-        `- ${p}saveDocument — save changes back to .docx\n` +
+        `- ${toolRef(cfg, 'listComments')} — list all review comments\n` +
+        `- ${toolRef(cfg, 'readComment')} — read full comment with replies\n` +
+        `- ${toolRef(cfg, 'replyComment')} — post a reply to a comment\n` +
+        `- ${toolRef(cfg, 'resolveComment')} — mark a comment as resolved\n` +
+        `- ${toolRef(cfg, 'listElements')} — get a compact text outline of the document (use first for general context)\n` +
+        `- ${toolRef(cfg, 'readElementXml')} — read raw XML of a specific element\n` +
+        `- ${toolRef(cfg, 'writeElementXml')} — replace an element's XML\n` +
+        `- ${toolRef(cfg, 'saveDocument')} — save changes back to .docx\n` +
         `For substantial edits, you can directly edit the XML file.${xmlInfo}\n` +
         DOCX_XML_RULES;
 }
 
 function pptxToolsText(cfg: PromptConfig): string {
-    const p = cfg.toolPrefix;
     const extractInfo = cfg.pptxExtractDir ? `\nExtracted slide XMLs are at: ${cfg.pptxExtractDir}` : '';
     return `This is a .pptx file (Office Open XML). Slide XMLs have been extracted for editing.${extractInfo}\n` +
         PPTX_XML_RULES + '\n\n' +
         `Available tools:\n` +
-        `- ${p}listReviewComments — list all comments\n` +
-        `- ${p}readReviewComment — read full comment with replies\n` +
-        `- ${p}replyToReviewComment — post a reply\n` +
-        `- ${p}resolveReviewComment — mark as resolved\n` +
-        `- ${p}captureSlide — capture a specific slide as a rendered screenshot (provide slideNumber)`;
+        `- ${toolRef(cfg, 'listComments')} — list all comments\n` +
+        `- ${toolRef(cfg, 'readComment')} — read full comment with replies\n` +
+        `- ${toolRef(cfg, 'replyComment')} — post a reply\n` +
+        `- ${toolRef(cfg, 'resolveComment')} — mark as resolved\n` +
+        `- ${toolRef(cfg, 'captureSlide')} — capture a specific slide as a rendered screenshot (provide slideNumber)`;
 }
 
 function reviewToolsText(cfg: PromptConfig): string {
-    const p = cfg.toolPrefix;
-    return `Please use ${p}readReviewComment to get the full context, ` +
-        `then use ${p}replyToReviewComment to post a helpful response.`;
+    return `Please use ${toolRef(cfg, 'readComment')} to get the full context, ` +
+        `then use ${toolRef(cfg, 'replyComment')} to post a helpful response.`;
 }
 
 export function buildSinglePrompt(cfg: PromptConfig, comment: any, mode: 'new' | 'thread'): string {
-    const { format, filePath, fileName, toolPrefix: p } = cfg;
+    const { format, filePath, fileName } = cfg;
     const repliesText = (mode === 'thread' && comment.replies?.length)
         ? '\n- Existing replies:\n' + comment.replies.map((r: any) => `  [${r.role || 'user'}] ${r.text}`).join('\n')
         : '';
@@ -604,11 +642,11 @@ export function buildSinglePrompt(cfg: PromptConfig, comment: any, mode: 'new' |
             `- On element (paraId=${comment.elementId || 'unknown'}): "${comment.blockPreview || '(unknown)'}"${statusText}` +
             repliesText;
         context = docxToolsText(cfg);
-        instructions = `To edit this element: use ${p}readElementXml(elementId="${comment.elementId || 'unknown'}") to see its XML, ` +
-            `then ${p}writeElementXml to replace it, then ${p}saveDocument to save.\n` +
+        instructions = `To edit this element: use ${toolRef(cfg, 'readElementXml')}(elementId="${comment.elementId || 'unknown'}") to see its XML, ` +
+            `then ${toolRef(cfg, 'writeElementXml')} to replace it, then ${toolRef(cfg, 'saveDocument')} to save.\n` +
             `In the XML, find the <w:p> tag with w14:paraId="${comment.elementId || 'unknown'}" — that's the target element.\n\n` +
-            `Please use ${p}readReviewComment (with commentId="${comment.id}" and filePath="${filePath}") first, ` +
-            `then make the requested changes and use ${p}replyToReviewComment to explain what you did.`;
+            `Please use ${toolRef(cfg, 'readComment')} (with commentId="${comment.id}" and filePath="${filePath}") first, ` +
+            `then make the requested changes and use ${toolRef(cfg, 'replyComment')} to explain what you did.`;
     } else if (format === 'pptx') {
         const slideNum = (comment.elementId || '').match(/slide_(\d+)/)?.[1] || '?';
         const shapeId = (comment.elementId || '').split('_shape_')[1] || '';
@@ -619,27 +657,27 @@ export function buildSinglePrompt(cfg: PromptConfig, comment: any, mode: 'new' |
             repliesText;
         context = pptxToolsText(cfg) +
             (shapeId ? `\nTo find this shape, open slide${slideNum}.xml and search for: <p:cNvPr id="${shapeId}"` : '');
-        instructions = `Please use ${p}readReviewComment (commentId="${comment.id}", filePath="${filePath}") first, ` +
-            `then use ${p}replyToReviewComment to respond.`;
+        instructions = `Please use ${toolRef(cfg, 'readComment')} (commentId="${comment.id}", filePath="${filePath}") first, ` +
+            `then use ${toolRef(cfg, 'replyComment')} to respond.`;
     } else {
         header = `I'm reviewing "${fileName}" (${filePath}). ${action}:\n\n` +
             `- Comment #${comment.id}: "${comment.comment}"\n` +
             `- On block: "${comment.blockPreview || '(unknown)'}"${statusText}` +
             repliesText;
         context = `Available tools:\n` +
-            `- ${p}listReviewComments — list all review comments\n` +
-            `- ${p}readReviewComment — read full comment with replies\n` +
-            `- ${p}replyToReviewComment — post a reply\n` +
-            `- ${p}resolveReviewComment — mark as resolved`;
-        instructions = `Please use ${p}readReviewComment to get the full context of comment "${comment.id}", ` +
-            `then use ${p}replyToReviewComment to post a helpful response.`;
+            `- ${toolRef(cfg, 'listComments')} — list all review comments\n` +
+            `- ${toolRef(cfg, 'readComment')} — read full comment with replies\n` +
+            `- ${toolRef(cfg, 'replyComment')} — post a reply\n` +
+            `- ${toolRef(cfg, 'resolveComment')} — mark as resolved`;
+        instructions = `Please use ${toolRef(cfg, 'readComment')} to get the full context of comment "${comment.id}", ` +
+            `then use ${toolRef(cfg, 'replyComment')} to post a helpful response.`;
     }
 
     return [header, context, instructions, NO_AUTO_RESOLVE].filter(Boolean).join('\n\n');
 }
 
 export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string {
-    const { format, filePath, fileName, toolPrefix: p } = cfg;
+    const { format, filePath, fileName } = cfg;
     const parts: string[] = [];
 
     if (format === 'docx') {
@@ -651,10 +689,10 @@ export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string
         parts.push(`This is a .pptx file. Each shape has <p:cNvPr id="N" name="..."/>. The shapeId in comments matches this id.`);
         parts.push(`XML EDITING: Position=<a:off x/y EMU>, Size=<a:ext cx/cy>, Font=<a:rPr sz="hundredths-pt">, Color=<a:solidFill><a:srgbClr val="hex"/>`);
         parts.push(`RULES: 1) PRESERVE <p:cNvPr id> attributes. 2) Do NOT modify <p188:cm> comment elements. 3) Keep <a:rPr> unless asked to change.`);
-        parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment, ${p}captureSlide\n`);
+        parts.push(`Available tools: ${toolRef(cfg, 'listComments')}, ${toolRef(cfg, 'readComment')}, ${toolRef(cfg, 'replyComment')}, ${toolRef(cfg, 'resolveComment')}, ${toolRef(cfg, 'captureSlide')}\n`);
     } else {
         parts.push(`Review comments on "${fileName}" (${filePath}):`);
-        parts.push(`Available tools: ${p}listReviewComments, ${p}readReviewComment, ${p}replyToReviewComment, ${p}resolveReviewComment\n`);
+        parts.push(`Available tools: ${toolRef(cfg, 'listComments')}, ${toolRef(cfg, 'readComment')}, ${toolRef(cfg, 'replyComment')}, ${toolRef(cfg, 'resolveComment')}\n`);
     }
 
     for (const c of comments) {
@@ -666,9 +704,9 @@ export function buildBatchPromptText(cfg: PromptConfig, comments: any[]): string
         parts.push(entry);
     }
     parts.push(`\nPlease review and respond to each open comment above. For each comment:\n` +
-        `1. Use ${p}readReviewComment (with commentId and filePath="${filePath}") to get the full context\n` +
+        `1. Use ${toolRef(cfg, 'readComment')} (with commentId and filePath="${filePath}") to get the full context\n` +
         `2. Make the requested changes if applicable\n` +
-        `3. Use ${p}replyToReviewComment (with commentId, text, and filePath="${filePath}") to explain what you did\n` +
+        `3. Use ${toolRef(cfg, 'replyComment')} (with commentId, text, and filePath="${filePath}") to explain what you did\n` +
         `IMPORTANT: Do NOT resolve comments automatically. Leave them open for the user to verify and resolve.`);
     return parts.join('\n');
 }
