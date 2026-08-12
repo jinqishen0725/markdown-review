@@ -443,6 +443,7 @@ console.log('\n--- Existing extension prompt actions ---');
 
 const previewSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'preview.ts'), 'utf8');
 const extensionSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'extension.ts'), 'utf8');
+const markdownEditorWebviewSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'markdown-editor-webview.ts'), 'utf8');
 assertIncludes(previewSource, "case 'copyPromptThread'", 'routes per-thread Copy Prompt');
 assertIncludes(previewSource, "case 'addCommentAndCopyPrompt'", 'routes add-comment Copy Prompt');
 assertIncludes(previewSource, 'submitAndCopyPrompt', 'PowerPoint dialog exposes Copy Prompt');
@@ -464,6 +465,12 @@ assertIncludes(extensionSource, 'async (uri?: vscode.Uri)', 'Markdown preview co
 assertIncludes(extensionSource, 'vscode.workspace.openTextDocument(uri)', 'Markdown preview command opens the selected custom-editor resource');
 assertIncludes(extensionSource, 'registerCustomEditorProvider(', 'Markdown Review registers an Open With provider');
 assertIncludes(extensionSource, "'markdownReview.previewEditor'", 'Open With provider uses the contributed view type');
+assertIncludes(previewSource, 'enterMarkdownEditor()', 'Markdown review toolbar exposes one-click Edit mode');
+assertIncludes(previewSource, 'id="review-mode"', 'Markdown editor exposes one-click return to Review mode');
+assertIncludes(previewSource, '>Back to Review</button>', 'Markdown editor labels the return action clearly');
+assertIncludes(previewSource, 'stripCommentAnchors(this.document.getText()).cleanText', 'Markdown editor source excludes review anchors');
+assertIncludes(previewSource, 'applyAnchorFreeReplacements(currentText, replacements, eol)', 'Markdown editor edits preserve review anchors');
+assertIncludes(markdownEditorWebviewSource, 'showReadonlyToggle: false', 'Edit mode hides the redundant built-in view/edit toggle');
 
 // ============================================================
 // Summary

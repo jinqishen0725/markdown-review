@@ -1,0 +1,18 @@
+{
+  "file": "markdown-editor-prototype.md",
+  "comments": [
+    {
+      "id": "c900001",
+      "anchor": "<!--@c900001-->",
+      "startOffset": 20,
+      "endOffset": 68,
+      "blockType": "paragraph",
+      "blockPreview": "This paragraph has an anchored review comment.",
+      "comment": "Prototype anchor must remain hidden and preserved.",
+      "role": "user",
+      "timestamp": "2026-08-12T00:00:00.000Z",
+      "resolved": false,
+      "replies": []
+    }
+  ]
+}

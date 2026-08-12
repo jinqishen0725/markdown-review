@@ -30,11 +30,17 @@ Review and comment on **Markdown**, **Word (.docx)**, and **PowerPoint (.pptx)**
 - **Word**: Click the **`+`** gutter button next to any paragraph
 - **PowerPoint**: Hover over any shape and click **`+`**, or click **`+`** on slide corner
 
-### 3. Enable AI Agent Tools
+### 3. Edit Markdown Inline
+- Select **Edit** in the Markdown review toolbar to edit the rendered document in the same third pane.
+- The active block reveals its Markdown syntax and changes are highlighted against the document state captured when Edit mode opened.
+- Review comment anchors are excluded from the editor and its diff, then preserved in the underlying Markdown file as edits are applied.
+- Select **Back to Review** to restore comments, gutter buttons, and review actions without changing tabs.
+
+### 4. Enable AI Agent Tools
 In **Copilot Agent Mode**, click **Tools** and enable the Document Review tools (prefixed with `#`). Then ask:
 > *"Review this document and respond to all open comments"*
 
-### 4. Send or Copy a Review Prompt
+### 5. Send or Copy a Review Prompt
 - **VS Code**: Select **Ask Copilot** to open the generated review prompt directly in Copilot Chat, or **Copy Prompt** to copy it.
 - **Cursor and hosts without direct chat integration**: Use **Copy Prompt**, then paste the generated prompt into the agent composer.
 - **Copy Prompt** is available when adding a comment, viewing a comment thread, reviewing a sidebar item, and sending all open comments.
@@ -53,6 +59,13 @@ In **Copilot Agent Mode**, click **Tools** and enable the Document Review tools 
 - **Comment highlighting** — Commented elements are highlighted (yellow for review, green for Word native, blue for PPTX)
 - **Popover details** — Click to see comment, replies, and actions (Reply, Resolve, Edit, Delete, Ask Copilot, Copy Prompt)
 - **Sidebar panel** — Search, filter (All/Open/Resolved/User/Agent), and bulk actions
+
+### Inline Markdown Editing
+- **Rendered editing** — Edit Markdown blocks directly in the existing third-pane document view.
+- **Inline differences** — Added and changed content is highlighted against the snapshot taken when Edit mode begins.
+- **Source-preserving updates** — Edits flow through the VS Code `TextDocument` and participate in normal save, undo, and external-change handling.
+- **Anchor-free projection** — Internal `<!--@c...-->` review anchors never appear in Edit mode or its diff. They are reinserted into the source as clean-text offsets move.
+- **Focused controls** — Review mode contains comments and agent actions; Edit mode hides those controls and provides a single **Back to Review** action.
 
 ### Prompt Actions
 - **Ask Copilot** — Available in VS Code when direct chat integration is supported. It sends the complete format-specific prompt to Copilot Chat.
@@ -128,6 +141,8 @@ The plugin intentionally has no inline MCP App. Install the companion VS Code ex
 src/
   extension.ts    — Commands, editor detection, tool/MCP registration
   preview.ts      — Webview panel for all 3 formats
+  markdown-editor-webview.ts — Microsoft Markdown editor bridge for inline editing and diffs
+  anchor-edit.ts  — Anchor-free edit projection and review-anchor preservation
   comment-ui.ts   — Shared comment UI (CSS, JS, prompts) for all formats
   comments.ts     — CommentsManager for JSON sidecar CRUD
   tools.ts        — 12 Copilot tool implementations
@@ -135,6 +150,7 @@ src/
   docx-parser.ts  — Word document parser (OOXML → HTML)
   pptx-parser.ts  — PowerPoint parser (OOXML → slide model)
 media/
+  markdown-editor.js/css — Bundled inline Markdown editor runtime
   pptx-viewer.js  — PPTX renderer (browser-native slide rendering)
   html-to-image.min.js — DOM-to-PNG capture (for slide screenshots)
   mermaid.min.js  — Mermaid diagram renderer
@@ -147,7 +163,7 @@ media/
 ```bash
 npm install
 
-# Bundle both entry points (extension + MCP server)
+# Bundle the Markdown editor, extension, and MCP server
 npm run bundle
 
 # Build and test the standalone Markdown Agent Plugin
@@ -158,11 +174,12 @@ npm run test:agent-plugin
 npx vsce package --no-dependencies --allow-missing-repository
 ```
 
-> ⚠️ Both `src/extension.ts` **and** `src/mcp-server.ts` must be bundled — the MCP server runs as a separate Node process spawned by Cursor and has no access to `node_modules`. `npm run bundle` handles both via the `bundle:extension` and `bundle:mcp` scripts in `package.json`.
+> ⚠️ The Markdown editor, extension, and MCP server must all be bundled. `npm run bundle` runs `bundle:markdown-editor`, `bundle:extension`, and `bundle:mcp`; the MCP server and webviews cannot load repository `node_modules` at runtime.
 
 ### Run tests
 ```bash
 node test/test-comment-ui.js        # Unit tests for shared comment UI
+node test/test-anchor-edit.js       # Anchor-free inline editing and anchor preservation
 node test/test-slide-capture.js     # E2E slide capture (requires Playwright)
 node test/test-scroll-exact.js      # E2E click-to-scroll
 node test/test-mermaid-edge-fix.js  # E2E mermaid rendering via Chrome/Edge headless
@@ -182,6 +199,7 @@ node test/test-mermaid-edge-fix.js  # E2E mermaid rendering via Chrome/Edge head
 
 | Version | Highlights |
 |---------|-----------|
+| **5.3.0** | Add inline rendered Markdown editing with in-pane diffs, Back to Review, and anchor-free source projection |
 | **5.2.6** | Wait for the Agents composer focus transition before inserting Ask Copilot prompts |
 | **5.2.5** | Restore reliable Ask Copilot composer prefill in the Agents window, add clipboard fallback, and expose the review-comments badge as an accessible button |
 | **5.2.4** | Add Markdown Review to Open With and send Ask Copilot prompts through the active Agents conversation |
@@ -208,3 +226,5 @@ node test/test-mermaid-edge-fix.js  # E2E mermaid rendering via Chrome/Edge head
 ## License
 
 [MIT](LICENSE)
+
+Bundled third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

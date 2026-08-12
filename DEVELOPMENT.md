@@ -20,6 +20,9 @@ npm install          # also runs postinstall to patch pptx-renderer
 # Build the VS Code extension
 npm run bundle
 
+# Build only the inline Markdown editor webview
+npm run bundle:markdown-editor
+
 # Build the PowerPoint webview renderer (pptx-viewer.js)
 npm run bundle:pptx-viewer
 
@@ -41,9 +44,12 @@ Copy built files directly to the installed extension for quick testing without V
 # Find your installed extension version
 ls ~/.vscode/extensions/ | grep markdown-review
 
-# Copy extension + pptx viewer bundle
+# Copy extension + webview bundles
 cp out/extension.js ~/.vscode/extensions/jinqishen.markdown-review-<version>/out/extension.js
 cp media/pptx-viewer.js ~/.vscode/extensions/jinqishen.markdown-review-<version>/media/pptx-viewer.js
+cp media/markdown-editor.js ~/.vscode/extensions/jinqishen.markdown-review-<version>/media/markdown-editor.js
+cp media/markdown-editor.css ~/.vscode/extensions/jinqishen.markdown-review-<version>/media/markdown-editor.css
+cp media/codicon-*.ttf ~/.vscode/extensions/jinqishen.markdown-review-<version>/media/
 cp package.json ~/.vscode/extensions/jinqishen.markdown-review-<version>/package.json
 ```
 
@@ -57,6 +63,8 @@ Then reload VS Code: `Ctrl+Shift+P` → "Developer: Reload Window"
 src/
   extension.ts          — VS Code extension entry point, command registration
   preview.ts            — WebviewPanel: markdown, Word, and PowerPoint preview rendering
+  markdown-editor-webview.ts — @vscode/markdown-editor browser entry point
+  anchor-edit.ts        — Clean-text edits mapped back to anchored Markdown
   comments.ts           — CommentsManager: sidecar .comments.json read/write
   tools.ts              — 11 Copilot language model tools (docReview_*)
   mcp-server.ts         — MCP server for Claude Code / Cursor / Windsurf
@@ -68,6 +76,9 @@ src/
   logger.ts             — Output channel logging
 
 media/
+  markdown-editor.js    — Bundled inline Markdown editor runtime
+  markdown-editor.css   — Extracted editor and theme styles
+  codicon-*.ttf         — Editor icon font emitted by esbuild
   pptx-viewer.js        — Bundled @aiden0z/pptx-renderer for webview (IIFE, ~2.8MB)
   mermaid.min.js        — Mermaid.js for diagram rendering
   trim-png-bundled.js   — PNG trimming utility
@@ -134,6 +145,9 @@ node out/mcp-server.js --document-path /path/to/file.md
 - Full rendering with remark/rehype pipeline
 - KaTeX math, Mermaid diagrams, GFM tables
 - Inline comment anchors (`<!--@cID-->`)
+- Rendered Edit mode powered by the pinned `@vscode/markdown-editor` package
+- Edit-session baseline differences with comment anchors excluded from both sides
+- Clean-text edits are applied through `WorkspaceEdit` and anchors are reinserted at mapped offsets
 
 ### Word (.docx)
 - JSZip + xmldom parsing
@@ -152,6 +166,9 @@ node out/mcp-server.js --document-path /path/to/file.md
 ```bash
 # Agent Plugin: type-check and staged stdio MCP integration tests
 npm run test:agent-plugin
+
+# Inline editor anchor projection
+node test/test-anchor-edit.js
 
 # Run parser tests
 node test/test-threading.js        # Word comment threading

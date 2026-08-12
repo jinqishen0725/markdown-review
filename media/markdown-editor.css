@@ -1,0 +1,3083 @@
+/* node_modules/@vscode/codicons/dist/codicon.css */
+@font-face {
+  font-family: "codicon";
+  font-display: block;
+  src: url("./codicon-B3TTTKGI.ttf?721d4c0a96379d0c13d3d5596893c348") format("truetype");
+}
+.codicon[class*=codicon-] {
+  font: normal normal normal 16px/1 codicon;
+  display: inline-block;
+  text-decoration: none;
+  text-rendering: auto;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+@keyframes codicon-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.codicon-sync.codicon-modifier-spin,
+.codicon-loading.codicon-modifier-spin,
+.codicon-gear.codicon-modifier-spin {
+  animation: codicon-spin 1.5s steps(30) infinite;
+}
+.codicon-modifier-disabled {
+  opacity: 0.5;
+}
+.codicon-modifier-hidden {
+  opacity: 0;
+}
+.codicon-loading {
+  animation-duration: 1s !important;
+  animation-timing-function: cubic-bezier(0.53, 0.21, 0.29, 0.67) !important;
+}
+.codicon-add:before {
+  content: "\ea60";
+}
+.codicon-plus:before {
+  content: "\ea60";
+}
+.codicon-gist-new:before {
+  content: "\ea60";
+}
+.codicon-repo-create:before {
+  content: "\ea60";
+}
+.codicon-lightbulb:before {
+  content: "\ea61";
+}
+.codicon-light-bulb:before {
+  content: "\ea61";
+}
+.codicon-repo:before {
+  content: "\ea62";
+}
+.codicon-repo-delete:before {
+  content: "\ea62";
+}
+.codicon-gist-fork:before {
+  content: "\ea63";
+}
+.codicon-repo-forked:before {
+  content: "\ea63";
+}
+.codicon-git-pull-request:before {
+  content: "\ea64";
+}
+.codicon-git-pull-request-abandoned:before {
+  content: "\ea64";
+}
+.codicon-record-keys:before {
+  content: "\ea65";
+}
+.codicon-keyboard:before {
+  content: "\ea65";
+}
+.codicon-tag:before {
+  content: "\ea66";
+}
+.codicon-git-pull-request-label:before {
+  content: "\ea66";
+}
+.codicon-tag-add:before {
+  content: "\ea66";
+}
+.codicon-tag-remove:before {
+  content: "\ea66";
+}
+.codicon-person:before {
+  content: "\ea67";
+}
+.codicon-person-follow:before {
+  content: "\ea67";
+}
+.codicon-person-outline:before {
+  content: "\ea67";
+}
+.codicon-person-filled:before {
+  content: "\ea67";
+}
+.codicon-source-control:before {
+  content: "\ea68";
+}
+.codicon-mirror:before {
+  content: "\ea69";
+}
+.codicon-mirror-public:before {
+  content: "\ea69";
+}
+.codicon-star:before {
+  content: "\ea6a";
+}
+.codicon-star-add:before {
+  content: "\ea6a";
+}
+.codicon-star-delete:before {
+  content: "\ea6a";
+}
+.codicon-star-empty:before {
+  content: "\ea6a";
+}
+.codicon-comment:before {
+  content: "\ea6b";
+}
+.codicon-comment-add:before {
+  content: "\ea6b";
+}
+.codicon-alert:before {
+  content: "\ea6c";
+}
+.codicon-warning:before {
+  content: "\ea6c";
+}
+.codicon-search:before {
+  content: "\ea6d";
+}
+.codicon-search-save:before {
+  content: "\ea6d";
+}
+.codicon-log-out:before {
+  content: "\ea6e";
+}
+.codicon-sign-out:before {
+  content: "\ea6e";
+}
+.codicon-log-in:before {
+  content: "\ea6f";
+}
+.codicon-sign-in:before {
+  content: "\ea6f";
+}
+.codicon-eye:before {
+  content: "\ea70";
+}
+.codicon-eye-unwatch:before {
+  content: "\ea70";
+}
+.codicon-eye-watch:before {
+  content: "\ea70";
+}
+.codicon-circle-filled:before {
+  content: "\ea71";
+}
+.codicon-primitive-dot:before {
+  content: "\ea71";
+}
+.codicon-close-dirty:before {
+  content: "\ea71";
+}
+.codicon-debug-breakpoint:before {
+  content: "\ea71";
+}
+.codicon-debug-breakpoint-disabled:before {
+  content: "\ea71";
+}
+.codicon-debug-hint:before {
+  content: "\ea71";
+}
+.codicon-terminal-decoration-success:before {
+  content: "\ea71";
+}
+.codicon-primitive-square:before {
+  content: "\ea72";
+}
+.codicon-edit:before {
+  content: "\ea73";
+}
+.codicon-pencil:before {
+  content: "\ea73";
+}
+.codicon-info:before {
+  content: "\ea74";
+}
+.codicon-issue-opened:before {
+  content: "\ea74";
+}
+.codicon-gist-private:before {
+  content: "\ea75";
+}
+.codicon-git-fork-private:before {
+  content: "\ea75";
+}
+.codicon-lock:before {
+  content: "\ea75";
+}
+.codicon-mirror-private:before {
+  content: "\ea75";
+}
+.codicon-close:before {
+  content: "\ea76";
+}
+.codicon-remove-close:before {
+  content: "\ea76";
+}
+.codicon-x:before {
+  content: "\ea76";
+}
+.codicon-repo-sync:before {
+  content: "\ea77";
+}
+.codicon-sync:before {
+  content: "\ea77";
+}
+.codicon-clone:before {
+  content: "\ea78";
+}
+.codicon-desktop-download:before {
+  content: "\ea78";
+}
+.codicon-beaker:before {
+  content: "\ea79";
+}
+.codicon-microscope:before {
+  content: "\ea79";
+}
+.codicon-vm:before {
+  content: "\ea7a";
+}
+.codicon-device-desktop:before {
+  content: "\ea7a";
+}
+.codicon-file:before {
+  content: "\ea7b";
+}
+.codicon-more:before {
+  content: "\ea7c";
+}
+.codicon-ellipsis:before {
+  content: "\ea7c";
+}
+.codicon-kebab-horizontal:before {
+  content: "\ea7c";
+}
+.codicon-mail-reply:before {
+  content: "\ea7d";
+}
+.codicon-reply:before {
+  content: "\ea7d";
+}
+.codicon-organization:before {
+  content: "\ea7e";
+}
+.codicon-organization-filled:before {
+  content: "\ea7e";
+}
+.codicon-organization-outline:before {
+  content: "\ea7e";
+}
+.codicon-new-file:before {
+  content: "\ea7f";
+}
+.codicon-file-add:before {
+  content: "\ea7f";
+}
+.codicon-new-folder:before {
+  content: "\ea80";
+}
+.codicon-file-directory-create:before {
+  content: "\ea80";
+}
+.codicon-trash:before {
+  content: "\ea81";
+}
+.codicon-trashcan:before {
+  content: "\ea81";
+}
+.codicon-history:before {
+  content: "\ea82";
+}
+.codicon-clock:before {
+  content: "\ea82";
+}
+.codicon-folder:before {
+  content: "\ea83";
+}
+.codicon-file-directory:before {
+  content: "\ea83";
+}
+.codicon-symbol-folder:before {
+  content: "\ea83";
+}
+.codicon-logo-github:before {
+  content: "\ea84";
+}
+.codicon-mark-github:before {
+  content: "\ea84";
+}
+.codicon-github:before {
+  content: "\ea84";
+}
+.codicon-terminal:before {
+  content: "\ea85";
+}
+.codicon-console:before {
+  content: "\ea85";
+}
+.codicon-repl:before {
+  content: "\ea85";
+}
+.codicon-zap:before {
+  content: "\ea86";
+}
+.codicon-symbol-event:before {
+  content: "\ea86";
+}
+.codicon-error:before {
+  content: "\ea87";
+}
+.codicon-stop:before {
+  content: "\ea87";
+}
+.codicon-variable:before {
+  content: "\ea88";
+}
+.codicon-symbol-variable:before {
+  content: "\ea88";
+}
+.codicon-array:before {
+  content: "\ea8a";
+}
+.codicon-symbol-array:before {
+  content: "\ea8a";
+}
+.codicon-symbol-module:before {
+  content: "\ea8b";
+}
+.codicon-symbol-package:before {
+  content: "\ea8b";
+}
+.codicon-symbol-namespace:before {
+  content: "\ea8b";
+}
+.codicon-symbol-object:before {
+  content: "\ea8b";
+}
+.codicon-symbol-method:before {
+  content: "\ea8c";
+}
+.codicon-symbol-function:before {
+  content: "\ea8c";
+}
+.codicon-symbol-constructor:before {
+  content: "\ea8c";
+}
+.codicon-symbol-boolean:before {
+  content: "\ea8f";
+}
+.codicon-symbol-null:before {
+  content: "\ea8f";
+}
+.codicon-symbol-numeric:before {
+  content: "\ea90";
+}
+.codicon-symbol-number:before {
+  content: "\ea90";
+}
+.codicon-symbol-structure:before {
+  content: "\ea91";
+}
+.codicon-symbol-struct:before {
+  content: "\ea91";
+}
+.codicon-symbol-parameter:before {
+  content: "\ea92";
+}
+.codicon-symbol-type-parameter:before {
+  content: "\ea92";
+}
+.codicon-symbol-key:before {
+  content: "\ea93";
+}
+.codicon-symbol-text:before {
+  content: "\ea93";
+}
+.codicon-symbol-reference:before {
+  content: "\ea94";
+}
+.codicon-go-to-file:before {
+  content: "\ea94";
+}
+.codicon-symbol-enum:before {
+  content: "\ea95";
+}
+.codicon-symbol-value:before {
+  content: "\ea95";
+}
+.codicon-symbol-ruler:before {
+  content: "\ea96";
+}
+.codicon-symbol-unit:before {
+  content: "\ea96";
+}
+.codicon-activate-breakpoints:before {
+  content: "\ea97";
+}
+.codicon-archive:before {
+  content: "\ea98";
+}
+.codicon-arrow-both:before {
+  content: "\ea99";
+}
+.codicon-arrow-down:before {
+  content: "\ea9a";
+}
+.codicon-arrow-left:before {
+  content: "\ea9b";
+}
+.codicon-arrow-right:before {
+  content: "\ea9c";
+}
+.codicon-arrow-small-down:before {
+  content: "\ea9d";
+}
+.codicon-arrow-small-left:before {
+  content: "\ea9e";
+}
+.codicon-arrow-small-right:before {
+  content: "\ea9f";
+}
+.codicon-arrow-small-up:before {
+  content: "\eaa0";
+}
+.codicon-arrow-up:before {
+  content: "\eaa1";
+}
+.codicon-bell:before {
+  content: "\eaa2";
+}
+.codicon-bold:before {
+  content: "\eaa3";
+}
+.codicon-book:before {
+  content: "\eaa4";
+}
+.codicon-bookmark:before {
+  content: "\eaa5";
+}
+.codicon-debug-breakpoint-conditional-unverified:before {
+  content: "\eaa6";
+}
+.codicon-debug-breakpoint-conditional:before {
+  content: "\eaa7";
+}
+.codicon-debug-breakpoint-conditional-disabled:before {
+  content: "\eaa7";
+}
+.codicon-debug-breakpoint-data-unverified:before {
+  content: "\eaa8";
+}
+.codicon-debug-breakpoint-data:before {
+  content: "\eaa9";
+}
+.codicon-debug-breakpoint-data-disabled:before {
+  content: "\eaa9";
+}
+.codicon-debug-breakpoint-log-unverified:before {
+  content: "\eaaa";
+}
+.codicon-debug-breakpoint-log:before {
+  content: "\eaab";
+}
+.codicon-debug-breakpoint-log-disabled:before {
+  content: "\eaab";
+}
+.codicon-briefcase:before {
+  content: "\eaac";
+}
+.codicon-broadcast:before {
+  content: "\eaad";
+}
+.codicon-browser:before {
+  content: "\eaae";
+}
+.codicon-bug:before {
+  content: "\eaaf";
+}
+.codicon-calendar:before {
+  content: "\eab0";
+}
+.codicon-case-sensitive:before {
+  content: "\eab1";
+}
+.codicon-check:before {
+  content: "\eab2";
+}
+.codicon-checklist:before {
+  content: "\eab3";
+}
+.codicon-chevron-down:before {
+  content: "\eab4";
+}
+.codicon-chevron-left:before {
+  content: "\eab5";
+}
+.codicon-chevron-right:before {
+  content: "\eab6";
+}
+.codicon-chevron-up:before {
+  content: "\eab7";
+}
+.codicon-chrome-close:before {
+  content: "\eab8";
+}
+.codicon-chrome-maximize:before {
+  content: "\eab9";
+}
+.codicon-chrome-minimize:before {
+  content: "\eaba";
+}
+.codicon-chrome-restore:before {
+  content: "\eabb";
+}
+.codicon-circle-outline:before {
+  content: "\eabc";
+}
+.codicon-circle:before {
+  content: "\eabc";
+}
+.codicon-debug-breakpoint-unverified:before {
+  content: "\eabc";
+}
+.codicon-terminal-decoration-incomplete:before {
+  content: "\eabc";
+}
+.codicon-circle-slash:before {
+  content: "\eabd";
+}
+.codicon-circuit-board:before {
+  content: "\eabe";
+}
+.codicon-clear-all:before {
+  content: "\eabf";
+}
+.codicon-clippy:before {
+  content: "\eac0";
+}
+.codicon-close-all:before {
+  content: "\eac1";
+}
+.codicon-cloud-download:before {
+  content: "\eac2";
+}
+.codicon-cloud-upload:before {
+  content: "\eac3";
+}
+.codicon-code:before {
+  content: "\eac4";
+}
+.codicon-collapse-all:before {
+  content: "\eac5";
+}
+.codicon-color-mode:before {
+  content: "\eac6";
+}
+.codicon-comment-discussion:before {
+  content: "\eac7";
+}
+.codicon-credit-card:before {
+  content: "\eac9";
+}
+.codicon-dash:before {
+  content: "\eacc";
+}
+.codicon-dashboard:before {
+  content: "\eacd";
+}
+.codicon-database:before {
+  content: "\eace";
+}
+.codicon-debug-continue:before {
+  content: "\eacf";
+}
+.codicon-debug-disconnect:before {
+  content: "\ead0";
+}
+.codicon-debug-pause:before {
+  content: "\ead1";
+}
+.codicon-debug-restart:before {
+  content: "\ead2";
+}
+.codicon-debug-start:before {
+  content: "\ead3";
+}
+.codicon-debug-step-into:before {
+  content: "\ead4";
+}
+.codicon-debug-step-out:before {
+  content: "\ead5";
+}
+.codicon-debug-step-over:before {
+  content: "\ead6";
+}
+.codicon-debug-stop:before {
+  content: "\ead7";
+}
+.codicon-debug:before {
+  content: "\ead8";
+}
+.codicon-device-camera-video:before {
+  content: "\ead9";
+}
+.codicon-device-camera:before {
+  content: "\eada";
+}
+.codicon-device-mobile:before {
+  content: "\eadb";
+}
+.codicon-diff-added:before {
+  content: "\eadc";
+}
+.codicon-diff-ignored:before {
+  content: "\eadd";
+}
+.codicon-diff-modified:before {
+  content: "\eade";
+}
+.codicon-diff-removed:before {
+  content: "\eadf";
+}
+.codicon-diff-renamed:before {
+  content: "\eae0";
+}
+.codicon-diff:before {
+  content: "\eae1";
+}
+.codicon-diff-sidebyside:before {
+  content: "\eae1";
+}
+.codicon-discard:before {
+  content: "\eae2";
+}
+.codicon-editor-layout:before {
+  content: "\eae3";
+}
+.codicon-empty-window:before {
+  content: "\eae4";
+}
+.codicon-exclude:before {
+  content: "\eae5";
+}
+.codicon-extensions:before {
+  content: "\eae6";
+}
+.codicon-eye-closed:before {
+  content: "\eae7";
+}
+.codicon-file-binary:before {
+  content: "\eae8";
+}
+.codicon-file-code:before {
+  content: "\eae9";
+}
+.codicon-file-media:before {
+  content: "\eaea";
+}
+.codicon-file-pdf:before {
+  content: "\eaeb";
+}
+.codicon-file-submodule:before {
+  content: "\eaec";
+}
+.codicon-file-symlink-directory:before {
+  content: "\eaed";
+}
+.codicon-file-symlink-file:before {
+  content: "\eaee";
+}
+.codicon-file-zip:before {
+  content: "\eaef";
+}
+.codicon-files:before {
+  content: "\eaf0";
+}
+.codicon-filter:before {
+  content: "\eaf1";
+}
+.codicon-flame:before {
+  content: "\eaf2";
+}
+.codicon-fold-down:before {
+  content: "\eaf3";
+}
+.codicon-fold-up:before {
+  content: "\eaf4";
+}
+.codicon-fold:before {
+  content: "\eaf5";
+}
+.codicon-folder-active:before {
+  content: "\eaf6";
+}
+.codicon-folder-opened:before {
+  content: "\eaf7";
+}
+.codicon-gear:before {
+  content: "\eaf8";
+}
+.codicon-gift:before {
+  content: "\eaf9";
+}
+.codicon-gist-secret:before {
+  content: "\eafa";
+}
+.codicon-gist:before {
+  content: "\eafb";
+}
+.codicon-git-commit:before {
+  content: "\eafc";
+}
+.codicon-git-compare:before {
+  content: "\eafd";
+}
+.codicon-compare-changes:before {
+  content: "\eafd";
+}
+.codicon-git-merge:before {
+  content: "\eafe";
+}
+.codicon-github-action:before {
+  content: "\eaff";
+}
+.codicon-github-alt:before {
+  content: "\eb00";
+}
+.codicon-globe:before {
+  content: "\eb01";
+}
+.codicon-grabber:before {
+  content: "\eb02";
+}
+.codicon-graph:before {
+  content: "\eb03";
+}
+.codicon-gripper:before {
+  content: "\eb04";
+}
+.codicon-heart:before {
+  content: "\eb05";
+}
+.codicon-home:before {
+  content: "\eb06";
+}
+.codicon-horizontal-rule:before {
+  content: "\eb07";
+}
+.codicon-hubot:before {
+  content: "\eb08";
+}
+.codicon-inbox:before {
+  content: "\eb09";
+}
+.codicon-issue-reopened:before {
+  content: "\eb0b";
+}
+.codicon-issues:before {
+  content: "\eb0c";
+}
+.codicon-italic:before {
+  content: "\eb0d";
+}
+.codicon-jersey:before {
+  content: "\eb0e";
+}
+.codicon-json:before {
+  content: "\eb0f";
+}
+.codicon-bracket:before {
+  content: "\eb0f";
+}
+.codicon-kebab-vertical:before {
+  content: "\eb10";
+}
+.codicon-key:before {
+  content: "\eb11";
+}
+.codicon-law:before {
+  content: "\eb12";
+}
+.codicon-lightbulb-autofix:before {
+  content: "\eb13";
+}
+.codicon-link-external:before {
+  content: "\eb14";
+}
+.codicon-link:before {
+  content: "\eb15";
+}
+.codicon-list-ordered:before {
+  content: "\eb16";
+}
+.codicon-list-unordered:before {
+  content: "\eb17";
+}
+.codicon-live-share:before {
+  content: "\eb18";
+}
+.codicon-loading:before {
+  content: "\eb19";
+}
+.codicon-location:before {
+  content: "\eb1a";
+}
+.codicon-mail-read:before {
+  content: "\eb1b";
+}
+.codicon-mail:before {
+  content: "\eb1c";
+}
+.codicon-markdown:before {
+  content: "\eb1d";
+}
+.codicon-megaphone:before {
+  content: "\eb1e";
+}
+.codicon-mention:before {
+  content: "\eb1f";
+}
+.codicon-milestone:before {
+  content: "\eb20";
+}
+.codicon-git-pull-request-milestone:before {
+  content: "\eb20";
+}
+.codicon-mortar-board:before {
+  content: "\eb21";
+}
+.codicon-move:before {
+  content: "\eb22";
+}
+.codicon-multiple-windows:before {
+  content: "\eb23";
+}
+.codicon-mute:before {
+  content: "\eb24";
+}
+.codicon-no-newline:before {
+  content: "\eb25";
+}
+.codicon-note:before {
+  content: "\eb26";
+}
+.codicon-octoface:before {
+  content: "\eb27";
+}
+.codicon-open-preview:before {
+  content: "\eb28";
+}
+.codicon-package:before {
+  content: "\eb29";
+}
+.codicon-paintcan:before {
+  content: "\eb2a";
+}
+.codicon-pin:before {
+  content: "\eb2b";
+}
+.codicon-play:before {
+  content: "\eb2c";
+}
+.codicon-run:before {
+  content: "\eb2c";
+}
+.codicon-plug:before {
+  content: "\eb2d";
+}
+.codicon-preserve-case:before {
+  content: "\eb2e";
+}
+.codicon-preview:before {
+  content: "\eb2f";
+}
+.codicon-project:before {
+  content: "\eb30";
+}
+.codicon-pulse:before {
+  content: "\eb31";
+}
+.codicon-question:before {
+  content: "\eb32";
+}
+.codicon-quote:before {
+  content: "\eb33";
+}
+.codicon-radio-tower:before {
+  content: "\eb34";
+}
+.codicon-reactions:before {
+  content: "\eb35";
+}
+.codicon-references:before {
+  content: "\eb36";
+}
+.codicon-refresh:before {
+  content: "\eb37";
+}
+.codicon-regex:before {
+  content: "\eb38";
+}
+.codicon-remote-explorer:before {
+  content: "\eb39";
+}
+.codicon-remote:before {
+  content: "\eb3a";
+}
+.codicon-remove:before {
+  content: "\eb3b";
+}
+.codicon-replace-all:before {
+  content: "\eb3c";
+}
+.codicon-replace:before {
+  content: "\eb3d";
+}
+.codicon-repo-clone:before {
+  content: "\eb3e";
+}
+.codicon-repo-force-push:before {
+  content: "\eb3f";
+}
+.codicon-repo-pull:before {
+  content: "\eb40";
+}
+.codicon-repo-push:before {
+  content: "\eb41";
+}
+.codicon-report:before {
+  content: "\eb42";
+}
+.codicon-request-changes:before {
+  content: "\eb43";
+}
+.codicon-rocket:before {
+  content: "\eb44";
+}
+.codicon-root-folder-opened:before {
+  content: "\eb45";
+}
+.codicon-root-folder:before {
+  content: "\eb46";
+}
+.codicon-rss:before {
+  content: "\eb47";
+}
+.codicon-ruby:before {
+  content: "\eb48";
+}
+.codicon-save-all:before {
+  content: "\eb49";
+}
+.codicon-save-as:before {
+  content: "\eb4a";
+}
+.codicon-save:before {
+  content: "\eb4b";
+}
+.codicon-screen-full:before {
+  content: "\eb4c";
+}
+.codicon-screen-normal:before {
+  content: "\eb4d";
+}
+.codicon-search-stop:before {
+  content: "\eb4e";
+}
+.codicon-server:before {
+  content: "\eb50";
+}
+.codicon-settings-gear:before {
+  content: "\eb51";
+}
+.codicon-settings:before {
+  content: "\eb52";
+}
+.codicon-shield:before {
+  content: "\eb53";
+}
+.codicon-smiley:before {
+  content: "\eb54";
+}
+.codicon-sort-precedence:before {
+  content: "\eb55";
+}
+.codicon-split-horizontal:before {
+  content: "\eb56";
+}
+.codicon-split-vertical:before {
+  content: "\eb57";
+}
+.codicon-squirrel:before {
+  content: "\eb58";
+}
+.codicon-star-full:before {
+  content: "\eb59";
+}
+.codicon-star-half:before {
+  content: "\eb5a";
+}
+.codicon-symbol-class:before {
+  content: "\eb5b";
+}
+.codicon-symbol-color:before {
+  content: "\eb5c";
+}
+.codicon-symbol-constant:before {
+  content: "\eb5d";
+}
+.codicon-symbol-enum-member:before {
+  content: "\eb5e";
+}
+.codicon-symbol-field:before {
+  content: "\eb5f";
+}
+.codicon-symbol-file:before {
+  content: "\eb60";
+}
+.codicon-symbol-interface:before {
+  content: "\eb61";
+}
+.codicon-symbol-keyword:before {
+  content: "\eb62";
+}
+.codicon-symbol-misc:before {
+  content: "\eb63";
+}
+.codicon-symbol-operator:before {
+  content: "\eb64";
+}
+.codicon-symbol-property:before {
+  content: "\eb65";
+}
+.codicon-wrench:before {
+  content: "\eb65";
+}
+.codicon-wrench-subaction:before {
+  content: "\eb65";
+}
+.codicon-symbol-snippet:before {
+  content: "\eb66";
+}
+.codicon-tasklist:before {
+  content: "\eb67";
+}
+.codicon-telescope:before {
+  content: "\eb68";
+}
+.codicon-text-size:before {
+  content: "\eb69";
+}
+.codicon-three-bars:before {
+  content: "\eb6a";
+}
+.codicon-thumbsdown:before {
+  content: "\eb6b";
+}
+.codicon-thumbsup:before {
+  content: "\eb6c";
+}
+.codicon-tools:before {
+  content: "\eb6d";
+}
+.codicon-triangle-down:before {
+  content: "\eb6e";
+}
+.codicon-triangle-left:before {
+  content: "\eb6f";
+}
+.codicon-triangle-right:before {
+  content: "\eb70";
+}
+.codicon-triangle-up:before {
+  content: "\eb71";
+}
+.codicon-twitter:before {
+  content: "\eb72";
+}
+.codicon-unfold:before {
+  content: "\eb73";
+}
+.codicon-unlock:before {
+  content: "\eb74";
+}
+.codicon-unmute:before {
+  content: "\eb75";
+}
+.codicon-unverified:before {
+  content: "\eb76";
+}
+.codicon-verified:before {
+  content: "\eb77";
+}
+.codicon-versions:before {
+  content: "\eb78";
+}
+.codicon-vm-active:before {
+  content: "\eb79";
+}
+.codicon-vm-outline:before {
+  content: "\eb7a";
+}
+.codicon-vm-running:before {
+  content: "\eb7b";
+}
+.codicon-watch:before {
+  content: "\eb7c";
+}
+.codicon-whitespace:before {
+  content: "\eb7d";
+}
+.codicon-whole-word:before {
+  content: "\eb7e";
+}
+.codicon-window:before {
+  content: "\eb7f";
+}
+.codicon-word-wrap:before {
+  content: "\eb80";
+}
+.codicon-zoom-in:before {
+  content: "\eb81";
+}
+.codicon-zoom-out:before {
+  content: "\eb82";
+}
+.codicon-list-filter:before {
+  content: "\eb83";
+}
+.codicon-list-flat:before {
+  content: "\eb84";
+}
+.codicon-list-selection:before {
+  content: "\eb85";
+}
+.codicon-selection:before {
+  content: "\eb85";
+}
+.codicon-list-tree:before {
+  content: "\eb86";
+}
+.codicon-debug-breakpoint-function-unverified:before {
+  content: "\eb87";
+}
+.codicon-debug-breakpoint-function:before {
+  content: "\eb88";
+}
+.codicon-debug-breakpoint-function-disabled:before {
+  content: "\eb88";
+}
+.codicon-debug-stackframe-active:before {
+  content: "\eb89";
+}
+.codicon-circle-small-filled:before {
+  content: "\eb8a";
+}
+.codicon-debug-stackframe-dot:before {
+  content: "\eb8a";
+}
+.codicon-terminal-decoration-mark:before {
+  content: "\eb8a";
+}
+.codicon-debug-stackframe:before {
+  content: "\eb8b";
+}
+.codicon-debug-stackframe-focused:before {
+  content: "\eb8b";
+}
+.codicon-debug-breakpoint-unsupported:before {
+  content: "\eb8c";
+}
+.codicon-symbol-string:before {
+  content: "\eb8d";
+}
+.codicon-debug-reverse-continue:before {
+  content: "\eb8e";
+}
+.codicon-debug-step-back:before {
+  content: "\eb8f";
+}
+.codicon-debug-restart-frame:before {
+  content: "\eb90";
+}
+.codicon-debug-alt:before {
+  content: "\eb91";
+}
+.codicon-call-incoming:before {
+  content: "\eb92";
+}
+.codicon-call-outgoing:before {
+  content: "\eb93";
+}
+.codicon-menu:before {
+  content: "\eb94";
+}
+.codicon-expand-all:before {
+  content: "\eb95";
+}
+.codicon-feedback:before {
+  content: "\eb96";
+}
+.codicon-git-pull-request-reviewer:before {
+  content: "\eb96";
+}
+.codicon-group-by-ref-type:before {
+  content: "\eb97";
+}
+.codicon-ungroup-by-ref-type:before {
+  content: "\eb98";
+}
+.codicon-account:before {
+  content: "\eb99";
+}
+.codicon-git-pull-request-assignee:before {
+  content: "\eb99";
+}
+.codicon-bell-dot:before {
+  content: "\eb9a";
+}
+.codicon-debug-console:before {
+  content: "\eb9b";
+}
+.codicon-library:before {
+  content: "\eb9c";
+}
+.codicon-output:before {
+  content: "\eb9d";
+}
+.codicon-run-all:before {
+  content: "\eb9e";
+}
+.codicon-sync-ignored:before {
+  content: "\eb9f";
+}
+.codicon-pinned:before {
+  content: "\eba0";
+}
+.codicon-github-inverted:before {
+  content: "\eba1";
+}
+.codicon-server-process:before {
+  content: "\eba2";
+}
+.codicon-server-environment:before {
+  content: "\eba3";
+}
+.codicon-pass:before {
+  content: "\eba4";
+}
+.codicon-issue-closed:before {
+  content: "\eba4";
+}
+.codicon-stop-circle:before {
+  content: "\eba5";
+}
+.codicon-play-circle:before {
+  content: "\eba6";
+}
+.codicon-record:before {
+  content: "\eba7";
+}
+.codicon-debug-alt-small:before {
+  content: "\eba8";
+}
+.codicon-vm-connect:before {
+  content: "\eba9";
+}
+.codicon-cloud:before {
+  content: "\ebaa";
+}
+.codicon-merge:before {
+  content: "\ebab";
+}
+.codicon-export:before {
+  content: "\ebac";
+}
+.codicon-graph-left:before {
+  content: "\ebad";
+}
+.codicon-magnet:before {
+  content: "\ebae";
+}
+.codicon-notebook:before {
+  content: "\ebaf";
+}
+.codicon-redo:before {
+  content: "\ebb0";
+}
+.codicon-check-all:before {
+  content: "\ebb1";
+}
+.codicon-pinned-dirty:before {
+  content: "\ebb2";
+}
+.codicon-pass-filled:before {
+  content: "\ebb3";
+}
+.codicon-circle-large-filled:before {
+  content: "\ebb4";
+}
+.codicon-circle-large:before {
+  content: "\ebb5";
+}
+.codicon-circle-large-outline:before {
+  content: "\ebb5";
+}
+.codicon-combine:before {
+  content: "\ebb6";
+}
+.codicon-gather:before {
+  content: "\ebb6";
+}
+.codicon-table:before {
+  content: "\ebb7";
+}
+.codicon-variable-group:before {
+  content: "\ebb8";
+}
+.codicon-type-hierarchy:before {
+  content: "\ebb9";
+}
+.codicon-type-hierarchy-sub:before {
+  content: "\ebba";
+}
+.codicon-type-hierarchy-super:before {
+  content: "\ebbb";
+}
+.codicon-git-pull-request-create:before {
+  content: "\ebbc";
+}
+.codicon-run-above:before {
+  content: "\ebbd";
+}
+.codicon-run-below:before {
+  content: "\ebbe";
+}
+.codicon-notebook-template:before {
+  content: "\ebbf";
+}
+.codicon-debug-rerun:before {
+  content: "\ebc0";
+}
+.codicon-workspace-trusted:before {
+  content: "\ebc1";
+}
+.codicon-workspace-untrusted:before {
+  content: "\ebc2";
+}
+.codicon-workspace-unknown:before {
+  content: "\ebc3";
+}
+.codicon-terminal-cmd:before {
+  content: "\ebc4";
+}
+.codicon-terminal-debian:before {
+  content: "\ebc5";
+}
+.codicon-terminal-linux:before {
+  content: "\ebc6";
+}
+.codicon-terminal-powershell:before {
+  content: "\ebc7";
+}
+.codicon-terminal-tmux:before {
+  content: "\ebc8";
+}
+.codicon-terminal-ubuntu:before {
+  content: "\ebc9";
+}
+.codicon-terminal-bash:before {
+  content: "\ebca";
+}
+.codicon-arrow-swap:before {
+  content: "\ebcb";
+}
+.codicon-copy:before {
+  content: "\ebcc";
+}
+.codicon-person-add:before {
+  content: "\ebcd";
+}
+.codicon-filter-filled:before {
+  content: "\ebce";
+}
+.codicon-wand:before {
+  content: "\ebcf";
+}
+.codicon-debug-line-by-line:before {
+  content: "\ebd0";
+}
+.codicon-inspect:before {
+  content: "\ebd1";
+}
+.codicon-layers:before {
+  content: "\ebd2";
+}
+.codicon-layers-dot:before {
+  content: "\ebd3";
+}
+.codicon-layers-active:before {
+  content: "\ebd4";
+}
+.codicon-compass:before {
+  content: "\ebd5";
+}
+.codicon-compass-dot:before {
+  content: "\ebd6";
+}
+.codicon-compass-active:before {
+  content: "\ebd7";
+}
+.codicon-azure:before {
+  content: "\ebd8";
+}
+.codicon-issue-draft:before {
+  content: "\ebd9";
+}
+.codicon-git-pull-request-closed:before {
+  content: "\ebda";
+}
+.codicon-git-pull-request-draft:before {
+  content: "\ebdb";
+}
+.codicon-debug-all:before {
+  content: "\ebdc";
+}
+.codicon-debug-coverage:before {
+  content: "\ebdd";
+}
+.codicon-run-errors:before {
+  content: "\ebde";
+}
+.codicon-folder-library:before {
+  content: "\ebdf";
+}
+.codicon-debug-continue-small:before {
+  content: "\ebe0";
+}
+.codicon-beaker-stop:before {
+  content: "\ebe1";
+}
+.codicon-graph-line:before {
+  content: "\ebe2";
+}
+.codicon-graph-scatter:before {
+  content: "\ebe3";
+}
+.codicon-pie-chart:before {
+  content: "\ebe4";
+}
+.codicon-bracket-dot:before {
+  content: "\ebe5";
+}
+.codicon-bracket-error:before {
+  content: "\ebe6";
+}
+.codicon-lock-small:before {
+  content: "\ebe7";
+}
+.codicon-azure-devops:before {
+  content: "\ebe8";
+}
+.codicon-verified-filled:before {
+  content: "\ebe9";
+}
+.codicon-newline:before {
+  content: "\ebea";
+}
+.codicon-layout:before {
+  content: "\ebeb";
+}
+.codicon-layout-activitybar-left:before {
+  content: "\ebec";
+}
+.codicon-layout-activitybar-right:before {
+  content: "\ebed";
+}
+.codicon-layout-panel-left:before {
+  content: "\ebee";
+}
+.codicon-layout-panel-center:before {
+  content: "\ebef";
+}
+.codicon-layout-panel-justify:before {
+  content: "\ebf0";
+}
+.codicon-layout-panel-right:before {
+  content: "\ebf1";
+}
+.codicon-layout-panel:before {
+  content: "\ebf2";
+}
+.codicon-layout-sidebar-left:before {
+  content: "\ebf3";
+}
+.codicon-layout-sidebar-right:before {
+  content: "\ebf4";
+}
+.codicon-layout-statusbar:before {
+  content: "\ebf5";
+}
+.codicon-layout-menubar:before {
+  content: "\ebf6";
+}
+.codicon-layout-centered:before {
+  content: "\ebf7";
+}
+.codicon-target:before {
+  content: "\ebf8";
+}
+.codicon-indent:before {
+  content: "\ebf9";
+}
+.codicon-record-small:before {
+  content: "\ebfa";
+}
+.codicon-error-small:before {
+  content: "\ebfb";
+}
+.codicon-terminal-decoration-error:before {
+  content: "\ebfb";
+}
+.codicon-arrow-circle-down:before {
+  content: "\ebfc";
+}
+.codicon-arrow-circle-left:before {
+  content: "\ebfd";
+}
+.codicon-arrow-circle-right:before {
+  content: "\ebfe";
+}
+.codicon-arrow-circle-up:before {
+  content: "\ebff";
+}
+.codicon-layout-sidebar-right-off:before {
+  content: "\ec00";
+}
+.codicon-layout-panel-off:before {
+  content: "\ec01";
+}
+.codicon-layout-sidebar-left-off:before {
+  content: "\ec02";
+}
+.codicon-blank:before {
+  content: "\ec03";
+}
+.codicon-heart-filled:before {
+  content: "\ec04";
+}
+.codicon-map:before {
+  content: "\ec05";
+}
+.codicon-map-horizontal:before {
+  content: "\ec05";
+}
+.codicon-fold-horizontal:before {
+  content: "\ec05";
+}
+.codicon-map-filled:before {
+  content: "\ec06";
+}
+.codicon-map-horizontal-filled:before {
+  content: "\ec06";
+}
+.codicon-fold-horizontal-filled:before {
+  content: "\ec06";
+}
+.codicon-circle-small:before {
+  content: "\ec07";
+}
+.codicon-bell-slash:before {
+  content: "\ec08";
+}
+.codicon-bell-slash-dot:before {
+  content: "\ec09";
+}
+.codicon-comment-unresolved:before {
+  content: "\ec0a";
+}
+.codicon-git-pull-request-go-to-changes:before {
+  content: "\ec0b";
+}
+.codicon-git-pull-request-new-changes:before {
+  content: "\ec0c";
+}
+.codicon-search-fuzzy:before {
+  content: "\ec0d";
+}
+.codicon-comment-draft:before {
+  content: "\ec0e";
+}
+.codicon-send:before {
+  content: "\ec0f";
+}
+.codicon-sparkle:before {
+  content: "\ec10";
+}
+.codicon-insert:before {
+  content: "\ec11";
+}
+.codicon-mic:before {
+  content: "\ec12";
+}
+.codicon-thumbsdown-filled:before {
+  content: "\ec13";
+}
+.codicon-thumbsup-filled:before {
+  content: "\ec14";
+}
+.codicon-coffee:before {
+  content: "\ec15";
+}
+.codicon-snake:before {
+  content: "\ec16";
+}
+.codicon-game:before {
+  content: "\ec17";
+}
+.codicon-vr:before {
+  content: "\ec18";
+}
+.codicon-chip:before {
+  content: "\ec19";
+}
+.codicon-piano:before {
+  content: "\ec1a";
+}
+.codicon-music:before {
+  content: "\ec1b";
+}
+.codicon-mic-filled:before {
+  content: "\ec1c";
+}
+.codicon-repo-fetch:before {
+  content: "\ec1d";
+}
+.codicon-copilot:before {
+  content: "\ec1e";
+}
+.codicon-lightbulb-sparkle:before {
+  content: "\ec1f";
+}
+.codicon-robot:before {
+  content: "\ec20";
+}
+.codicon-sparkle-filled:before {
+  content: "\ec21";
+}
+.codicon-diff-single:before {
+  content: "\ec22";
+}
+.codicon-diff-multiple:before {
+  content: "\ec23";
+}
+.codicon-surround-with:before {
+  content: "\ec24";
+}
+.codicon-share:before {
+  content: "\ec25";
+}
+.codicon-git-stash:before {
+  content: "\ec26";
+}
+.codicon-git-stash-apply:before {
+  content: "\ec27";
+}
+.codicon-git-stash-pop:before {
+  content: "\ec28";
+}
+.codicon-vscode:before {
+  content: "\ec29";
+}
+.codicon-vscode-insiders:before {
+  content: "\ec2a";
+}
+.codicon-code-oss:before {
+  content: "\ec2b";
+}
+.codicon-run-coverage:before {
+  content: "\ec2c";
+}
+.codicon-run-all-coverage:before {
+  content: "\ec2d";
+}
+.codicon-coverage:before {
+  content: "\ec2e";
+}
+.codicon-github-project:before {
+  content: "\ec2f";
+}
+.codicon-map-vertical:before {
+  content: "\ec30";
+}
+.codicon-fold-vertical:before {
+  content: "\ec30";
+}
+.codicon-map-vertical-filled:before {
+  content: "\ec31";
+}
+.codicon-fold-vertical-filled:before {
+  content: "\ec31";
+}
+.codicon-go-to-search:before {
+  content: "\ec32";
+}
+.codicon-percentage:before {
+  content: "\ec33";
+}
+.codicon-sort-percentage:before {
+  content: "\ec33";
+}
+.codicon-attach:before {
+  content: "\ec34";
+}
+.codicon-go-to-editing-session:before {
+  content: "\ec35";
+}
+.codicon-edit-session:before {
+  content: "\ec36";
+}
+.codicon-code-review:before {
+  content: "\ec37";
+}
+.codicon-copilot-warning:before {
+  content: "\ec38";
+}
+.codicon-python:before {
+  content: "\ec39";
+}
+.codicon-copilot-large:before {
+  content: "\ec3a";
+}
+.codicon-copilot-warning-large:before {
+  content: "\ec3b";
+}
+.codicon-keyboard-tab:before {
+  content: "\ec3c";
+}
+.codicon-copilot-blocked:before {
+  content: "\ec3d";
+}
+.codicon-copilot-not-connected:before {
+  content: "\ec3e";
+}
+.codicon-flag:before {
+  content: "\ec3f";
+}
+.codicon-lightbulb-empty:before {
+  content: "\ec40";
+}
+.codicon-symbol-method-arrow:before {
+  content: "\ec41";
+}
+.codicon-copilot-unavailable:before {
+  content: "\ec42";
+}
+.codicon-repo-pinned:before {
+  content: "\ec43";
+}
+.codicon-keyboard-tab-above:before {
+  content: "\ec44";
+}
+.codicon-keyboard-tab-below:before {
+  content: "\ec45";
+}
+.codicon-git-pull-request-done:before {
+  content: "\ec46";
+}
+.codicon-mcp:before {
+  content: "\ec47";
+}
+.codicon-extensions-large:before {
+  content: "\ec48";
+}
+.codicon-layout-panel-dock:before {
+  content: "\ec49";
+}
+.codicon-layout-sidebar-left-dock:before {
+  content: "\ec4a";
+}
+.codicon-layout-sidebar-right-dock:before {
+  content: "\ec4b";
+}
+.codicon-copilot-in-progress:before {
+  content: "\ec4c";
+}
+.codicon-copilot-error:before {
+  content: "\ec4d";
+}
+.codicon-copilot-success:before {
+  content: "\ec4e";
+}
+.codicon-chat-sparkle:before {
+  content: "\ec4f";
+}
+.codicon-search-sparkle:before {
+  content: "\ec50";
+}
+.codicon-edit-sparkle:before {
+  content: "\ec51";
+}
+.codicon-copilot-snooze:before {
+  content: "\ec52";
+}
+.codicon-send-to-remote-agent:before {
+  content: "\ec53";
+}
+.codicon-comment-discussion-sparkle:before {
+  content: "\ec54";
+}
+.codicon-chat-sparkle-warning:before {
+  content: "\ec55";
+}
+.codicon-chat-sparkle-error:before {
+  content: "\ec56";
+}
+.codicon-collection:before {
+  content: "\ec57";
+}
+.codicon-new-collection:before {
+  content: "\ec58";
+}
+.codicon-thinking:before {
+  content: "\ec59";
+}
+.codicon-build:before {
+  content: "\ec5a";
+}
+.codicon-comment-discussion-quote:before {
+  content: "\ec5b";
+}
+.codicon-cursor:before {
+  content: "\ec5c";
+}
+.codicon-eraser:before {
+  content: "\ec5d";
+}
+.codicon-file-text:before {
+  content: "\ec5e";
+}
+.codicon-quotes:before {
+  content: "\ec60";
+}
+.codicon-rename:before {
+  content: "\ec61";
+}
+.codicon-run-with-deps:before {
+  content: "\ec62";
+}
+.codicon-debug-connected:before {
+  content: "\ec63";
+}
+.codicon-strikethrough:before {
+  content: "\ec64";
+}
+.codicon-open-in-product:before {
+  content: "\ec65";
+}
+.codicon-index-zero:before {
+  content: "\ec66";
+}
+.codicon-agent:before {
+  content: "\ec67";
+}
+.codicon-edit-code:before {
+  content: "\ec68";
+}
+.codicon-repo-selected:before {
+  content: "\ec69";
+}
+.codicon-skip:before {
+  content: "\ec6a";
+}
+.codicon-merge-into:before {
+  content: "\ec6b";
+}
+.codicon-git-branch-changes:before {
+  content: "\ec6c";
+}
+.codicon-git-branch-staged-changes:before {
+  content: "\ec6d";
+}
+.codicon-git-branch-conflicts:before {
+  content: "\ec6e";
+}
+.codicon-git-branch:before {
+  content: "\ec6f";
+}
+.codicon-git-branch-create:before {
+  content: "\ec6f";
+}
+.codicon-git-branch-delete:before {
+  content: "\ec6f";
+}
+.codicon-search-large:before {
+  content: "\ec70";
+}
+.codicon-terminal-git-bash:before {
+  content: "\ec71";
+}
+.codicon-window-active:before {
+  content: "\ec72";
+}
+.codicon-forward:before {
+  content: "\ec73";
+}
+.codicon-download:before {
+  content: "\ec74";
+}
+.codicon-clockface:before {
+  content: "\ec75";
+}
+.codicon-unarchive:before {
+  content: "\ec76";
+}
+.codicon-session-in-progress:before {
+  content: "\ec77";
+}
+.codicon-collection-small:before {
+  content: "\ec78";
+}
+.codicon-vm-small:before {
+  content: "\ec79";
+}
+.codicon-cloud-small:before {
+  content: "\ec7a";
+}
+.codicon-add-small:before {
+  content: "\ec7b";
+}
+.codicon-remove-small:before {
+  content: "\ec7c";
+}
+.codicon-worktree-small:before {
+  content: "\ec7d";
+}
+.codicon-worktree:before {
+  content: "\ec7e";
+}
+.codicon-screen-cut:before {
+  content: "\ec7f";
+}
+.codicon-ask:before {
+  content: "\ec80";
+}
+.codicon-openai:before {
+  content: "\ec81";
+}
+.codicon-claude:before {
+  content: "\ec82";
+}
+.codicon-open-in-window:before {
+  content: "\ec83";
+}
+.codicon-new-session:before {
+  content: "\ec84";
+}
+.codicon-git-fetch:before {
+  content: "\f101";
+}
+.codicon-vm-pending:before {
+  content: "\f102";
+}
+
+/* node_modules/@vscode/markdown-editor/src/contrib/find/find.css */
+.md-editor {
+  --md-find-widget-background: light-dark(#f3f3f3, #252526);
+  --md-find-widget-foreground: light-dark(#616161, #cccccc);
+  --md-find-widget-border: light-dark(#c8c8c8, #454545);
+  --md-find-widget-shadow: rgba(0, 0, 0, 0.24);
+  --md-find-input-background: light-dark(#ffffff, #313131);
+  --md-find-input-foreground: light-dark(#3b3b3b, #cccccc);
+  --md-find-placeholder-foreground: light-dark(#767676, #a6a6a6);
+  --md-find-input-caret: currentColor;
+  --md-find-input-border: light-dark(#cecece, #3c3c3c);
+  --md-find-count-foreground: light-dark(#616161, #cccccc);
+  --md-find-focus-border: light-dark(#0090f1, #007fd4);
+  --md-find-button-hover-background: light-dark(rgba(184, 184, 184, 0.31), rgba(90, 93, 94, 0.5));
+  --md-find-option-background: light-dark(rgba(0, 144, 241, 0.2), rgba(0, 127, 212, 0.4));
+  --md-find-option-border: light-dark(#007acc, #1c9cf0);
+  --md-find-option-foreground: light-dark(#000000, #ffffff);
+  --md-find-disabled-foreground: light-dark(#9d9d9d, rgba(204, 204, 204, 0.5));
+  --md-find-error-border: light-dark(#be1100, #be1100);
+  --md-find-error-foreground: light-dark(#a1260d, #f48771);
+  --md-find-editor-background: light-dark(#ffffff, #1e1e1e);
+  --md-find-match-background: rgba(234, 92, 0, 0.33);
+  --md-find-match-fill: color-mix( in srgb, var(--md-find-editor-background) 85%, var(--md-find-match-background) );
+  --md-find-match-border: color-mix( in srgb, var(--md-find-widget-foreground) 55%, #ea5c00 );
+  --md-find-current-background: light-dark(#a8ac94, #515c6a);
+  --md-find-current-fill: color-mix( in srgb, var(--md-find-editor-background) 90%, var(--md-find-current-background) );
+  --md-find-current-border: color-mix( in srgb, var(--md-find-widget-foreground) 55%, var(--md-find-current-background) );
+}
+::highlight(md-editor-find-match) {
+  background-color: var(--md-find-match-fill);
+}
+::highlight(md-editor-find-current) {
+  background-color: var(--md-find-current-fill);
+}
+.md-find-highlight-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.md-find-match-rect,
+.md-find-current-rect {
+  position: absolute;
+  border-radius: 2px;
+}
+.md-find-match-rect {
+  background: transparent;
+  outline: 1px solid var(--md-find-match-border);
+  outline-offset: -1px;
+}
+.md-find-current-rect {
+  background: transparent;
+  outline: 2px solid var(--md-find-current-border);
+  outline-offset: -1px;
+}
+.md-find-zero-width-rect.md-find-match-rect {
+  background: var(--md-find-match-fill);
+}
+.md-find-zero-width-rect.md-find-current-rect {
+  background: var(--md-find-current-fill);
+}
+.md-find-widget-host {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  height: 0;
+  justify-content: flex-end;
+  overflow: visible;
+  pointer-events: none;
+}
+.md-find-widget-host[hidden] {
+  display: none;
+}
+.md-editor.md-find-visible .md-find-widget-host {
+  height: auto;
+}
+.md-find-widget {
+  display: flex;
+  box-sizing: border-box;
+  width: min(420px, calc(100% - 8px));
+  margin: 4px 4px 0 0;
+  padding: 3px 4px;
+  align-self: flex-start;
+  flex: none;
+  flex-direction: column;
+  gap: 0;
+  color: var(--md-find-widget-foreground);
+  background: var(--md-find-widget-background);
+  border: 1px solid var(--md-find-widget-border);
+  border-radius: var(--vscode-cornerRadius-large, 8px);
+  box-shadow: 0 2px 8px var(--md-find-widget-shadow);
+  font: 13px/1.4 var(--vscode-font-family, system-ui, sans-serif);
+  pointer-events: auto;
+}
+.md-find-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+.md-find-input-shell {
+  display: flex;
+  box-sizing: border-box;
+  height: 26px;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  color: var(--md-find-input-foreground);
+  background: var(--md-find-input-background);
+  border: 1px solid var(--md-find-input-border);
+  border-radius: var(--vscode-cornerRadius-small, 2px);
+}
+.md-find-input-shell:focus-within {
+  border-color: var(--md-find-focus-border);
+  outline: 1px solid var(--md-find-focus-border);
+  outline-offset: -1px;
+}
+.md-find-input-shell.md-find-input-invalid {
+  border-color: var(--md-find-error-border);
+  outline-color: var(--md-find-error-border);
+}
+.md-find-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 48px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 80px;
+  margin: 0;
+  padding: 2px 4px;
+  flex: 1 1 auto;
+  resize: none;
+  overflow: auto;
+  color: inherit;
+  caret-color: var(--md-find-input-caret);
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  outline: 0;
+  font: inherit;
+  line-height: 20px;
+}
+.md-find-input:focus {
+  outline: 0;
+}
+.md-find-input::placeholder {
+  color: var(--md-find-placeholder-foreground);
+  opacity: 1;
+}
+.md-find-input[aria-invalid=true] {
+  outline: 0;
+}
+.md-find-options {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0;
+  padding-right: 1px;
+}
+.md-find-button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--vscode-cornerRadius-small, 5px);
+  font: inherit;
+  flex: 0 0 24px;
+  cursor: pointer;
+}
+.md-find-button:hover:not(:disabled) {
+  background: var(--md-find-button-hover-background);
+}
+.md-find-button:focus-visible {
+  border-color: var(--md-find-focus-border);
+  outline: none;
+}
+.md-find-button:disabled {
+  color: var(--md-find-disabled-foreground);
+  cursor: default;
+}
+.md-find-option {
+  width: 24px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.md-find-option-whole-word {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.md-find-option-active {
+  color: var(--md-find-option-foreground);
+  background: var(--md-find-option-background);
+  border-color: var(--md-find-option-border);
+}
+.md-find-option-active:hover:not(:disabled) {
+  background: var(--md-find-option-background);
+}
+.md-find-count {
+  min-width: 54px;
+  padding-inline: 2px;
+  color: var(--md-find-count-foreground, inherit);
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+  text-align: center;
+  white-space: nowrap;
+}
+.md-find-error {
+  padding: 2px 6px 3px;
+  color: var(--md-find-error-foreground);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.md-find-no-results .md-find-count {
+  color: var(--md-find-error-foreground);
+}
+.md-editor.md-find-widget-focused .md-cursor {
+  visibility: hidden;
+  animation: none;
+}
+.md-find-has-current-match .md-selection-path {
+  fill: transparent;
+}
+.md-editor.md-find-visible .md-readonly-toggle-host {
+  visibility: hidden;
+  pointer-events: none;
+}
+.md-find-compact .md-find-widget {
+  width: calc(100% - 4px);
+  margin-right: 2px;
+}
+.md-find-compact .md-find-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.md-find-compact .md-find-input {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
+}
+.md-find-compact .md-find-count {
+  min-width: 40px;
+  margin-right: auto;
+  padding-inline: 0;
+}
+.md-find-compact .md-find-options {
+  display: none;
+}
+.md-find-compact .md-find-input-shell {
+  flex: 1 1 100%;
+}
+@media (forced-colors: active) {
+  ::highlight(md-editor-find-match),
+  ::highlight(md-editor-find-current) {
+    background-color: transparent;
+  }
+  .md-find-match-rect {
+    forced-color-adjust: none;
+    background: transparent;
+    outline: 1px solid Highlight;
+  }
+  .md-find-current-rect {
+    forced-color-adjust: none;
+    background: transparent;
+    opacity: 1;
+    outline: 2px solid Highlight;
+  }
+  .md-find-widget,
+  .md-find-input,
+  .md-find-button {
+    border-color: ButtonText;
+  }
+  .md-find-option-active {
+    color: HighlightText;
+    background: Highlight;
+  }
+}
+
+/* node_modules/@vscode/markdown-editor/src/view/editor.css */
+.md-editor {
+  display: flow-root;
+  outline: none;
+  caret-color: transparent;
+}
+.md-editor-a11y-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.md-pending-paragraph {
+  min-height: 1em;
+}
+.md-editor-content {
+  --md-editor-content-inline-start-padding: 48px;
+  --md-readonly-toggle-width: 58px;
+  --md-readonly-toggle-height: 32px;
+  --md-readonly-toggle-gap: 24px;
+  --md-readonly-toggle-inset: 4px;
+  --md-editor-content-inline-end-padding: var(--md-editor-content-inline-start-padding);
+  position: relative;
+  margin-inline: auto;
+  padding-block: 24px 0;
+  padding-inline: var(--md-editor-content-inline-start-padding) var(--md-editor-content-inline-end-padding);
+}
+.md-editor-content-with-readonly-toggle {
+  --md-editor-content-inline-end-padding: calc(var(--md-readonly-toggle-width) + var(--md-readonly-toggle-gap) + var(--md-readonly-toggle-inset));
+}
+.md-editor-content-with-readonly-toggle > .md-document :is(.md-heading, .md-paragraph) {
+  overflow-wrap: anywhere;
+}
+.md-block-active {
+  background: var(--md-block-active-background, #f8f8f8);
+  border-radius: 4px;
+  box-shadow: 0 0 0 8px var(--md-block-active-background, #f8f8f8);
+}
+.md-paragraph:empty {
+  min-height: 1lh;
+}
+.md-paragraph:empty.md-block-active {
+  background: transparent;
+  box-shadow: none;
+}
+.md-block-active a {
+  cursor: inherit;
+}
+.md-editor.md-mod-down .md-block-active a[href] {
+  cursor: pointer;
+}
+.md-editor a[href]:hover {
+  text-decoration: underline;
+}
+.md-editor:not(.md-mod-down) .md-block-active a[href]:hover {
+  text-decoration: none;
+}
+.md-fence-spacer {
+  visibility: hidden;
+  font-family:
+    "Cascadia Code",
+    "Fira Code",
+    monospace;
+  font-size: 0.85em;
+}
+.md-marker {
+  color: #999;
+  font-family:
+    "Cascadia Code",
+    "Fira Code",
+    monospace;
+  font-size: 0.85em;
+  display: inline;
+  overflow: hidden;
+  max-width: 100px;
+  opacity: 1;
+  line-height: 1;
+}
+.md-marker-hidden {
+  display: none;
+}
+.md-thematic-break-source {
+  display: inline-block;
+  color: #999;
+  font-family:
+    "Cascadia Code",
+    "Fira Code",
+    monospace;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+}
+.md-unhandled-block {
+  margin: 0.5em 0;
+  border: 1px dashed #d0a000;
+  border-radius: 4px;
+}
+pre.md-unhandled-scroll.md-code-block {
+  margin: 0;
+  border: 0;
+  border-radius: 4px;
+}
+.md-ws-space,
+.md-ws-tab {
+  position: relative;
+  white-space: pre;
+}
+.md-ws-space::before,
+.md-ws-tab::before {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #b0b0b0;
+  pointer-events: none;
+}
+.md-ws-space::before {
+  content: "\b7";
+}
+.md-ws-tab::before {
+  content: "\21e5";
+}
+.md-ws-newline::before {
+  content: "\21b5";
+  color: #b0b0b0;
+  pointer-events: none;
+}
+.md-ws-newline-glyph {
+  color: #b0b0b0;
+}
+.md-ws-blockbreak-glyph {
+  color: #4a90d9;
+}
+.md-hardbreak-src {
+  color: #4a90d9;
+}
+.md-hardbreak-src .md-ws-space::before {
+  color: #4a90d9;
+}
+.md-hardbreak-src-hidden {
+  display: none;
+}
+.md-glue-hidden {
+  display: inline;
+  visibility: hidden;
+}
+.md-table td > .md-glue-tableCellGlue.md-glue-hidden {
+  display: none;
+}
+.md-table.md-block-active td {
+  position: relative;
+}
+.md-table.md-block-active td > .md-glue-tableCellGlue:last-child:not(:first-child) {
+  position: absolute;
+  top: auto;
+  bottom: auto;
+}
+.md-glue-blockGap {
+  white-space: normal;
+}
+.md-glue-blockBreak {
+  white-space: normal;
+}
+.md-marker-checkbox.md-marker-hidden {
+  display: inline;
+  visibility: hidden;
+}
+.md-marker-openFence.md-marker-hidden,
+.md-marker-closeFence.md-marker-hidden {
+  display: inline;
+  visibility: hidden;
+}
+.md-table-delimiter-row {
+  display: none;
+}
+.md-block-active .md-table-delimiter-row {
+  display: table-row;
+}
+.md-table-delimiter-row td {
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+  height: 16px;
+}
+.md-table-wrapper {
+  overflow-x: auto;
+  width: fit-content;
+  max-width: 100%;
+}
+.md-table-wrapper:has(> .md-table.md-block-active) {
+  background: var(--md-block-active-background, #f8f8f8);
+  border-radius: 4px;
+  box-shadow: 0 0 0 8px var(--md-block-active-background, #f8f8f8);
+}
+.md-table.md-block-active {
+  background: none;
+  box-shadow: none;
+}
+.md-selection-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.md-selection-path {
+  fill: rgba(59, 130, 246, 0.25);
+}
+.md-gutter-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.md-gutter-marker {
+  position: absolute;
+  left: var(--md-gutter-marker-left, 18px);
+  width: var(--md-gutter-marker-width, 3px);
+  border-radius: 2px;
+}
+.md-gutter-marker-added {
+  background: var(--md-gutter-added, #2ea043);
+}
+.md-gutter-marker-modified {
+  background: var(--md-gutter-modified, #0969da);
+}
+.md-gutter-marker-deleted {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  border-left: var(--md-gutter-marker-width, 3px) solid var(--md-gutter-deleted, #cf222e);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transform: translateY(-4px);
+}
+.md-heading {
+  position: relative;
+}
+.md-heading > .md-marker:first-child {
+  position: absolute;
+  right: 100%;
+  white-space: pre;
+  top: 0;
+  font-size: inherit;
+  line-height: inherit;
+  height: 1lh;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  transform: scale(0.85);
+  transform-origin: right center;
+}
+.md-heading > .md-marker-hidden:first-child {
+  display: none;
+}
+.md-blockquote {
+  position: relative;
+}
+.md-blockquote > .md-marker-blockQuoteMarker {
+  position: absolute;
+  right: calc(100% - var(--md-blockquote-pad, 0px));
+  top: auto;
+  white-space: pre;
+}
+.md-blockquote > .md-marker-blockQuoteMarker.md-marker-hidden {
+  display: none;
+}
+.md-code-block {
+  overflow-x: auto;
+}
+.md-math-block {
+  overflow-x: auto;
+}
+.md-list li > .md-paragraph {
+  margin: 0;
+}
+.md-list li > .md-block {
+  margin: 0;
+}
+.md-list li > .md-block + .md-block {
+  margin-top: 0.25em;
+}
+.md-list-item-active {
+  list-style: none;
+  position: relative;
+}
+.md-list-item-active > .md-marker-listItemMarker {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  line-height: inherit;
+  white-space: pre;
+}
+ol.md-list > .md-list-item-active > .md-marker-listItemMarker,
+ol.md-list > .md-list-item-active > .md-list-gutter > .md-marker-listItemMarker {
+  font-family: inherit;
+  font-size: inherit;
+}
+.md-list-gutter {
+  position: absolute;
+  right: 100%;
+  display: flex;
+  white-space: pre;
+}
+.md-list-gutter > .md-glue-indent {
+  flex: 0 0 calc((var(--md-list-level, 1) - 1) * var(--md-list-indent-step, 2em));
+  display: flex;
+  justify-content: space-between;
+}
+.md-list-gutter > .md-marker-listItemMarker {
+  flex: 0 0 auto;
+}
+.md-glue-indent {
+  white-space: pre;
+}
+.md-paragraph > .md-glue-indent.md-glue-hidden {
+  display: none;
+}
+.md-list li > .md-block,
+.md-task-list-item > .md-block {
+  position: relative;
+}
+.md-list li > .md-block > .md-glue-indent:first-child,
+.md-task-list-item > .md-block > .md-glue-indent:first-child {
+  position: absolute;
+  right: 100%;
+  top: 0;
+}
+.md-task-list-item {
+  list-style: none;
+  position: relative;
+  --md-task-marker-width: 1.75em;
+}
+.md-task-list-item .md-paragraph > .md-glue:first-child {
+  display: inline-block;
+  width: var(--md-task-marker-width);
+}
+.md-task-list-item > .md-block + .md-block {
+  padding-left: var(--md-task-marker-width);
+}
+.md-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #bbb;
+  border-radius: 3px;
+  position: absolute;
+  left: 0;
+  top: 0.25em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.md-checkbox:checked {
+  background-color: #4c8bf5;
+  border-color: #4c8bf5;
+}
+.md-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 2.5px;
+  top: -1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.md-checkbox:hover {
+  border-color: #888;
+}
+.md-checkbox:checked:hover {
+  background-color: #3a73d4;
+  border-color: #3a73d4;
+}
+.md-checkbox:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.md-cursor {
+  position: absolute;
+  width: 2px;
+  background: var(--md-cursor-background, #000);
+  pointer-events: none;
+}
+.md-editor:not(.md-focused) .md-cursor {
+  visibility: hidden;
+}
+.md-editor.md-focused .md-cursor {
+  animation: md-cursor-blink 1s step-end infinite;
+}
+.md-editor.md-readonly .md-cursor {
+  visibility: hidden;
+}
+.md-editor.md-readonly-editing-attempt {
+  animation: md-readonly-editing-attempt 300ms ease-out;
+}
+@keyframes md-readonly-editing-attempt {
+  50% {
+    box-shadow: inset 0 0 0 2px var(--md-readonly-shine-glow, rgba(255, 255, 255, 0.58));
+  }
+}
+@keyframes md-cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.md-readonly-toggle-host {
+  position: sticky;
+  top: 0;
+  width: calc(100% + var(--md-editor-content-inline-end-padding));
+  height: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+.md-readonly-toggle {
+  position: absolute;
+  top: 4px;
+  right: var(--md-readonly-toggle-inset);
+  pointer-events: auto;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 24px);
+  align-items: center;
+  justify-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  width: var(--md-readonly-toggle-width);
+  height: var(--md-readonly-toggle-height);
+  padding: 3px;
+  overflow: hidden;
+  direction: ltr;
+  appearance: none;
+  border-radius: 999px;
+  border: 1px solid var(--md-readonly-border, #b8b8b8);
+  background: var(--md-readonly-background, #f3f3f3);
+  color: var(--md-readonly-foreground, #444444);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.md-editor-narrow .md-readonly-toggle-host {
+  position: relative;
+  height: calc(var(--md-readonly-toggle-height) + var(--md-readonly-toggle-inset) + var(--md-readonly-toggle-inset));
+}
+.md-readonly-toggle::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -8px;
+  bottom: -8px;
+  left: -30px;
+  width: 24px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      var(--md-readonly-shine-edge, rgba(255, 255, 255, 0.16)) 24%,
+      var(--md-readonly-shine, #ffffff) 50%,
+      var(--md-readonly-shine-edge, rgba(255, 255, 255, 0.16)) 76%,
+      transparent);
+  box-shadow: 0 0 8px 2px var(--md-readonly-shine-glow, rgba(255, 255, 255, 0.58));
+  opacity: 0;
+  pointer-events: none;
+  transform: skewX(-20deg);
+}
+.md-readonly-toggle.md-readonly-toggle-shine::after {
+  animation: md-readonly-toggle-shine 2s linear;
+  will-change: transform, opacity;
+}
+@keyframes md-readonly-toggle-shine {
+  0% {
+    opacity: 0;
+    transform: translateX(0) skewX(-20deg);
+  }
+  12%, 88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(122px) skewX(-20deg);
+  }
+}
+.md-readonly-toggle:hover {
+  border-color: var(--md-readonly-border-hover, #8d8d8d);
+  background: var(--md-readonly-background-hover, #e9e9e9);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+.md-readonly-toggle:focus-visible {
+  outline: 2px solid var(--md-readonly-accent, #4c8bf5);
+  outline-offset: 1px;
+}
+.md-readonly-toggle .md-readonly-toggle-indicator {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--md-readonly-accent, #4c8bf5);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.25);
+  transform: translate(26px, -50%);
+  transition: background-color 0.12s ease, transform 0.16s ease;
+}
+.md-readonly-toggle .md-readonly-toggle-icon {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 16px;
+  height: 16px;
+  color: var(--md-readonly-foreground, #444444);
+  opacity: 0.62;
+  pointer-events: none;
+  transition: color 0.12s ease, opacity 0.12s ease;
+}
+.md-readonly-toggle:not(.md-readonly-toggle-locked) .md-readonly-toggle-icon-editing,
+.md-readonly-toggle.md-readonly-toggle-locked .md-readonly-toggle-icon-locked {
+  color: var(--md-readonly-accent-foreground, #ffffff);
+  opacity: 1;
+}
+.md-readonly-toggle.md-readonly-toggle-locked .md-readonly-toggle-indicator {
+  transform: translate(0, -50%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .md-editor.md-readonly-editing-attempt,
+  .md-readonly-toggle,
+  .md-readonly-toggle .md-readonly-toggle-indicator,
+  .md-readonly-toggle .md-readonly-toggle-icon,
+  .md-readonly-toggle.md-readonly-toggle-shine::after {
+    animation: none;
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .md-readonly-toggle {
+    forced-color-adjust: none;
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+    box-shadow: none;
+  }
+  .md-readonly-toggle::after {
+    display: none;
+  }
+  .md-readonly-toggle:hover {
+    border-color: Highlight;
+    background: ButtonFace;
+    box-shadow: none;
+  }
+  .md-readonly-toggle:focus-visible {
+    outline-color: Highlight;
+  }
+  .md-readonly-toggle .md-readonly-toggle-indicator {
+    background: Highlight;
+    box-shadow: none;
+  }
+  .md-readonly-toggle .md-readonly-toggle-icon {
+    color: ButtonText;
+    opacity: 1;
+  }
+  .md-readonly-toggle:not(.md-readonly-toggle-locked) .md-readonly-toggle-icon-editing,
+  .md-readonly-toggle.md-readonly-toggle-locked .md-readonly-toggle-icon-locked {
+    color: HighlightText;
+  }
+}
+
+/* node_modules/@vscode/markdown-editor/src/view/themes/vscode-default.css */
+.md-editor.md-theme-vscode-default {
+  font-family: var(--markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif);
+  font-size: var(--markdown-font-size, 14px);
+  line-height: var(--markdown-line-height, 1.572);
+  color: var(--vscode-editor-foreground, #1f2328);
+  word-wrap: break-word;
+  --md-block-active-background: var(--vscode-editorWidget-background, #f8f8f8);
+  --md-cursor-background: var(--vscode-editorCursor-foreground, #000);
+  --md-readonly-background: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background, #f3f3f3));
+  --md-readonly-background-hover: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background, #e9e9e9)));
+  --md-readonly-foreground: var(--vscode-button-secondaryForeground, var(--vscode-editorWidget-foreground, #444));
+  --md-readonly-border: var(--vscode-button-secondaryBorder, var(--vscode-button-border, var(--vscode-contrastBorder, var(--vscode-editorWidget-border, #b8b8b8))));
+  --md-readonly-border-hover: var(--vscode-button-secondaryBorder, var(--vscode-button-border, var(--vscode-contrastBorder, var(--vscode-editorWidget-border, #8d8d8d))));
+  --md-readonly-accent: var(--vscode-button-background, rgb(45, 92, 180));
+  --md-readonly-accent-foreground: var(--vscode-button-foreground, #fff);
+  --md-find-widget-background: var(--vscode-editorWidget-background, #f3f3f3);
+  --md-find-widget-foreground: var(--vscode-editorWidget-foreground, #222);
+  --md-find-widget-border: var(--vscode-editorWidget-border, #c8c8c8);
+  --md-find-widget-shadow: var(--vscode-widget-shadow, rgba(0, 0, 0, 0.2));
+  --md-find-input-background: var(--vscode-input-background, #fff);
+  --md-find-input-foreground: var(--vscode-input-foreground, #222);
+  --md-find-placeholder-foreground: var(--vscode-input-placeholderForeground, #767676);
+  --md-find-input-caret: var(--vscode-editorCursor-foreground, currentColor);
+  --md-find-input-border: var(--vscode-input-border, #cecece);
+  --md-find-count-foreground: var(--vscode-editorWidget-foreground, #222);
+  --md-find-focus-border: var(--vscode-focusBorder, #007fd4);
+  --md-find-button-hover-background: var(--vscode-inputOption-hoverBackground, rgba(128, 128, 128, 0.18));
+  --md-find-disabled-foreground: var(--vscode-disabledForeground, rgba(97, 97, 97, 0.5));
+  --md-find-editor-background: var(--vscode-editor-background, #ffffff);
+  --md-find-match-background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+  --md-find-current-background: var(--vscode-editor-findMatchBackground, #a8ac94);
+  --md-find-current-border: var(--vscode-editor-findMatchBorder, color-mix(in srgb, var(--vscode-editorWidget-foreground, #616161) 55%, var(--vscode-editor-findMatchBackground, #a8ac94)));
+  --md-find-option-background: var(--vscode-inputOption-activeBackground, #007acc);
+  --md-find-option-border: color-mix(in srgb, var(--vscode-focusBorder, #007acc) 70%, var(--vscode-inputOption-activeForeground, #000000));
+  --md-find-option-foreground: var(--vscode-inputOption-activeForeground, #fff);
+  --md-find-error-border: var(--vscode-inputValidation-errorBorder, #be1100);
+  --md-find-error-foreground: var(--vscode-errorForeground, #a1260d);
+  --md-separator-color: color-mix(in srgb, var(--vscode-textSeparator-foreground, #d1d9e0) 60%, transparent);
+  --md-inline-code-background: color-mix(in srgb, var(--vscode-textPreformat-background, #818b981f) 60%, transparent);
+}
+.vscode-high-contrast .md-editor.md-theme-vscode-default,
+.vscode-high-contrast-light .md-editor.md-theme-vscode-default {
+  --md-separator-color: var(--vscode-textSeparator-foreground, currentColor);
+  --md-inline-code-background: var(--vscode-textPreformat-background, #818b981f);
+}
+.md-theme-vscode-default .md-heading {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.md-theme-vscode-default h1.md-heading {
+  font-size: 1.75em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-separator-color);
+}
+.md-theme-vscode-default h2.md-heading {
+  font-size: 1.4em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-separator-color);
+}
+.md-theme-vscode-default h3.md-heading {
+  font-size: 1.2em;
+}
+.md-theme-vscode-default h4.md-heading {
+  font-size: 1em;
+}
+.md-theme-vscode-default h5.md-heading {
+  font-size: 0.875em;
+}
+.md-theme-vscode-default h6.md-heading {
+  font-size: 0.85em;
+}
+.md-theme-vscode-default .md-paragraph {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.md-theme-vscode-default .md-blockquote {
+  margin: 0 0 16px 0;
+  padding: 0 16px 0 10px;
+  --md-blockquote-pad: 10px;
+  background-color: var(--vscode-textBlockQuote-background, transparent);
+  border-left: 5px solid var(--vscode-textBlockQuote-border, #d1d9e0);
+  border-radius: 2px;
+}
+.md-theme-vscode-default .md-list {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-left: 2em;
+  --md-list-indent-step: 2em;
+}
+.md-theme-vscode-default .md-thematic-break {
+  height: 0;
+  padding: 0;
+  margin: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--md-separator-color);
+}
+.md-theme-vscode-default a {
+  color: var(--vscode-textLink-foreground, #0969da);
+  text-decoration: none;
+}
+.md-theme-vscode-default a:hover {
+  text-decoration: underline;
+}
+.md-theme-vscode-default strong {
+  font-weight: 600;
+}
+.md-theme-vscode-default :not(pre) > code {
+  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+  font-size: 1em;
+  line-height: 1.357em;
+  padding: 1px 3px;
+  margin: 0;
+  color: var(--vscode-textPreformat-foreground, inherit);
+  background-color: var(--md-inline-code-background);
+  border-radius: 4px;
+  white-space: break-spaces;
+}
+.md-theme-vscode-default .md-code-block {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding: 16px;
+  line-height: 1.357;
+  background-color: var(--vscode-textCodeBlock-background, #f6f8fa);
+  border: 1px solid var(--vscode-widget-border, #d1d9e0);
+  border-radius: 3px;
+}
+.md-theme-vscode-default .md-code-block code {
+  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+  padding: 0;
+  background-color: transparent;
+  border-radius: 0;
+}
+.md-theme-vscode-default .md-code-block .tok-keyword {
+  color: var(--md-tok-keyword, #0000ff);
+}
+.md-theme-vscode-default .md-code-block .tok-string {
+  color: var(--md-tok-string, #a31515);
+}
+.md-theme-vscode-default .md-code-block .tok-comment {
+  color: var(--md-tok-comment, #008000);
+}
+.md-theme-vscode-default .md-code-block .tok-number {
+  color: var(--md-tok-number, #098658);
+}
+.md-theme-vscode-default .md-code-block .tok-regexp {
+  color: var(--md-tok-regexp, #811f3f);
+}
+.md-theme-vscode-default .md-code-block .tok-type {
+  color: var(--md-tok-type, #267f99);
+}
+.md-theme-vscode-default .md-code-block .tok-annotation {
+  color: var(--md-tok-annotation, #267f99);
+}
+.md-theme-vscode-default .md-code-block .tok-tag {
+  color: var(--md-tok-tag, #800000);
+}
+.md-theme-vscode-default .md-code-block .tok-attribute {
+  color: var(--md-tok-attribute, #e50000);
+}
+.md-theme-vscode-default .md-code-block .tok-delimiter {
+  color: var(--md-tok-delimiter, inherit);
+}
+.md-theme-vscode-default .md-math-block {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.md-theme-vscode-default .md-inline-math .katex {
+  line-height: 1;
+}
+.md-theme-vscode-default .md-table-wrapper {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.md-theme-vscode-default .md-table {
+  border-collapse: collapse;
+  width: auto;
+}
+.md-theme-vscode-default .md-table th,
+.md-theme-vscode-default .md-table td {
+  padding: 5px 10px;
+  border: 1px solid var(--vscode-editorWidget-border, #d1d9e0);
+  text-align: left;
+}
+.md-theme-vscode-default .md-table tr:first-child td {
+  font-weight: 600;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.md-theme-vscode-default .md-table.md-block-active tr:first-child td {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.md-theme-vscode-default .md-table tr:nth-child(even):not(.md-table-delimiter-row) {
+  background-color: var(--vscode-textCodeBlock-background, #f6f8fa);
+}
+.md-theme-vscode-default .md-table-delimiter-row td {
+  border: 0;
+  padding: 0 10px;
+  background: transparent;
+}
+.md-theme-vscode-default .md-table.md-block-active td {
+  border-color: transparent;
+}
+.md-theme-vscode-default .md-table.md-block-active tr:nth-child(even):not(.md-table-delimiter-row) td {
+  background-color: transparent;
+}
+.md-theme-vscode-default .md-table.md-block-active td > .md-glue-tableCellGlue:first-child,
+.md-theme-vscode-default .md-table.md-block-active .md-table-delimiter-row td > .md-marker-tableDelimiter {
+  position: relative;
+  left: -10px;
+}
+.md-theme-vscode-default .md-table.md-block-active td:last-child {
+  position: relative;
+}
+.md-theme-vscode-default .md-table.md-block-active td:last-child > .md-glue-tableCellGlue:last-child {
+  position: absolute;
+  right: 0;
+  top: auto;
+}
+.md-theme-vscode-default .md-table.md-block-active .md-table-delimiter-row td:last-child > .md-marker-tableDelimiterClose {
+  position: absolute;
+  right: 0;
+  top: auto;
+}

@@ -7,6 +7,12 @@ import {
     buildSinglePrompt, buildBatchPromptText, buildMergedNativeComment,
     PromptConfig, NativeCommentConfig,
 } from './comment-ui';
+import {
+    applyAnchorFreeReplacements,
+    computeMinimalReplacement,
+    stripCommentAnchors,
+    CleanTextReplacement,
+} from './anchor-edit';
 
 const { unified } = require('unified');
 const remarkParse = require('remark-parse').default || require('remark-parse');
@@ -108,6 +114,8 @@ export class PreviewPanel {
     // so adding/deleting a comment doesn't reload the whole webview (which would
     // re-run _restoreState and make the comment panel pop open).
     private lastInternalEditTime: number = 0;
+    private markdownEditorActive = false;
+    private applyingMarkdownEditorEdit = false;
 
     // Word-specific fields
     public isDocx: boolean = false;
@@ -154,6 +162,15 @@ export class PreviewPanel {
             (e) => {
                 if (this.isDocx || this.isPptx) return; // docx/pptx don't use TextDocument
                 if (e.document.uri.fsPath === this.document.uri.fsPath) {
+                    if (this.markdownEditorActive) {
+                        if (!this.applyingMarkdownEditorEdit) {
+                            this.panel.webview.postMessage({
+                                command: 'setMarkdownEditorSource',
+                                source: stripCommentAnchors(e.document.getText()).cleanText,
+                            });
+                        }
+                        return;
+                    }
                     if (this.debounceTimer) { clearTimeout(this.debounceTimer); }
                     this.debounceTimer = setTimeout(() => {
                         this.debounceTimer = null;
@@ -308,6 +325,43 @@ export class PreviewPanel {
 
     private async handleMessage(message: any) {
         switch (message.command) {
+            case 'enterMarkdownEditor': {
+                if (this.isDocx || this.isPptx) return;
+                const cleanText = stripCommentAnchors(this.document.getText()).cleanText;
+                this.markdownEditorActive = true;
+                this.panel.webview.html = this.getMarkdownEditorHtml(cleanText, cleanText);
+                return;
+            }
+            case 'exitMarkdownEditor':
+                this.markdownEditorActive = false;
+                this.commentsManager.reload();
+                this.updateContent();
+                return;
+            case 'applyMarkdownEditorEdit': {
+                if (!this.markdownEditorActive || !Array.isArray(message.replacements)) return;
+                const replacements = message.replacements as CleanTextReplacement[];
+                const currentText = this.document.getText();
+                const eol = this.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+                const nextText = applyAnchorFreeReplacements(currentText, replacements, eol);
+                const minimalEdit = computeMinimalReplacement(currentText, nextText);
+                if (!minimalEdit) return;
+                const workspaceEdit = new vscode.WorkspaceEdit();
+                workspaceEdit.replace(
+                    this.document.uri,
+                    new vscode.Range(
+                        this.document.positionAt(minimalEdit.start),
+                        this.document.positionAt(minimalEdit.endExclusive),
+                    ),
+                    minimalEdit.newText,
+                );
+                this.applyingMarkdownEditorEdit = true;
+                try {
+                    await vscode.workspace.applyEdit(workspaceEdit);
+                } finally {
+                    this.applyingMarkdownEditorEdit = false;
+                }
+                return;
+            }
             case 'addComment': {
                 if ((this.isDocx || this.isPptx) && message.eid) {
                     const c = this.commentsManager.addDocxComment(
@@ -1728,6 +1782,33 @@ ${commentUiCss()}
         return this.panel.webview.asWebviewUri(onDiskPath);
     }
 
+    private getMarkdownEditorHtml(source: string, baseline: string): string {
+        const scriptUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'markdown-editor.js'));
+        const styleUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'markdown-editor.css'));
+        const bootstrap = JSON.stringify({ source, baseline }).replace(/</g, '\\u003c');
+        return /*html*/`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="${styleUri}">
+<style>
+html, body { margin: 0; min-height: 100%; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+#mode-bar { position: sticky; top: 0; z-index: 100; display: flex; justify-content: flex-end; padding: 8px 16px; background: var(--vscode-editor-background); border-bottom: 1px solid var(--vscode-editorWidget-border); }
+#review-mode { border: 1px solid var(--vscode-button-border, transparent); border-radius: 4px; padding: 5px 12px; color: var(--vscode-button-foreground); background: var(--vscode-button-background); cursor: pointer; }
+#review-mode:hover { background: var(--vscode-button-hoverBackground); }
+#editor-root { min-height: calc(100vh - 42px); }
+</style>
+</head>
+<body>
+<div id="mode-bar"><button id="review-mode" type="button">Back to Review</button></div>
+<div id="editor-root"></div>
+<script>window.markdownEditorData = ${bootstrap};</script>
+<script src="${scriptUri}"></script>
+</body>
+</html>`;
+    }
+
     private getHtml(body: string, blocks: Block[], comments: Comment[]): string {
         const blocksJson = JSON.stringify(blocks).replace(/</g, '\\u003c');
         const commentsJson = JSON.stringify(comments).replace(/</g, '\\u003c');
@@ -1901,6 +1982,7 @@ ${commentUiCss()}
     ${this.isDocx ? `
     <button class="export-btn" onclick="saveDocx()" title="Save changes back to .docx file">&#x1F4BE; Save .docx</button>
     ` : `
+    <button class="export-btn" onclick="enterMarkdownEditor()" title="Edit Markdown with inline differences">&#x270E; Edit</button>
     <button class="export-btn" onclick="jumpToSource()" title="Jump to source editor at current scroll position. You can also double-click anywhere in the preview to jump to that block in the source.">&#x2190; Source</button>
     <button class="export-btn" onclick="exportPdf()" title="Export to PDF">&#x1F4C4; PDF</button>
     <button class="export-btn" onclick="exportDocx()" title="Export to DOCX">&#x1F4DD; DOCX</button>
@@ -2158,6 +2240,7 @@ ${commentUiCss()}
     window.exportPdf = function() { vscode.postMessage({ command: 'exportPdf' }); };
     window.exportDocx = function() { vscode.postMessage({ command: 'exportDocx' }); };
     window.saveDocx = function() { vscode.postMessage({ command: 'saveDocxFile' }); };
+    window.enterMarkdownEditor = function() { vscode.postMessage({ command: 'enterMarkdownEditor' }); };
 
     // ========== Shared comment UI (from comment-ui.ts) ==========
     var __nativePrefix = '${this.isDocx ? 'word_' : ''}';
