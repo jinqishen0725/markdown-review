@@ -1813,6 +1813,7 @@ html, body { margin: 0; min-height: 100%; background: var(--vscode-editor-backgr
         const blocksJson = JSON.stringify(blocks).replace(/</g, '\\u003c');
         const commentsJson = JSON.stringify(comments).replace(/</g, '\\u003c');
         const mermaidUri = this.getMermaidUri();
+        const editorStyleUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'markdown-editor.css'));
 
         const cspSource = this.panel.webview.cspSource;
         return /*html*/`<!DOCTYPE html>
@@ -1821,6 +1822,7 @@ html, body { margin: 0; min-height: 100%; background: var(--vscode-editor-backgr
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown Review</title>
+<link rel="stylesheet" href="${editorStyleUri}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -1828,58 +1830,88 @@ html, body { margin: 0; min-height: 100%; background: var(--vscode-editor-backgr
 <style>
 /* ---------- layout ---------- */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    font-size: 14px; line-height: 1.6;
+    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+    font-size: var(--vscode-font-size, 13px); line-height: 1.65;
     color: var(--vscode-editor-foreground, #24292e);
     background: var(--vscode-editor-background, #fff);
     margin: 0; padding: 0;
 }
-#wrapper { display: flex; min-height: 100vh; }
+#review-toolbar {
+    position: sticky; top: 0; z-index: 1200; height: 40px; padding: 0 10px 0 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--vscode-editor-background); border-bottom: 1px solid var(--vscode-editorWidget-border);
+}
+.toolbar-mode { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--vscode-foreground); font-weight: 600; }
+.toolbar-mode .codicon { color: var(--vscode-descriptionForeground); }
+.toolbar-actions { display: flex; align-items: center; gap: 2px; }
+.toolbar-action, .toolbar-menu > summary {
+    min-height: 28px; padding: 0 8px; display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid transparent; border-radius: 4px; background: transparent;
+    color: var(--vscode-foreground); font: inherit; cursor: pointer; white-space: nowrap;
+}
+.toolbar-action:hover, .toolbar-menu > summary:hover, .toolbar-menu[open] > summary {
+    background: var(--vscode-toolbar-hoverBackground); outline: 1px solid var(--vscode-toolbar-hoverOutline, transparent);
+}
+.toolbar-action:focus-visible, .toolbar-menu > summary:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px;
+}
+.toolbar-action .codicon, .toolbar-menu .codicon { font-size: 15px; }
+.toolbar-action-primary { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+.toolbar-action-primary:hover { background: var(--vscode-button-hoverBackground); }
+.toolbar-menu { position: relative; }
+.toolbar-menu > summary { list-style: none; }
+.toolbar-menu > summary::-webkit-details-marker { display: none; }
+.toolbar-menu-popover {
+    position: absolute; top: calc(100% + 4px); right: 0; min-width: 164px; padding: 4px;
+    background: var(--vscode-menu-background); color: var(--vscode-menu-foreground);
+    border: 1px solid var(--vscode-menu-border); border-radius: 5px;
+    box-shadow: 0 4px 12px var(--vscode-widget-shadow); z-index: 1400;
+}
+.toolbar-menu-popover button {
+    width: 100%; min-height: 28px; padding: 0 8px; display: flex; align-items: center; gap: 8px;
+    border: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.toolbar-menu-popover button:hover { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
+#wrapper { display: flex; min-height: calc(100vh - 41px); max-width: 960px; margin: 0 auto; }
 #gutter {
-    width: 40px; min-width: 40px; position: relative;
-    border-right: 1px solid var(--vscode-editorWidget-border, #e1e4e8);
-    user-select: none;
+    width: 34px; min-width: 34px; position: relative; user-select: none;
 }
 #content {
-    flex: 1; padding: 20px 40px; max-width: 860px;
-    position: relative;
+    flex: 1; min-width: 0; padding: 32px clamp(20px, 4vw, 48px) 80px; max-width: 820px; position: relative;
 }
 
 /* ---------- markdown styles ---------- */
-h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; margin-top: 24px; }
-h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: .3em; margin-top: 24px; }
-h3 { font-size: 1.25em; margin-top: 24px; }
+h1 { font-size: 2em; border-bottom: 1px solid var(--vscode-editorWidget-border); padding-bottom: .3em; margin-top: 20px; }
+h2 { font-size: 1.5em; border-bottom: 1px solid var(--vscode-editorWidget-border); padding-bottom: .3em; margin-top: 28px; }
+h3 { font-size: 1.25em; margin-top: 26px; }
 h4 { font-size: 1em; margin-top: 24px; }
-code { background: var(--vscode-textCodeBlock-background, #f6f8fa); padding: .2em .4em; border-radius: 3px; font-size: 85%; }
-pre { background: var(--vscode-textCodeBlock-background, #f6f8fa); padding: 16px; border-radius: 6px; overflow: auto; }
+code { background: var(--vscode-textCodeBlock-background, #f6f8fa); padding: .15em .35em; border-radius: 3px; font-size: 85%; }
+pre { background: var(--vscode-textCodeBlock-background, #f6f8fa); padding: 16px; border-radius: 4px; overflow: auto; border: 1px solid var(--vscode-editorWidget-border); }
 pre code { background: none; padding: 0; }
-blockquote { border-left: 4px solid #dfe2e5; padding: 0 16px; margin: 0 0 16px 0; color: #6a737d; }
+blockquote { border-left: 2px solid var(--vscode-textBlockQuote-border); padding: 2px 14px; margin: 0 0 16px 0; color: var(--vscode-descriptionForeground); background: var(--vscode-textBlockQuote-background); }
 table { border-collapse: collapse; width: auto; margin-bottom: 16px; }
-th, td { border: 1px solid #dfe2e5; padding: 6px 13px; }
+th, td { border: 1px solid var(--vscode-editorWidget-border); padding: 6px 13px; }
 th { font-weight: 600; background: var(--vscode-textCodeBlock-background, #f6f8fa); }
 tr:nth-child(2n) { background: var(--vscode-textCodeBlock-background, #f6f8fa50); }
-hr { border: none; border-top: 1px solid #eaecef; margin: 24px 0; }
+hr { border: none; border-top: 1px solid var(--vscode-editorWidget-border); margin: 28px 0; }
 img { max-width: 100%; }
 .katex-display { overflow-x: auto; margin: 16px 0; }
 .comment-anchor { display: none; }
 
 /* ---------- "+" gutter buttons ---------- */
 .gutter-btn {
-    position: absolute; left: 6px;
-    width: 24px; height: 24px; border-radius: 50%;
-    background: #0078d4; color: #fff; border: none;
-    font-size: 16px; line-height: 24px; text-align: center;
-    cursor: pointer; opacity: 0; transition: opacity .15s;
-    z-index: 10; padding: 0;
+    position: absolute; left: 4px; width: 24px; height: 24px; border-radius: 4px;
+    background: transparent; color: var(--vscode-icon-foreground); border: 1px solid transparent;
+    cursor: pointer; opacity: 0; transition: opacity .12s, background-color .12s; z-index: 10; padding: 0;
 }
-#wrapper:hover .gutter-btn { opacity: .35; }
-.gutter-btn:hover { opacity: 1 !important; transform: scale(1.15); }
+#wrapper:hover .gutter-btn { opacity: .45; }
+.gutter-btn:hover, .gutter-btn:focus-visible { opacity: 1 !important; background: var(--vscode-toolbar-hoverBackground); border-color: var(--vscode-toolbar-hoverOutline, transparent); }
 
 /* ---------- commented block highlight ---------- */
-.commented-block { border-left: 4px solid #ffc107; padding-left: 8px; cursor: pointer; }
-.commented-block:hover { background: rgba(255,193,7,.08); }
-.word-commented-block { border-left: 4px solid #4caf50; padding-left: 8px; background: rgba(76,175,80,.04); }
-.word-commented-block:hover { background: rgba(76,175,80,.08); }
+.commented-block { border-left: 2px solid var(--vscode-editorWarning-foreground); padding-left: 12px; cursor: pointer; }
+.commented-block:hover { background: var(--vscode-list-hoverBackground); }
+.word-commented-block { border-left: 2px solid var(--vscode-testing-iconPassed); padding-left: 12px; background: transparent; }
+.word-commented-block:hover { background: var(--vscode-list-hoverBackground); }
 
 /* ---------- popover, dialog, badge, sidebar, and roles (from comment-ui.ts) ---------- */
 ${commentUiCss()}
@@ -1920,74 +1952,70 @@ ${commentUiCss()}
 #comment-dialog .btn-primary:hover { background: #106ebe; }
 #comment-dialog .btn-cancel { background: #333; color: #ccc; border: 1px solid #555; }
 
-/* badge override (Markdown uses different class) */
-.comment-badge {
-    position: fixed; top: 10px; right: 10px; background: #0078d4; color: #fff;
-    border: none; border-radius: 12px; padding: 4px 12px; font: inherit; font-size: 12px;
-    z-index: 100; cursor: pointer;
-}
-.comment-badge:hover { background: #106ebe; }
-
 /* sidebar panel (Markdown uses #comment-list-panel instead of #sidebar) */
 #comment-list-panel {
-    display: none; position: fixed; top: 0; right: 0; width: 350px; height: 100%;
-    background: var(--vscode-editorWidget-background, #1e1e1e);
-    border-left: 1px solid var(--vscode-editorWidget-border, #454545);
-    box-shadow: -4px 0 12px rgba(0,0,0,.3); z-index: 1500; overflow-y: auto;
+    display: none; position: fixed; top: 0; right: 0; width: min(400px, 92vw); height: 100%;
+    background: var(--vscode-sideBar-background, var(--vscode-editorWidget-background)); color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+    border-left: 1px solid var(--vscode-sideBar-border, var(--vscode-editorWidget-border));
+    box-shadow: -6px 0 18px var(--vscode-widget-shadow); z-index: 1500; overflow-y: auto;
 }
 #comment-list-panel .panel-hdr {
-    position: sticky; top: 0; padding: 12px 16px;
-    background: var(--vscode-editorWidget-background, #1e1e1e);
-    border-bottom: 1px solid #454545; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; padding: 0 12px 0 16px; height: 42px;
+    background: var(--vscode-sideBar-background, var(--vscode-editorWidget-background));
+    border-bottom: 1px solid var(--vscode-sideBar-border, var(--vscode-editorWidget-border)); display: flex; justify-content: space-between; align-items: center;
     z-index: 10;
 }
-#comment-list-panel .panel-hdr h3 { margin: 0; font-size: 14px; border: none; }
+#comment-list-panel .panel-hdr h3 { margin: 0; font-size: 13px; border: none; }
 #comment-list-panel .panel-close {
-    background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; padding: 4px 8px;
+    width: 28px; height: 28px; background: none; border: none; border-radius: 4px; color: var(--vscode-icon-foreground); cursor: pointer; padding: 0;
 }
+#comment-list-panel .panel-close:hover { background: var(--vscode-toolbar-hoverBackground); }
 .panel-toolbar {
-    padding: 8px 16px; border-bottom: 1px solid #333;
-    position: sticky; top: 48px; background: var(--vscode-editorWidget-background, #1e1e1e); z-index: 9;
+    padding: 12px 16px; border-bottom: 1px solid var(--vscode-sideBar-border, var(--vscode-editorWidget-border));
+    position: sticky; top: 42px; background: var(--vscode-sideBar-background, var(--vscode-editorWidget-background)); z-index: 9;
 }
 .panel-toolbar input {
-    width: 100%; padding: 4px 8px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c);
-    color: var(--vscode-input-foreground, #ccc); border-radius: 3px; font-size: 12px; box-sizing: border-box;
+    width: 100%; height: 28px; padding: 0 9px; border: 1px solid var(--vscode-input-border, transparent); background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground); border-radius: 3px; font: inherit; box-sizing: border-box;
 }
-.panel-filters { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-.panel-filters button { padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc; border-radius: 3px; cursor: pointer; font-size: 10px; }
-.panel-filters button:hover { background: #444; }
-.panel-filters button.active { background: #0078d4; border-color: #0078d4; color: #fff; }
-.panel-bulk { display: flex; gap: 4px; margin-top: 6px; }
-.panel-bulk button { padding: 2px 8px; border: 1px solid #555; background: #333; color: #ccc; border-radius: 3px; cursor: pointer; font-size: 10px; }
-.panel-bulk button:hover { background: #444; }
-
-/* ---------- export buttons ---------- */
-.export-buttons {
-    position: fixed; top: 10px; right: 220px; z-index: 100;
-    display: flex; gap: 6px;
+.panel-filters { display: flex; gap: 0; margin-top: 8px; flex-wrap: wrap; }
+.panel-filters button { min-height: 26px; padding: 0 9px; border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border)); background: transparent; color: var(--vscode-foreground); cursor: pointer; font-size: 11px; }
+.panel-filters button:first-child { border-radius: 4px 0 0 4px; }
+.panel-filters button:last-child { border-radius: 0 4px 4px 0; }
+.panel-filters button + button { margin-left: -1px; }
+.panel-filters button:hover { background: var(--vscode-toolbar-hoverBackground); }
+.panel-filters button.active { background: var(--vscode-button-background); border-color: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.panel-bulk { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+.panel-bulk button { min-height: 26px; padding: 0 8px; border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border)); background: transparent; color: var(--vscode-foreground); border-radius: 4px; cursor: pointer; font-size: 11px; }
+.panel-bulk button:hover { background: var(--vscode-toolbar-hoverBackground); }
+@media (max-width: 620px) {
+    .toolbar-label { display: none; }
+    .toolbar-action, .toolbar-menu > summary { padding: 0 7px; }
+    #content { padding-left: 14px; padding-right: 16px; }
 }
-.export-btn {
-    padding: 4px 10px; border-radius: 12px; border: 1px solid #555;
-    background: #333; color: #ccc; font-size: 12px; cursor: pointer;
-}
-.export-btn:hover { background: #444; }
 </style>
 </head>
 <body>
 
-<button type="button" class="comment-badge" id="comment-badge" style="display:none" onclick="togglePanel()" aria-label="Review comments">
-    &#x1F4AC; <span id="badge-count">0</span> comments
-</button>
-<div class="export-buttons">
+<header id="review-toolbar">
+    <div class="toolbar-mode"><span class="codicon codicon-comment-discussion" aria-hidden="true"></span><span>Review</span></div>
+    <div class="toolbar-actions">
     ${this.isDocx ? `
-    <button class="export-btn" onclick="saveDocx()" title="Save changes back to .docx file">&#x1F4BE; Save .docx</button>
+        <button class="toolbar-action toolbar-action-primary" onclick="saveDocx()" title="Save changes back to .docx file"><span class="codicon codicon-save" aria-hidden="true"></span><span class="toolbar-label">Save</span></button>
     ` : `
-    <button class="export-btn" onclick="enterMarkdownEditor()" title="Edit Markdown with inline differences">&#x270E; Edit</button>
-    <button class="export-btn" onclick="jumpToSource()" title="Jump to source editor at current scroll position. You can also double-click anywhere in the preview to jump to that block in the source.">&#x2190; Source</button>
-    <button class="export-btn" onclick="exportPdf()" title="Export to PDF">&#x1F4C4; PDF</button>
-    <button class="export-btn" onclick="exportDocx()" title="Export to DOCX">&#x1F4DD; DOCX</button>
+        <button class="toolbar-action toolbar-action-primary" onclick="enterMarkdownEditor()" title="Edit Markdown with inline differences"><span class="codicon codicon-edit" aria-hidden="true"></span><span class="toolbar-label">Edit</span></button>
+        <button class="toolbar-action" onclick="jumpToSource()" title="Open the source at the current block"><span class="codicon codicon-code" aria-hidden="true"></span><span class="toolbar-label">Source</span></button>
+        <details class="toolbar-menu">
+            <summary title="Export document"><span class="codicon codicon-export" aria-hidden="true"></span><span class="toolbar-label">Export</span><span class="codicon codicon-chevron-down" aria-hidden="true"></span></summary>
+            <div class="toolbar-menu-popover">
+                <button onclick="exportPdf(); this.closest('details').removeAttribute('open')"><span class="codicon codicon-file-pdf" aria-hidden="true"></span>Export PDF</button>
+                <button onclick="exportDocx(); this.closest('details').removeAttribute('open')"><span class="codicon codicon-file-code" aria-hidden="true"></span>Export DOCX</button>
+            </div>
+        </details>
     `}
-</div>
+        <button type="button" class="toolbar-action" id="comment-badge" style="display:none" onclick="togglePanel()" aria-label="Review comments"><span class="codicon codicon-comment-discussion" aria-hidden="true"></span><span class="toolbar-label">Comments</span><span id="badge-count">0</span></button>
+    </div>
+</header>
 
 <div id="wrapper">
     <div id="gutter"></div>
@@ -1998,8 +2026,8 @@ ${commentUiCss()}
 
 <div id="comment-list-panel">
     <div class="panel-hdr">
-        <h3>&#x1F4AC; Review Comments</h3>
-        <button class="panel-close" onclick="togglePanel()">&times;</button>
+        <h3>Review comments</h3>
+        <button class="panel-close" onclick="togglePanel()" aria-label="Close review comments"><span class="codicon codicon-close" aria-hidden="true"></span></button>
     </div>
     <div class="panel-toolbar">
         <input type="text" id="comment-search" placeholder="Search comments..." oninput="buildList()">
@@ -2011,8 +2039,8 @@ ${commentUiCss()}
             <button id="filter-agent" onclick="setFilter('agent')">Agent</button>
         </div>
         <div class="panel-bulk">
-            ${this.canSendPrompt() ? '<button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>' : ''}
-            <button onclick="copyAllToClipboard()">&#x1F4CB; Copy Prompt</button>
+            ${this.canSendPrompt() ? '<button onclick="sendAllToCopilot()">Send All to Copilot</button>' : ''}
+            <button onclick="copyAllToClipboard()">Copy Prompt</button>
             <button onclick="resolveAll()">Resolve All</button>
             <button onclick="deleteAllResolved()">Delete Resolved</button>
         </div>
@@ -2028,8 +2056,8 @@ ${commentUiCss()}
     <div class="dlg-actions">
         <button class="btn-cancel" onclick="hideDialog()">Cancel</button>
         <button class="btn-primary" onclick="submitComment()">Add Comment</button>
-        ${this.canSendPrompt() ? '<button class="btn-primary btn-copilot" onclick="submitCommentAndAsk()">&#x2728; Ask Copilot</button>' : ''}
-        <button class="btn-primary" onclick="submitCommentAndCopyPrompt()">&#x1F4CB; Copy Prompt</button>
+        ${this.canSendPrompt() ? '<button class="btn-primary btn-copilot" onclick="submitCommentAndAsk()">Ask Copilot</button>' : ''}
+        <button class="btn-primary" onclick="submitCommentAndCopyPrompt()">Copy Prompt</button>
     </div>
 </div>
 
@@ -2065,11 +2093,13 @@ ${commentUiCss()}
             var el = findElement(block);
             if (!el) return;
             var rect = el.getBoundingClientRect();
+            var gutterRect = gutter.getBoundingClientRect();
             var btn = document.createElement('button');
             btn.className = 'gutter-btn';
-            btn.textContent = '+';
-            btn.style.top = (rect.top + window.scrollY) + 'px';
-            btn.title = block.type + ': ' + block.preview.substring(0, 40);
+            btn.innerHTML = '<span class="codicon codicon-add" aria-hidden="true"></span>';
+            btn.style.top = (rect.top - gutterRect.top) + 'px';
+            btn.title = 'Add comment to ' + block.type;
+            btn.setAttribute('aria-label', 'Add comment to ' + block.type);
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 pendingBlock = {

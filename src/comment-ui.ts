@@ -13,84 +13,84 @@ export function commentUiCss(): string {
     return `
 /* ---------- comment badge ---------- */
 #comment-badge {
-    position: fixed; top: 10px; right: 10px;
-    background: var(--vscode-badge-background, #007acc);
-    color: var(--vscode-badge-foreground, #fff);
-    padding: 6px 14px; border-radius: 20px; cursor: pointer;
-    font-size: 13px; z-index: 999; display: none;
+    cursor: pointer; display: none;
 }
 
 /* ---------- popover ---------- */
 #comment-popover {
     display: none; position: absolute; z-index: 100;
-    background: var(--vscode-editor-background, #252526);
-    border: 1px solid var(--vscode-panel-border, #444);
-    border-radius: 8px; padding: 12px; width: 340px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    background: var(--vscode-editorWidget-background);
+    color: var(--vscode-editorWidget-foreground);
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 5px; padding: 12px; width: 340px;
+    box-shadow: 0 4px 14px var(--vscode-widget-shadow);
     max-height: 400px; overflow-y: auto;
 }
 .pop-text { font-size: 13px; margin-bottom: 6px; }
-.pop-meta { font-size: 11px; color: #888; margin-bottom: 8px; }
-.pop-replies { margin: 8px 0; padding-left: 12px; border-left: 2px solid #555; max-height: 40vh; overflow-y: auto; }
+.pop-meta { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
+.pop-replies { margin: 10px 0; padding-left: 12px; border-left: 1px solid var(--vscode-editorWidget-border); max-height: 40vh; overflow-y: auto; }
 .pop-reply { margin-bottom: 6px; }
 .pop-reply-text { font-size: 12px; white-space: pre-wrap; }
-.pop-reply-meta { font-size: 10px; color: #888; }
+.pop-reply-meta { font-size: 10px; color: var(--vscode-descriptionForeground); }
 .pop-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.pop-actions button { padding: 3px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); }
+.pop-actions button { min-height: 26px; padding: 0 9px; border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border)); border-radius: 4px; cursor: pointer; font-size: 11px; background: transparent; color: var(--vscode-foreground); }
+.pop-actions button:hover { background: var(--vscode-toolbar-hoverBackground); }
 .pop-reply-input { margin-top: 8px; }
 .pop-reply-input textarea {
-    width: 100%; padding: 4px; border: 1px solid #555;
-    background: var(--vscode-input-background, #3c3c3c);
-    color: var(--vscode-input-foreground, #ccc);
+    width: 100%; padding: 6px 8px; border: 1px solid var(--vscode-input-border, transparent);
+    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
     border-radius: 3px; font-family: inherit; font-size: 12px;
     resize: none; box-sizing: border-box;
 }
 .pop-reply-input button {
-    margin-top: 4px; padding: 3px 10px; border: 1px solid #555; background: #333;
-    color: #ccc; border-radius: 3px; cursor: pointer; font-size: 11px;
+    min-height: 26px; margin-top: 6px; padding: 0 9px; border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border)); background: transparent;
+    color: var(--vscode-foreground); border-radius: 4px; cursor: pointer; font-size: 11px;
 }
-.pop-reply-input button:hover { background: #444; }
+.pop-reply-input button:hover { background: var(--vscode-toolbar-hoverBackground); }
 
 /* ---------- comment dialog ---------- */
 #comment-dialog { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
 #comment-dialog.open { display: flex; }
-.dlg-box { background: var(--vscode-editor-background, #252526); border: 1px solid var(--vscode-panel-border, #444); border-radius: 8px; padding: 20px; width: 500px; max-width: 90vw; }
+.dlg-box { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 6px; padding: 20px; width: 500px; max-width: 90vw; box-shadow: 0 8px 24px var(--vscode-widget-shadow); }
 .dlg-box h3 { margin: 0 0 8px; color: var(--vscode-foreground, #ccc); }
-.dlg-preview { font-size: 12px; color: #888; margin-bottom: 8px; padding: 6px; background: var(--vscode-textBlockQuote-background, #2d2d30); border-radius: 4px; }
-.dlg-box textarea { width: 100%; min-height: 80px; padding: 8px; border: 1px solid #555; background: var(--vscode-input-background, #3c3c3c); color: var(--vscode-input-foreground, #ccc); border-radius: 4px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+.dlg-preview { font-size: 12px; color: var(--vscode-descriptionForeground); margin-bottom: 10px; padding: 8px; background: var(--vscode-textBlockQuote-background); border-left: 2px solid var(--vscode-textBlockQuote-border); }
+.dlg-box textarea { width: 100%; min-height: 88px; padding: 8px; border: 1px solid var(--vscode-input-border, transparent); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 3px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
 .dlg-actions { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
-.dlg-actions button { padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.dlg-actions button { min-height: 28px; padding: 0 12px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-size: 12px; }
 .btn-primary { background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); }
-.btn-cancel { background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #ccc); }
-.btn-copilot { background: #68217A !important; color: #fff; }
+.btn-cancel { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.btn-copilot { background: var(--vscode-button-secondaryBackground) !important; color: var(--vscode-button-secondaryForeground) !important; border-color: var(--vscode-button-border, transparent) !important; }
 
 /* ---------- role badges ---------- */
-.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; font-weight: 600; }
-.role-user { background: #0078D4; color: #fff; }
-.role-agent { background: #68217A; color: #fff; }
-.role-word { background: #2e7d32; color: #fff; }
-.role-pptx { background: #2196F3; color: #fff; }
+.role-badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-right: 5px; font-weight: 600; border: 1px solid var(--vscode-editorWidget-border); background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.role-user { border-color: var(--vscode-charts-blue); }
+.role-agent { border-color: var(--vscode-charts-purple); }
+.role-word { border-color: var(--vscode-charts-green); }
+.role-pptx { border-color: var(--vscode-charts-orange); }
 
 /* ---------- inline edit / delete buttons ---------- */
-.inline-edit-btn { background: none !important; border: none !important; color: #888 !important; cursor: pointer; font-size: 10px !important; padding: 0 2px !important; text-decoration: underline; }
-.inline-edit-btn:hover { color: #ccc !important; }
-.reply-delete-btn { background: none !important; border: none !important; color: #888 !important; cursor: pointer; font-size: 14px !important; padding: 0 2px !important; }
-.reply-delete-btn:hover { color: #f44 !important; }
+.inline-edit-btn { background: none !important; border: none !important; color: var(--vscode-descriptionForeground) !important; cursor: pointer; font-size: 10px !important; padding: 0 2px !important; }
+.inline-edit-btn:hover { color: var(--vscode-foreground) !important; }
+.reply-delete-btn { background: none !important; border: none !important; color: var(--vscode-descriptionForeground) !important; cursor: pointer; font-size: 14px !important; padding: 0 2px !important; }
+.reply-delete-btn:hover { color: var(--vscode-errorForeground) !important; }
 
 /* ---------- sidebar / comment list panel ---------- */
-.clist-item { padding: 10px; margin-bottom: 8px; background: var(--vscode-input-background, #3c3c3c); border-radius: 6px; border-left: 3px solid #007acc; cursor: pointer; }
-.clist-item.word-comment { border-left-color: #4caf50; }
-.clist-item.pptx-comment { border-left-color: #2196F3; }
-.clist-item.resolved { opacity: 0.5; border-left-color: #666; }
-.item-preview { font-size: 11px; color: #888; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-comment { font-size: 13px; margin-bottom: 4px; white-space: pre-wrap; }
-.item-meta { font-size: 11px; color: #888; }
-.item-replies { margin-top: 6px; padding-left: 12px; border-left: 2px solid #555; }
+.clist-item { padding: 14px 16px; margin: 0; background: transparent; border-radius: 0; border-bottom: 1px solid var(--vscode-sideBar-border, var(--vscode-editorWidget-border)); cursor: pointer; }
+.clist-item:hover { background: var(--vscode-list-hoverBackground); }
+.clist-item.word-comment { box-shadow: inset 2px 0 var(--vscode-charts-green); }
+.clist-item.pptx-comment { box-shadow: inset 2px 0 var(--vscode-charts-orange); }
+.clist-item.resolved { opacity: 0.62; }
+.item-preview { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-comment { font-size: 13px; line-height: 1.45; margin-bottom: 5px; white-space: pre-wrap; }
+.item-meta { font-size: 10px; color: var(--vscode-descriptionForeground); }
+.item-replies { margin-top: 10px; padding-left: 12px; border-left: 1px solid var(--vscode-editorWidget-border); }
 .item-reply { margin-bottom: 4px; }
 .item-reply-text { font-size: 12px; white-space: pre-wrap; }
-.item-reply-meta { font-size: 10px; color: #888; }
+.item-reply-meta { font-size: 10px; color: var(--vscode-descriptionForeground); }
 .item-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
-.item-actions button, .item-reply-input button { padding: 3px 10px; background: var(--vscode-button-background, #0078D4); color: var(--vscode-button-foreground, #fff); border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+.item-actions button, .item-reply-input button { min-height: 26px; padding: 0 9px; background: transparent; color: var(--vscode-foreground); border: 1px solid var(--vscode-button-border, var(--vscode-editorWidget-border)); border-radius: 4px; cursor: pointer; font-size: 11px; }
+.item-actions button:hover, .item-reply-input button:hover { background: var(--vscode-toolbar-hoverBackground); }
+.item-reply-input textarea { border-color: var(--vscode-input-border, transparent) !important; background: var(--vscode-input-background) !important; color: var(--vscode-input-foreground) !important; border-radius: 3px !important; padding: 6px 8px !important; }
 `;
 }
 
@@ -158,7 +158,7 @@ export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
     function _isNativeComment(c) { return c._source === __nativeSource && __nativeSource; }
     function _isNativeReply(r) { return r.id && __nativePrefix && r.id.startsWith(__nativePrefix); }
     function _authorBadge(c) {
-        if (c._source === 'word') return '<span class="role-badge role-word">\\uD83D\\uDCCE ' + esc(c._wordAuthor || 'Word') + '</span>';
+        if (c._source === 'word') return '<span class="role-badge role-word">' + esc(c._wordAuthor || 'Word') + '</span>';
         if (c._source === 'pptx') return '<span class="role-badge role-pptx">' + esc(c._wordAuthor || 'PPT') + '</span>';
         return '<span class="role-badge role-' + (c.role||'user') + '">' + (c.role||'user') + '</span>';
     }
@@ -186,7 +186,7 @@ export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
         }
         var editBtn = isNative ? '' : ' <button class="inline-edit-btn" onclick="event.stopPropagation();startEditComment(\\'' + comment.id + '\\')">edit</button>';
         var directPromptBtn = __canSendPrompt
-            ? '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">&#x2728; Ask Copilot</button>'
+            ? '<button class="btn-copilot" onclick="askCopilotThread(\\'' + comment.id + '\\')">Ask Copilot</button>'
             : '';
         pop.innerHTML =
             '<div class="pop-text" id="pop-comment-' + comment.id + '">' + authorBadge + esc(comment.comment) + editBtn + '</div>' +
@@ -195,7 +195,7 @@ export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
             '<div class="pop-reply-input"><textarea id="pop-reply-input" placeholder="Reply..." rows="2"></textarea>' +
             '<button onclick="submitReply(\\'' + comment.id + '\\')">Reply</button>' +
             directPromptBtn +
-            '<button onclick="copyPromptThread(\\'' + comment.id + '\\')">&#x1F4CB; Copy Prompt</button></div>' +
+            '<button onclick="copyPromptThread(\\'' + comment.id + '\\')">Copy Prompt</button></div>' +
             '<div class="pop-actions">' + resolveBtn +
             (isNative ? '' : '<button onclick="deleteComment(\\'' + comment.id + '\\')">Delete</button>') + '</div>';
         var rect = anchorEl.getBoundingClientRect();
@@ -343,7 +343,7 @@ export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
                 : '<button onclick="event.stopPropagation();resolveComment(\\'' + c.id + '\\')">Resolve</button>';
             var deleteBtn = isNative ? '' : '<button onclick="event.stopPropagation();deleteComment(\\'' + c.id + '\\')">Delete</button>';
             var directPromptBtn = __canSendPrompt
-                ? '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x2728; Ask Copilot</button>'
+                ? '<button class="btn-copilot" onclick="event.stopPropagation();askCopilotThread(\\'' + c.id + '\\')" style="margin-top:4px;">Ask Copilot</button>'
                 : '';
 
             div.innerHTML =
@@ -355,7 +355,7 @@ export function commentUiJs(opts: { canSendPrompt?: boolean } = {}): string {
                 '<textarea id="list-reply-' + c.id + '" placeholder="Reply..." rows="1" style="width:100%;margin-top:6px;padding:4px;border:1px solid #555;background:var(--vscode-input-background,#3c3c3c);color:var(--vscode-input-foreground,#ccc);border-radius:3px;font-size:12px;resize:none;box-sizing:border-box;"></textarea>' +
                 '<button onclick="event.stopPropagation();submitListReply(\\'' + c.id + '\\')" style="margin-top:4px;">Reply</button>' +
                 directPromptBtn +
-                '<button onclick="event.stopPropagation();copyPromptThread(\\'' + c.id + '\\')" style="margin-top:4px;">&#x1F4CB; Copy Prompt</button></div>' +
+                '<button onclick="event.stopPropagation();copyPromptThread(\\'' + c.id + '\\')" style="margin-top:4px;">Copy Prompt</button></div>' +
                 '<div class="item-actions">' + resolveBtn +
                 deleteBtn + '</div>';
 
@@ -511,7 +511,7 @@ export function sidebarHtml(opts: { containerId: string; toggleFn: string; filte
         return `<button id="filter-${f}" ${f === 'all' ? 'class="active"' : ''} onclick="setFilter('${f}')">${label}</button>`;
     }).join('\n            ');
     const directPromptButton = opts.canSendPrompt !== false
-        ? '<button onclick="sendAllToCopilot()">&#x2728; Send All to Copilot</button>'
+        ? '<button onclick="sendAllToCopilot()">Send All to Copilot</button>'
         : '';
 
     return `
@@ -522,7 +522,7 @@ export function sidebarHtml(opts: { containerId: string; toggleFn: string; filte
     </div>
     <div class="panel-bulk" style="display:flex;gap:4px;flex-wrap:wrap;">
         ${directPromptButton}
-        <button onclick="copyAllToClipboard()">&#x1F4CB; Copy Prompt</button>
+        <button onclick="copyAllToClipboard()">Copy Prompt</button>
         <button onclick="resolveAll()">Resolve All</button>
         <button onclick="deleteAllResolved()">Delete Resolved</button>
     </div>
