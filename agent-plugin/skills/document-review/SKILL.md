@@ -11,10 +11,10 @@ description: Review and address comments on Markdown documents using docReview t
 4. Edit the Markdown file using the host's normal file-editing tools.
 5. Call `docReview_reply_to_comment` with `role: "agent"` and briefly explain the completed change.
 6. Do not resolve a comment unless the user explicitly asks. If asked, call `docReview_resolve_comment` only after the requested change is complete.
-7. In the main VS Code window, prefer the native **Markdown Review: Open Markdown Preview** command when the installed extension is available. It provides the full rendered document and blue gutter `+` buttons.
-8. In the dedicated Agents window, use `docReview_open_review` for the compact inline MCP review UI. VS Code does not currently expose the native preview there.
+7. In VS Code, use the companion **Markdown Review: Open Markdown Preview** command when the extension is installed. It provides the full rendered document and blue gutter `+` buttons.
+8. This plugin does not provide an inline review UI. Use the MCP tools directly when the companion extension is unavailable.
 
-The inline review fallback lists Markdown blocks with a blue `+` button. The user can add a new anchored review comment directly from that view. Agents can use `docReview_add_comment` when the user explicitly asks them to create a comment on a block from the latest snapshot.
+Agents can use `docReview_add_comment` when the user explicitly asks them to create a comment on a block from the latest `docReview_list_comments` snapshot.
 
 Preserve `<!--@c...-->` review anchors. The delete-comment tool owns anchor removal.
 

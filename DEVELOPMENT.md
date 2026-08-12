@@ -150,7 +150,7 @@ node out/mcp-server.js --document-path /path/to/file.md
 ## Testing
 
 ```bash
-# Agent Plugin: type-check, staged stdio MCP tests, and Edge MCP App bridge tests
+# Agent Plugin: type-check and staged stdio MCP integration tests
 npm run test:agent-plugin
 
 # Run parser tests

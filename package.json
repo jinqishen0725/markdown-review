@@ -422,7 +422,7 @@
     "bundle:pptx-viewer": "npx esbuild src/pptx-viewer-webview.ts --bundle --outfile=media/pptx-viewer.js --format=iife --global-name=PptxLib --platform=browser --target=es2020",
     "watch": "tsc -watch -p ./",
     "package": "npm run bundle && vsce package",
-    "test:agent-plugin": "npm run build:agent-plugin && npx tsc -p agent-plugin/tsconfig.json && node agent-plugin/test/test-server.js && node agent-plugin/test/test-app.js"
+    "test:agent-plugin": "npm run build:agent-plugin && npx tsc -p agent-plugin/tsconfig.json && node agent-plugin/test/test-server.js"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -435,7 +435,6 @@
   },
   "dependencies": {
     "@aiden0z/pptx-renderer": "^1.0.2",
-    "@modelcontextprotocol/ext-apps": "^1.7.5",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@traptitech/markdown-it-katex": "^3.6.0",
     "@xmldom/xmldom": "^0.9.9",

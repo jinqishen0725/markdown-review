@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { z } from 'zod';
 import {
     addComment,
@@ -14,8 +11,6 @@ import {
     setResolved,
 } from './review-store';
 
-const REVIEW_APP_URI = 'ui://markdown-review/review-v3.html';
-
 function textResult(message: string, structuredContent: object) {
     return {
         content: [{ type: 'text' as const, text: message }],
@@ -25,7 +20,7 @@ function textResult(message: string, structuredContent: object) {
 
 export function createServer(): McpServer {
     const server = new McpServer(
-        { name: 'markdown-review-agent', version: '0.3.0' },
+        { name: 'markdown-review-agent', version: '0.4.0' },
         {
             instructions: 'Use these tools for Markdown review comments. Read a comment before editing, reply after editing, and never resolve comments unless the user explicitly asks.',
         },
@@ -151,42 +146,6 @@ export function createServer(): McpServer {
             const snapshot = deleteComment(filePath, commentId);
             return textResult(`Comment ${commentId} deleted.`, snapshot);
         },
-    );
-
-    registerAppTool(
-        server,
-        'docReview_open_review',
-        {
-            title: 'Open Inline Markdown Review',
-            description: 'Open a compact inline MCP App for Markdown blocks and comments. In VS Code, prefer the native Markdown Review preview when the extension is available.',
-            inputSchema: { filePath: z.string().describe('Absolute path to a Markdown file.') },
-            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-            _meta: { ui: { resourceUri: REVIEW_APP_URI } },
-        },
-        async ({ filePath }) => {
-            const snapshot = listComments(filePath);
-            return textResult(`Opened compact inline review for ${snapshot.fileName}.`, snapshot);
-        },
-    );
-
-    registerAppResource(
-        server,
-        'Markdown Review App',
-        REVIEW_APP_URI,
-        { description: 'Interactive Markdown comment review interface.' },
-        async () => ({
-            contents: [{
-                uri: REVIEW_APP_URI,
-                mimeType: RESOURCE_MIME_TYPE,
-                text: fs.readFileSync(path.join(__dirname, 'review-app.html'), 'utf8'),
-                _meta: {
-                    ui: {
-                        prefersBorder: true,
-                        permissions: { clipboardWrite: {} },
-                    },
-                },
-            }],
-        }),
     );
 
     return server;

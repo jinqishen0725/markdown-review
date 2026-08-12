@@ -5,11 +5,12 @@ This is the standalone, Markdown-only Agent Plugin for the VS Code Agent App. It
 - A `document-review` Agent Skill.
 - A bundled stdio MCP server.
 - Markdown comment list/read/reply/resolve/reopen/delete tools.
-- An interactive MCP App with blue block-level `+` buttons, `Prepare for Agent`, and `Copy Prompt` actions.
 
-`Prepare for Agent` fills the owning conversation's composer. VS Code does not auto-submit MCP App messages, so review and send the prepared prompt yourself.
+## Visual Review Requirement
 
-The dedicated Agents window currently supports this MCP App as a compact inline chat widget. The full native **Markdown Review: Open Markdown Preview** experience, including blue gutter `+` buttons, remains available in the main VS Code window.
+This plugin intentionally does not include an inline MCP App. For the full third-pane Markdown Review editor, blue gutter `+` buttons, and Ask Copilot actions, install the companion [Markdown Reader with Copilot extension](https://marketplace.visualstudio.com/items?itemName=JinqiShen.markdown-review).
+
+The plugin remains usable by itself for agent-driven Markdown comment operations through its MCP tools. Agent Plugin marketplaces cannot install the companion VS Code extension automatically, so VS Code users must install both entries for the complete visual experience.
 
 ## Build And Test
 

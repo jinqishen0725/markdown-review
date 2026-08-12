@@ -1,6 +1,8 @@
 # VS Code Agent App Integration Plan
 
-Status: Proposed
+Status: Implemented, with the inline MCP App sections superseded
+
+Current decision: the standalone plugin provides the Agent Skill and Markdown MCP tools only. The inline MCP App was removed because VS Code can render it only as a compact chat widget, not as the full review editor. VS Code users should install the companion Markdown Reader with Copilot extension for the third-pane visual review experience. Agent Plugin Marketplace documentation may link to that extension, but plugin installation cannot install it automatically.
 
 Primary target: VS Code Agent App / Agent Host
 

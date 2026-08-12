@@ -78,15 +78,13 @@ async function run() {
             'docReview_resolve_comment',
             'docReview_reopen_comment',
             'docReview_delete_comment',
-            'docReview_open_review',
         ];
         assert.deepEqual([...tools.keys()].sort(), expected.sort());
         assert.equal(tools.get('docReview_list_comments').annotations.readOnlyHint, true);
         assert.equal(tools.get('docReview_delete_comment').annotations.destructiveHint, true);
-        assert.equal(tools.get('docReview_open_review')._meta.ui.resourceUri, 'ui://markdown-review/review-v3.html');
 
         const openResult = await client.callTool({
-            name: 'docReview_open_review',
+            name: 'docReview_list_comments',
             arguments: { filePath: markdownPath },
         });
         assert.equal(openResult.structuredContent.fileName, 'review fixture.md');
@@ -118,12 +116,6 @@ async function run() {
         });
         assert.equal(staleResult.isError, true);
         assert.match(staleResult.content[0].text, /stale or no longer exists/);
-
-        const resource = await client.readResource({ uri: 'ui://markdown-review/review-v3.html' });
-        assert.equal(resource.contents[0].mimeType, 'text/html;profile=mcp-app');
-        assert.match(resource.contents[0].text, /Prepare for Agent/);
-        assert.match(resource.contents[0].text, /Copy Prompt/);
-        assert.doesNotMatch(resource.contents[0].text, /<script>\/\*__APP_SCRIPT__\*\/<\/script>/);
 
         const readResult = await client.callTool({
             name: 'docReview_read_comment',

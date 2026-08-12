@@ -117,11 +117,8 @@ The separate [agent-plugin](agent-plugin) folder contains a Markdown-only Agent 
 
 - `document-review` Agent Skill
 - Self-contained stdio MCP server
-- Interactive MCP App for reviewing comment threads
-- **Prepare for Agent** fills the owning conversation's composer
-- **Copy Prompt** provides an explicit clipboard fallback
 
-The dedicated Agents window currently uses the compact inline MCP review UI; the full native Markdown Review preview remains available in the main VS Code window. VS Code does not auto-submit messages prepared by an MCP App, so review the populated composer and send it yourself. Word and PowerPoint support are deferred for this plugin preview; the VS Code extension continues to support them.
+The plugin intentionally has no inline MCP App. Install the companion VS Code extension for the full third-pane review UI; an Agent Plugin Marketplace listing can link to that extension but cannot install it automatically. Word and PowerPoint support remain extension-only.
 
 ---
 

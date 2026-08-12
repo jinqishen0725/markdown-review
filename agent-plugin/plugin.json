@@ -1,12 +1,13 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "markdown-review",
-  "version": "0.3.0",
-  "description": "Review Markdown documents with agent-accessible comments and an interactive MCP App.",
+  "version": "0.4.0",
+  "description": "Review Markdown documents with agent-accessible comment tools. Install the companion VS Code extension for the visual editor.",
   "author": {
     "name": "Jinqi Shen"
   },
   "repository": "https://github.com/jinqishen0725/markdown-review",
+  "homepage": "https://marketplace.visualstudio.com/items?itemName=JinqiShen.markdown-review",
   "license": "MIT",
   "keywords": [
     "markdown",
