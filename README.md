@@ -111,6 +111,20 @@ Full support in **Cursor IDE** via an embedded MCP server that registers automat
 
 ---
 
+## Agent App Plugin (Preview)
+
+The separate [agent-plugin](agent-plugin) folder contains a Markdown-only Agent Plugin for the VS Code Agent App:
+
+- `document-review` Agent Skill
+- Self-contained stdio MCP server
+- Interactive MCP App for reviewing comment threads
+- **Prepare for Agent** fills the owning conversation's composer
+- **Copy Prompt** provides an explicit clipboard fallback
+
+The dedicated Agents window currently uses the compact inline MCP review UI; the full native Markdown Review preview remains available in the main VS Code window. VS Code does not auto-submit messages prepared by an MCP App, so review the populated composer and send it yourself. Word and PowerPoint support are deferred for this plugin preview; the VS Code extension continues to support them.
+
+---
+
 ## Architecture
 
 ```
@@ -138,6 +152,10 @@ npm install
 
 # Bundle both entry points (extension + MCP server)
 npm run bundle
+
+# Build and test the standalone Markdown Agent Plugin
+npm run build:agent-plugin
+npm run test:agent-plugin
 
 # Package VSIX
 npx vsce package --no-dependencies --allow-missing-repository
@@ -167,6 +185,9 @@ node test/test-mermaid-edge-fix.js  # E2E mermaid rendering via Chrome/Edge head
 
 | Version | Highlights |
 |---------|-----------|
+| **5.2.6** | Wait for the Agents composer focus transition before inserting Ask Copilot prompts |
+| **5.2.5** | Restore reliable Ask Copilot composer prefill in the Agents window, add clipboard fallback, and expose the review-comments badge as an accessible button |
+| **5.2.4** | Add Markdown Review to Open With and send Ask Copilot prompts through the active Agents conversation |
 | **5.2.3** | Remove the unintended Copy Comment action and include both VS Code and MCP tool identifiers in copied prompts |
 | **5.2.2** | Add explicit Copy Prompt actions across comment dialogs, threads, and bulk review; Cursor now uses copy-only prompt handoff |
 | **5.1.8** | Bundle MCP server with esbuild so it loads in Cursor without `node_modules` (fixes `MODULE_NOT_FOUND` for `@modelcontextprotocol/sdk`) |

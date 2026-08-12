@@ -218,6 +218,24 @@ export class PreviewPanel {
         PreviewPanel.currentPanels.set(key, p);
     }
 
+    public static createInCustomEditor(
+        context: vscode.ExtensionContext,
+        document: vscode.TextDocument,
+        panel: vscode.WebviewPanel,
+    ) {
+        const key = document.uri.fsPath;
+        PreviewPanel.currentPanels.get(key)?.panel.dispose();
+        panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(context.extensionUri, 'media'),
+                vscode.Uri.file(path.dirname(document.uri.fsPath)),
+            ],
+        };
+        const preview = new PreviewPanel(panel, document, context.extensionUri);
+        PreviewPanel.currentPanels.set(key, preview);
+    }
+
     public static async createOrShowDocx(context: vscode.ExtensionContext, docxPath: string) {
         const key = docxPath;
         const existing = PreviewPanel.currentPanels.get(key);
@@ -631,7 +649,14 @@ export class PreviewPanel {
             vscode.window.showWarningMessage('Direct chat is unavailable in this host. Use Copy Prompt instead.');
             return;
         }
-        await vscode.commands.executeCommand('workbench.action.chat.open', { query: prompt });
+        try {
+            await vscode.commands.executeCommand('workbench.action.chat.focusInput');
+            await new Promise(resolve => setTimeout(resolve, 100));
+            await vscode.commands.executeCommand('type', { text: prompt });
+        } catch (error) {
+            await vscode.env.clipboard.writeText(prompt);
+            vscode.window.showWarningMessage('Could not fill the Copilot composer. The prompt was copied to the clipboard.');
+        }
     }
 
     private async copyPrompt(prompt: string): Promise<void> {
@@ -1817,7 +1842,8 @@ ${commentUiCss()}
 /* badge override (Markdown uses different class) */
 .comment-badge {
     position: fixed; top: 10px; right: 10px; background: #0078d4; color: #fff;
-    border-radius: 12px; padding: 4px 12px; font-size: 12px; z-index: 100; cursor: pointer;
+    border: none; border-radius: 12px; padding: 4px 12px; font: inherit; font-size: 12px;
+    z-index: 100; cursor: pointer;
 }
 .comment-badge:hover { background: #106ebe; }
 
@@ -1868,9 +1894,9 @@ ${commentUiCss()}
 </head>
 <body>
 
-<div class="comment-badge" id="comment-badge" style="display:none" onclick="togglePanel()">
+<button type="button" class="comment-badge" id="comment-badge" style="display:none" onclick="togglePanel()" aria-label="Review comments">
     &#x1F4AC; <span id="badge-count">0</span> comments
-</div>
+</button>
 <div class="export-buttons">
     ${this.isDocx ? `
     <button class="export-btn" onclick="saveDocx()" title="Save changes back to .docx file">&#x1F4BE; Save .docx</button>

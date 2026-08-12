@@ -6,6 +6,9 @@ patches/
 .gitignore
 .claude/
 .playwright-mcp/
+agent-plugin/
+AGENT_APP_PLUGIN_PLAN.md
+.AGENT_APP_PLUGIN_PLAN.md.comments.json
 node_modules/
 tsconfig.json
 gen-icon.js

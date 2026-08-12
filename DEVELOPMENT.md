@@ -26,6 +26,9 @@ npm run bundle:pptx-viewer
 # Build both
 npm run bundle && npm run bundle:pptx-viewer
 
+# Build the standalone Markdown Agent Plugin
+npm run build:agent-plugin
+
 # Package VSIX for distribution
 npx @vscode/vsce package --no-dependencies
 ```
@@ -147,6 +150,9 @@ node out/mcp-server.js --document-path /path/to/file.md
 ## Testing
 
 ```bash
+# Agent Plugin: type-check, staged stdio MCP tests, and Edge MCP App bridge tests
+npm run test:agent-plugin
+
 # Run parser tests
 node test/test-threading.js        # Word comment threading
 node test/test-pptx-parser.js      # PPTX parser output

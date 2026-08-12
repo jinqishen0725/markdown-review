@@ -12,13 +12,34 @@ function isCursor(): boolean {
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
-        vscode.commands.registerCommand('markdownReview.openPreview', () => {
-            const editor = vscode.window.activeTextEditor;
-            if (!editor || editor.document.languageId !== 'markdown') {
-                vscode.window.showWarningMessage('Open a Markdown file first.');
+        vscode.window.registerCustomEditorProvider(
+            'markdownReview.previewEditor',
+            {
+                resolveCustomTextEditor(document, panel) {
+                    PreviewPanel.createInCustomEditor(context, document, panel);
+                },
+            },
+            {
+                webviewOptions: { retainContextWhenHidden: true },
+                supportsMultipleEditorsPerDocument: false,
+            },
+        ),
+
+        vscode.commands.registerCommand('markdownReview.openPreview', async (uri?: vscode.Uri) => {
+            let document: vscode.TextDocument | undefined;
+            if (uri?.scheme === 'file' && uri.fsPath.toLowerCase().endsWith('.md')) {
+                document = await vscode.workspace.openTextDocument(uri);
+            } else {
+                const editor = vscode.window.activeTextEditor;
+                if (editor?.document.languageId === 'markdown') {
+                    document = editor.document;
+                }
+            }
+            if (!document) {
+                vscode.window.showWarningMessage('Open or select a Markdown file first.');
                 return;
             }
-            PreviewPanel.createOrShow(context, editor.document);
+            PreviewPanel.createOrShow(context, document);
         }),
 
         vscode.commands.registerCommand('markdownReview.openWordPreview', async (uri?: vscode.Uri) => {

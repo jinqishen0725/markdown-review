@@ -442,13 +442,28 @@ assertIncludes(noShapePrompt, 'Shape cNvPr id: N/A', 'no shape id shown as N/A')
 console.log('\n--- Existing extension prompt actions ---');
 
 const previewSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'preview.ts'), 'utf8');
+const extensionSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'extension.ts'), 'utf8');
 assertIncludes(previewSource, "case 'copyPromptThread'", 'routes per-thread Copy Prompt');
 assertIncludes(previewSource, "case 'addCommentAndCopyPrompt'", 'routes add-comment Copy Prompt');
 assertIncludes(previewSource, 'submitAndCopyPrompt', 'PowerPoint dialog exposes Copy Prompt');
 assertIncludes(previewSource, 'submitCommentAndCopyPrompt', 'Markdown/Word dialog exposes Copy Prompt');
 assertIncludes(previewSource, 'canSendPrompt: this.canSendPrompt()', 'shared UI receives direct-send capability');
 assertIncludes(previewSource, "getPromptConfig('both')", 'copied prompts request both native and MCP tool names');
+const focusInputIndex = previewSource.indexOf("executeCommand('workbench.action.chat.focusInput')");
+const focusDelayIndex = previewSource.indexOf('setTimeout(resolve, 100)');
+const typePromptIndex = previewSource.indexOf("executeCommand('type', { text: prompt })");
+assert(focusInputIndex >= 0 && focusInputIndex < focusDelayIndex && focusDelayIndex < typePromptIndex,
+    'Ask Copilot lets composer focus settle before filling it');
+assertNotIncludes(previewSource, "executeCommand('workbench.action.chat.open'", 'Ask Copilot does not redirect through the global Chat router');
+assertNotIncludes(previewSource, "executeCommand('workbench.action.chat.submit')", 'Ask Copilot does not invoke unsupported direct submission');
+assertNotIncludes(previewSource, "executeCommand('workbench.view.sessions.chat')", 'Ask Copilot does not execute a view ID as a command');
+assertIncludes(previewSource, 'The prompt was copied to the clipboard', 'Ask Copilot reports a clipboard fallback when composer fill fails');
+assertIncludes(previewSource, 'aria-label="Review comments"', 'Markdown comment badge is exposed as an accessible button');
 assertNotIncludes(previewSource, 'Review prompt copied to clipboard — paste in Cursor Agent', 'Cursor no longer disguises copy as direct send');
+assertIncludes(extensionSource, 'async (uri?: vscode.Uri)', 'Markdown preview command accepts a custom-editor resource URI');
+assertIncludes(extensionSource, 'vscode.workspace.openTextDocument(uri)', 'Markdown preview command opens the selected custom-editor resource');
+assertIncludes(extensionSource, 'registerCustomEditorProvider(', 'Markdown Review registers an Open With provider');
+assertIncludes(extensionSource, "'markdownReview.previewEditor'", 'Open With provider uses the contributed view type');
 
 // ============================================================
 // Summary

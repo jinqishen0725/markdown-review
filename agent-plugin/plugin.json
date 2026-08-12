@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "markdown-review",
+  "version": "0.3.0",
+  "description": "Review Markdown documents with agent-accessible comments and an interactive MCP App.",
+  "author": {
+    "name": "Jinqi Shen"
+  },
+  "repository": "https://github.com/jinqishen0725/markdown-review",
+  "license": "MIT",
+  "keywords": [
+    "markdown",
+    "review",
+    "comments",
+    "mcp"
+  ]
+}

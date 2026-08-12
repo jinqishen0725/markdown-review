@@ -2,7 +2,7 @@
   "name": "markdown-review",
   "displayName": "Markdown Reader with Copilot",
   "description": "Review Markdown, Word (.docx), and PowerPoint (.pptx) with inline commenting, AI agent tools, and Copilot integration",
-  "version": "5.2.3",
+  "version": "5.2.6",
   "publisher": "JinqiShen",
   "icon": "icon.png",
   "repository": {
@@ -48,6 +48,18 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "customEditors": [
+      {
+        "viewType": "markdownReview.previewEditor",
+        "displayName": "Markdown Review",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
     "commands": [
       {
         "command": "markdownReview.openPreview",
@@ -404,11 +416,13 @@
     "postinstall": "node patches/apply-pptx-renderer-patches.js",
     "compile": "tsc -p ./",
     "bundle": "npm run bundle:extension && npm run bundle:mcp",
+    "build:agent-plugin": "node agent-plugin/scripts/build.js",
     "bundle:extension": "npx esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
     "bundle:mcp": "npx esbuild src/mcp-server.ts --bundle --outfile=out/mcp-server.js --format=cjs --platform=node --target=node18",
     "bundle:pptx-viewer": "npx esbuild src/pptx-viewer-webview.ts --bundle --outfile=media/pptx-viewer.js --format=iife --global-name=PptxLib --platform=browser --target=es2020",
     "watch": "tsc -watch -p ./",
-    "package": "npm run bundle && vsce package"
+    "package": "npm run bundle && vsce package",
+    "test:agent-plugin": "npm run build:agent-plugin && npx tsc -p agent-plugin/tsconfig.json && node agent-plugin/test/test-server.js && node agent-plugin/test/test-app.js"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -421,6 +435,7 @@
   },
   "dependencies": {
     "@aiden0z/pptx-renderer": "^1.0.2",
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@traptitech/markdown-it-katex": "^3.6.0",
     "@xmldom/xmldom": "^0.9.9",
@@ -440,6 +455,7 @@
     "remark-math": "^6.0.0",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
-    "unified": "^11.0.5"
+    "unified": "^11.0.5",
+    "zod": "^3.25.76"
   }
 }
