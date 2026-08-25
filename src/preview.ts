@@ -13,15 +13,7 @@ import {
     stripCommentAnchors,
     CleanTextReplacement,
 } from './anchor-edit';
-
-const { unified } = require('unified');
-const remarkParse = require('remark-parse').default || require('remark-parse');
-const remarkMath = require('remark-math').default || require('remark-math');
-const remarkGfm = require('remark-gfm').default || require('remark-gfm');
-const remarkRehype = require('remark-rehype').default || require('remark-rehype');
-const rehypeKatex = require('rehype-katex').default || require('rehype-katex');
-const rehypeStringify = require('rehype-stringify').default || require('rehype-stringify');
-const rehypeRaw = require('rehype-raw').default || require('rehype-raw');
+import { Block, renderMarkdownDocument } from './markdown-render';
 
 // ---------- AST helpers ----------
 
@@ -37,64 +29,6 @@ function isColorDark(hex: string): boolean {
     return (r * 0.299 + g * 0.587 + b * 0.114) < 128;
 }
 
-interface Block {
-    type: string;
-    startOffset: number;
-    endOffset: number;
-    startLine: number;
-    preview: string;
-    eid?: string;  // Word element ID (paraId) — used instead of offsets for .docx
-}
-
-const BLOCK_TYPES = new Set([
-    'heading', 'paragraph', 'listItem', 'blockquote', 'table', 'math', 'code', 'thematicBreak',
-]);
-
-function collectBlocks(tree: any, source: string): Block[] {
-    const blocks: Block[] = [];
-    function walk(node: any) {
-        if (BLOCK_TYPES.has(node.type) && node.position) {
-            const start = node.position.start.offset as number;
-            const end = node.position.end.offset as number;
-            const raw = source.substring(start, Math.min(end, start + 120));
-            const preview = raw.replace(/\n/g, ' ').trim().substring(0, 80);
-            blocks.push({
-                type: node.type,
-                startOffset: start,
-                endOffset: end,
-                startLine: node.position.start.line,
-                preview,
-            });
-        }
-        if (node.children) {
-            for (const child of node.children) {
-                walk(child);
-            }
-        }
-    }
-    walk(tree);
-    return blocks;
-}
-
-// ---------- rehype plugin: inject data-start-offset / data-end-offset ----------
-
-function rehypeSourcePositions() {
-    return (tree: any) => {
-        visitHast(tree);
-    };
-    function visitHast(node: any) {
-        if (node.type === 'element' && node.position) {
-            if (!node.properties) { node.properties = {}; }
-            node.properties['data-start-offset'] = node.position.start.offset;
-            node.properties['data-end-offset'] = node.position.end.offset;
-        }
-        if (node.children) {
-            for (const child of node.children) {
-                visitHast(child);
-            }
-        }
-    }
-}
 
 // ---------- PreviewPanel ----------
 
@@ -860,35 +794,7 @@ export class PreviewPanel {
     // ---------- rendering ----------
 
     private renderMarkdown(text: string): { html: string; blocks: Block[]; anchorMap: Map<string, number> } {
-        // Strip anchors, building a map of anchorId → clean-text offset
-        const anchorMap = new Map<string, number>();
-        let cleanText = '';
-        let lastEnd = 0;
-        const anchorRe = /<!--@(c\d+)-->\r?\n?/g;
-        let m: RegExpExecArray | null;
-        while ((m = anchorRe.exec(text)) !== null) {
-            cleanText += text.substring(lastEnd, m.index);
-            anchorMap.set(m[1], cleanText.length); // offset in clean text where the next block starts
-            lastEnd = m.index + m[0].length;
-        }
-        cleanText += text.substring(lastEnd);
-
-        const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
-        const tree = parser.parse(cleanText);
-        const blocks = collectBlocks(tree, cleanText);
-
-        const processor = unified()
-            .use(remarkParse)
-            .use(remarkGfm)
-            .use(remarkMath)
-            .use(remarkRehype, { allowDangerousHtml: true })
-            .use(rehypeRaw)
-            .use(rehypeKatex, { throwOnError: false })
-            .use(rehypeSourcePositions)
-            .use(rehypeStringify, { allowDangerousHtml: true });
-
-        const html = String(processor.processSync(cleanText));
-        return { html, blocks, anchorMap };
+        return renderMarkdownDocument(text);
     }
 
     private immediateRender() {

@@ -20,7 +20,7 @@ function textResult(message: string, structuredContent: object) {
 
 export function createServer(): McpServer {
     const server = new McpServer(
-        { name: 'markdown-review-agent', version: '0.4.0' },
+        { name: 'markdown-review-agent', version: '0.5.0' },
         {
             instructions: 'Use these tools for Markdown review comments. Read a comment before editing, reply after editing, and never resolve comments unless the user explicitly asks.',
         },

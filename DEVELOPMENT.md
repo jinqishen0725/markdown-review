@@ -164,7 +164,7 @@ node out/mcp-server.js --document-path /path/to/file.md
 ## Testing
 
 ```bash
-# Agent Plugin: type-check and staged stdio MCP integration tests
+# Agent Plugin: build, type-check, staged MCP tests, and Canvas loopback integration tests
 npm run test:agent-plugin
 
 # Inline editor anchor projection

@@ -35,23 +35,33 @@ function writeFixture(directory) {
 }
 
 async function run() {
-    const pluginManifest = JSON.parse(fs.readFileSync(path.join(sourcePlugin, 'plugin.json'), 'utf8'));
-    assert.equal(pluginManifest.$schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
+    const pluginManifest = JSON.parse(fs.readFileSync(path.join(sourcePlugin, '.github', 'plugin', 'plugin.json'), 'utf8'));
     assert.equal(pluginManifest.name, 'markdown-review');
+    assert.equal(pluginManifest.version, '0.5.0');
+    assert.equal(pluginManifest.keywords.includes('canvas'), true);
+    assert.equal(pluginManifest.logo, 'assets/preview.png');
+    assert.equal(pluginManifest.extensions, 'extensions');
+    assert.equal(pluginManifest.mcpServers, 'mcp.json');
     const mcpManifest = JSON.parse(fs.readFileSync(path.join(sourcePlugin, 'mcp.json'), 'utf8'));
     assert.equal(mcpManifest.$schema, 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json');
     assert.deepEqual(mcpManifest.mcpServers['markdown-review'].args, ['${PLUGIN_ROOT}/dist/server.js']);
     assert.equal(mcpManifest.mcpServers['markdown-review'].cwd, '${PLUGIN_ROOT}');
     assert.equal(fs.existsSync(path.join(sourcePlugin, 'skills', 'document-review', 'SKILL.md')), true);
+    assert.equal(fs.existsSync(path.join(sourcePlugin, 'assets', 'preview.png')), true);
+    assert.equal(fs.existsSync(path.join(sourcePlugin, 'extensions', 'markdown-review', 'extension.mjs')), true);
+    assert.equal(fs.existsSync(path.join(sourcePlugin, 'extensions', 'markdown-review', 'assets', 'icon.png')), true);
 
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'markdown review agent '));
     const stagedPlugin = path.join(tempRoot, 'plugin with spaces');
     fs.mkdirSync(stagedPlugin, { recursive: true });
-    for (const name of ['plugin.json', 'mcp.json', 'README.md']) {
+    for (const name of ['mcp.json', 'README.md']) {
         fs.copyFileSync(path.join(sourcePlugin, name), path.join(stagedPlugin, name));
     }
     fs.cpSync(path.join(sourcePlugin, 'dist'), path.join(stagedPlugin, 'dist'), { recursive: true });
     fs.cpSync(path.join(sourcePlugin, 'skills'), path.join(stagedPlugin, 'skills'), { recursive: true });
+    fs.cpSync(path.join(sourcePlugin, 'extensions'), path.join(stagedPlugin, 'extensions'), { recursive: true });
+    fs.cpSync(path.join(sourcePlugin, 'assets'), path.join(stagedPlugin, 'assets'), { recursive: true });
+    fs.cpSync(path.join(sourcePlugin, '.github'), path.join(stagedPlugin, '.github'), { recursive: true });
 
     const markdownPath = writeFixture(tempRoot);
     const serverPath = path.join(stagedPlugin, 'dist', 'server.js');

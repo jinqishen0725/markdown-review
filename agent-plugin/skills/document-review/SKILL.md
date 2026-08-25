@@ -11,8 +11,8 @@ description: Review and address comments on Markdown documents using docReview t
 4. Edit the Markdown file using the host's normal file-editing tools.
 5. Call `docReview_reply_to_comment` with `role: "agent"` and briefly explain the completed change.
 6. Do not resolve a comment unless the user explicitly asks. If asked, call `docReview_resolve_comment` only after the requested change is complete.
-7. In VS Code, use the companion **Markdown Review: Open Markdown Preview** command when the extension is installed. It provides the full rendered document and blue gutter `+` buttons.
-8. This plugin does not provide an inline review UI. Use the MCP tools directly when the companion extension is unavailable.
+7. Open the bundled **Markdown Review** canvas for rendered Markdown, blue gutter `+` buttons, comment threads, and prompt handoff.
+8. In VS Code, the companion **Markdown Review: Open Markdown Preview** command additionally provides inline editing, differences, export, source navigation, Word, and PowerPoint support.
 
 Agents can use `docReview_add_comment` when the user explicitly asks them to create a comment on a block from the latest `docReview_list_comments` snapshot.
 

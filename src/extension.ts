@@ -6,14 +6,62 @@ import { PreviewPanel } from './preview';
 import { registerTools } from './tools';
 import { disposeChannel, log } from './logger';
 
+const MARKDOWN_REVIEW_VIEW_TYPE = 'markdownReview.previewEditor';
+const MARKDOWN_FILE_PATTERN = '*.md';
+const DEFAULT_EDITOR_PROMPT_KEY = 'markdownReview.defaultEditorPrompt.v1';
+
 function isCursor(): boolean {
     return vscode.env.appName?.toLowerCase().includes('cursor') || false;
+}
+
+async function setAsDefaultMarkdownEditor(): Promise<void> {
+    const configuration = vscode.workspace.getConfiguration('workbench');
+    const inspected = configuration.inspect<Record<string, string>>('editorAssociations');
+    const userAssociations = { ...(inspected?.globalValue || {}) };
+    userAssociations[MARKDOWN_FILE_PATTERN] = MARKDOWN_REVIEW_VIEW_TYPE;
+    await configuration.update(
+        'editorAssociations',
+        userAssociations,
+        vscode.ConfigurationTarget.Global,
+    );
+    vscode.window.showInformationMessage(
+        'Markdown Review is now the default editor for Markdown files.',
+    );
+}
+
+async function promptForDefaultMarkdownEditor(context: vscode.ExtensionContext): Promise<void> {
+    if (context.globalState.get<boolean>(DEFAULT_EDITOR_PROMPT_KEY)) {
+        return;
+    }
+
+    const associations = vscode.workspace
+        .getConfiguration('workbench')
+        .get<Record<string, string>>('editorAssociations', {});
+    if (associations[MARKDOWN_FILE_PATTERN] === MARKDOWN_REVIEW_VIEW_TYPE) {
+        await context.globalState.update(DEFAULT_EDITOR_PROMPT_KEY, true);
+        return;
+    }
+
+    await context.globalState.update(DEFAULT_EDITOR_PROMPT_KEY, true);
+    const choice = await vscode.window.showInformationMessage(
+        'Open Markdown files with Markdown Review by default? You can switch back anytime with Reopen Editor With.',
+        'Set as Default',
+        'Keep Current Default',
+    );
+    if (choice === 'Set as Default') {
+        try {
+            await setAsDefaultMarkdownEditor();
+        } catch (error) {
+            log(`Failed to set Markdown Review as the default editor: ${error}`);
+            vscode.window.showErrorMessage('Could not update the default Markdown editor setting.');
+        }
+    }
 }
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
-            'markdownReview.previewEditor',
+            MARKDOWN_REVIEW_VIEW_TYPE,
             {
                 resolveCustomTextEditor(document, panel) {
                     PreviewPanel.createInCustomEditor(context, document, panel);
@@ -40,6 +88,16 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             PreviewPanel.createOrShow(context, document);
+        }),
+
+        vscode.commands.registerCommand('markdownReview.setAsDefaultEditor', async () => {
+            try {
+                await setAsDefaultMarkdownEditor();
+                await context.globalState.update(DEFAULT_EDITOR_PROMPT_KEY, true);
+            } catch (error) {
+                log(`Failed to set Markdown Review as the default editor: ${error}`);
+                vscode.window.showErrorMessage('Could not update the default Markdown editor setting.');
+            }
         }),
 
         vscode.commands.registerCommand('markdownReview.openWordPreview', async (uri?: vscode.Uri) => {
@@ -129,6 +187,7 @@ export function activate(context: vscode.ExtensionContext) {
     } else {
         log('Detected VS Code — registering Copilot tools');
         registerTools(context);
+        void promptForDefaultMarkdownEditor(context);
     }
 }
 

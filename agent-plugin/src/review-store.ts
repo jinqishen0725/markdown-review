@@ -162,7 +162,15 @@ function loadComments(filePath: string): CommentsFile {
 }
 
 function saveComments(filePath: string, data: CommentsFile): void {
-    fs.writeFileSync(getCommentsPath(filePath), JSON.stringify(data, null, 2), 'utf8');
+    const commentsPath = getCommentsPath(filePath);
+    const temporaryPath = `${commentsPath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(temporaryPath, JSON.stringify(data, null, 2), 'utf8');
+    try {
+        fs.renameSync(temporaryPath, commentsPath);
+    } catch (error) {
+        fs.rmSync(temporaryPath, { force: true });
+        throw error;
+    }
 }
 
 function requireComment(data: CommentsFile, commentId: string): ReviewComment {
@@ -296,6 +304,75 @@ export function setResolved(filePathInput: string, commentId: string, resolved: 
     const data = loadComments(filePath);
     requireComment(data, commentId).resolved = resolved;
     saveComments(filePath, data);
+    return listComments(filePath);
+}
+
+export function editComment(filePathInput: string, commentId: string, text: string): ReviewSnapshot {
+    const filePath = resolveMarkdownPath(filePathInput);
+    const data = loadComments(filePath);
+    requireComment(data, commentId).comment = text;
+    saveComments(filePath, data);
+    return listComments(filePath);
+}
+
+export function editReply(
+    filePathInput: string,
+    commentId: string,
+    replyId: string,
+    text: string,
+): ReviewSnapshot {
+    const filePath = resolveMarkdownPath(filePathInput);
+    const data = loadComments(filePath);
+    const comment = requireComment(data, commentId);
+    const reply = (comment.replies || []).find(candidate => candidate.id === replyId);
+    if (!reply) {
+        throw new Error(`Review reply not found: ${replyId}`);
+    }
+    reply.text = text;
+    saveComments(filePath, data);
+    return listComments(filePath);
+}
+
+export function deleteReply(filePathInput: string, commentId: string, replyId: string): ReviewSnapshot {
+    const filePath = resolveMarkdownPath(filePathInput);
+    const data = loadComments(filePath);
+    const comment = requireComment(data, commentId);
+    const replies = comment.replies || [];
+    const nextReplies = replies.filter(candidate => candidate.id !== replyId);
+    if (nextReplies.length === replies.length) {
+        throw new Error(`Review reply not found: ${replyId}`);
+    }
+    comment.replies = nextReplies;
+    saveComments(filePath, data);
+    return listComments(filePath);
+}
+
+export function resolveAll(filePathInput: string): ReviewSnapshot {
+    const filePath = resolveMarkdownPath(filePathInput);
+    const data = loadComments(filePath);
+    for (const comment of data.comments) {
+        comment.resolved = true;
+    }
+    saveComments(filePath, data);
+    return listComments(filePath);
+}
+
+export function deleteResolved(filePathInput: string): ReviewSnapshot {
+    const filePath = resolveMarkdownPath(filePathInput);
+    const data = loadComments(filePath);
+    const deletedIds = new Set(data.comments.filter(comment => comment.resolved).map(comment => comment.id));
+    data.comments = data.comments.filter(comment => !comment.resolved);
+    saveComments(filePath, data);
+
+    if (deletedIds.size > 0) {
+        const markdown = fs.readFileSync(filePath, 'utf8');
+        const withoutAnchors = markdown.replace(/<!--@(c\d+)-->\r?\n?/g, (match, id) =>
+            deletedIds.has(id) ? '' : match,
+        );
+        if (withoutAnchors !== markdown) {
+            fs.writeFileSync(filePath, withoutAnchors, 'utf8');
+        }
+    }
     return listComments(filePath);
 }
 

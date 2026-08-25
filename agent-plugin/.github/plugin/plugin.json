@@ -1,8 +1,7 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "markdown-review",
-  "version": "0.4.0",
-  "description": "Review Markdown documents with agent-accessible comment tools. Install the companion VS Code extension for the visual editor.",
+  "version": "0.5.0",
+  "description": "Review Markdown documents in an interactive Copilot canvas with agent-accessible comment tools.",
   "author": {
     "name": "Jinqi Shen"
   },
@@ -13,6 +12,13 @@
     "markdown",
     "review",
     "comments",
-    "mcp"
+    "mcp",
+    "canvas"
+  ],
+  "logo": "assets/preview.png",
+  "extensions": "extensions",
+  "mcpServers": "mcp.json",
+  "skills": [
+    "./skills/document-review/"
   ]
 }

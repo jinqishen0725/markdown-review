@@ -1,8 +1,14 @@
 # VS Code Agent App Integration Plan
 
-Status: Implemented, with the inline MCP App sections superseded
+Status: Implemented with a bundled Markdown Canvas; the earlier inline MCP App design is superseded
 
-Current decision: the standalone plugin provides the Agent Skill and Markdown MCP tools only. The inline MCP App was removed because VS Code can render it only as a compact chat widget, not as the full review editor. VS Code users should install the companion Markdown Reader with Copilot extension for the third-pane visual review experience. Agent Plugin Marketplace documentation may link to that extension, but plugin installation cannot install it automatically.
+Current decision: the standalone plugin bundles the Agent Skill, Markdown MCP tools, and a GitHub Copilot Canvas. The Canvas reuses `src/markdown-render.ts`, `src/comment-ui.ts`, and `agent-plugin/src/review-store.ts`; its only separate code is the Canvas SDK, loopback HTTP, and host chrome adapter. The companion VS Code extension remains responsible for custom-editor registration, inline rendered editing and differences, export, source synchronization, Word, and PowerPoint.
+
+Packaging decision: `.github/plugin/plugin.json` is the canonical plugin manifest. Keeping a second root `plugin.json` caused local hosts to select the MCP-only Agent Plugins manifest before the Canvas manifest, so the duplicate root manifest was removed. This matches approved external Canvas plugin layouts.
+
+Maintenance rule: document rendering, comment actions, prompt construction, anchors, and sidecar persistence must stay in shared modules. Canvas and VS Code may have separate host adapters and toolbars, but must not fork those behaviors.
+
+The sections below preserve the original implementation history. Any MCP App requirements are superseded by the Canvas architecture under `agent-plugin/src/canvas-extension.ts` and `agent-plugin/src/canvas-runtime.ts`.
 
 Primary target: VS Code Agent App / Agent Host
 

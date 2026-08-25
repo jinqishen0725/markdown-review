@@ -464,7 +464,14 @@ assertNotIncludes(previewSource, 'Review prompt copied to clipboard — paste in
 assertIncludes(extensionSource, 'async (uri?: vscode.Uri)', 'Markdown preview command accepts a custom-editor resource URI');
 assertIncludes(extensionSource, 'vscode.workspace.openTextDocument(uri)', 'Markdown preview command opens the selected custom-editor resource');
 assertIncludes(extensionSource, 'registerCustomEditorProvider(', 'Markdown Review registers an Open With provider');
-assertIncludes(extensionSource, "'markdownReview.previewEditor'", 'Open With provider uses the contributed view type');
+assertIncludes(extensionSource, "const MARKDOWN_REVIEW_VIEW_TYPE = 'markdownReview.previewEditor'", 'Open With provider uses the contributed view type');
+assertIncludes(extensionSource, "registerCommand('markdownReview.setAsDefaultEditor'", 'registers an explicit default-editor command');
+assertIncludes(extensionSource, "'editorAssociations'", 'updates the supported editor-associations setting');
+assertIncludes(extensionSource, 'inspected?.globalValue', 'preserves existing user editor associations');
+assertIncludes(extensionSource, 'vscode.ConfigurationTarget.Global', 'sets the default across VS Code workspaces');
+assertIncludes(extensionSource, "'Set as Default'", 'offers an explicit opt-in default-editor action');
+assertIncludes(extensionSource, "'Keep Current Default'", 'lets users decline without changing settings');
+assertIncludes(extensionSource, 'context.globalState.update(DEFAULT_EDITOR_PROMPT_KEY, true)', 'records the one-time prompt decision');
 assertIncludes(previewSource, 'enterMarkdownEditor()', 'Markdown review toolbar exposes one-click Edit mode');
 assertIncludes(previewSource, 'id="review-mode"', 'Markdown editor exposes one-click return to Review mode');
 assertIncludes(previewSource, '>Back to Review</button>', 'Markdown editor labels the return action clearly');

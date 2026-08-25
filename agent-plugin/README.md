@@ -5,12 +5,13 @@ This is the standalone, Markdown-only Agent Plugin for the VS Code Agent App. It
 - A `document-review` Agent Skill.
 - A bundled stdio MCP server.
 - Markdown comment list/read/reply/resolve/reopen/delete tools.
+- An interactive Markdown Review canvas with rendered content, gutter comment controls, threads, filters, and prompt handoff.
 
-## Visual Review Requirement
+## Canvas And VS Code Extension
 
-This plugin intentionally does not include an inline MCP App. For the full third-pane Markdown Review editor, blue gutter `+` buttons, and Ask Copilot actions, install the companion [Markdown Reader with Copilot extension](https://marketplace.visualstudio.com/items?itemName=JinqiShen.markdown-review).
+The bundled canvas provides the visual Markdown comment workflow from one plugin installation. It reuses the same Markdown renderer, comment controls, prompt builders, sidecar format, and review store as the existing implementation.
 
-The plugin remains usable by itself for agent-driven Markdown comment operations through its MCP tools. Agent Plugin marketplaces cannot install the companion VS Code extension automatically, so VS Code users must install both entries for the complete visual experience.
+Install the companion [Markdown Reader with Copilot extension](https://marketplace.visualstudio.com/items?itemName=JinqiShen.markdown-review) for VS Code custom-editor integration, inline rendered editing and differences, source navigation, export, Word, and PowerPoint support. Agent Plugin marketplaces cannot install the VS Code extension automatically.
 
 ## Build And Test
 
@@ -21,7 +22,7 @@ npm run build:agent-plugin
 npm run test:agent-plugin
 ```
 
-The built plugin is self-contained under this folder. Its runtime files are in `dist/` and do not require repository `node_modules`.
+The built plugin is self-contained under this folder. Its canonical manifest is `.github/plugin/plugin.json`, its MCP runtime is in `dist/`, and its Canvas extension is in `extensions/`. Neither requires repository `node_modules` at runtime.
 
 ## Local Installation
 
@@ -36,9 +37,10 @@ Until this plugin is published through a marketplace, register the folder in VS 
 }
 ```
 
-Reload VS Code, open Agent Customizations, and verify that the `markdown-review` plugin, `document-review` skill, and `markdown-review` MCP server are enabled.
+Reload the Agent host and verify that the `markdown-review` plugin, `document-review` skill, `markdown-review` MCP server, and **Markdown Review** canvas are enabled.
 
 ## Current Scope
 
-- Supported: Markdown sidecar comments created by the Markdown Review extension.
-- Deferred: Word, PowerPoint, native preview scrolling, and slide capture.
+- Canvas: rendered Markdown, local images, comment CRUD and threads, filters, bulk actions, Copy Prompt, and Ask Copilot. In an untouched Agent App conversation, Canvas opens a selectable prompt dialog because it cannot prefill the composer and embedded WebViews may deny direct clipboard access.
+- MCP: agent-driven Markdown comment operations with the same anchors and sidecar files.
+- Companion VS Code extension: inline editing/differences, export, source synchronization, Word, and PowerPoint.

@@ -32820,7 +32820,15 @@ function loadComments(filePath) {
   };
 }
 function saveComments(filePath, data) {
-  fs.writeFileSync(getCommentsPath(filePath), JSON.stringify(data, null, 2), "utf8");
+  const commentsPath = getCommentsPath(filePath);
+  const temporaryPath = `${commentsPath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporaryPath, JSON.stringify(data, null, 2), "utf8");
+  try {
+    fs.renameSync(temporaryPath, commentsPath);
+  } catch (error2) {
+    fs.rmSync(temporaryPath, { force: true });
+    throw error2;
+  }
 }
 function requireComment(data, commentId) {
   const comment = data.comments.find((candidate) => candidate.id === commentId);
@@ -32963,7 +32971,7 @@ function textResult(message, structuredContent) {
 }
 function createServer() {
   const server = new McpServer(
-    { name: "markdown-review-agent", version: "0.4.0" },
+    { name: "markdown-review-agent", version: "0.5.0" },
     {
       instructions: "Use these tools for Markdown review comments. Read a comment before editing, reply after editing, and never resolve comments unless the user explicitly asks."
     }

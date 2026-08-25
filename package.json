@@ -67,6 +67,10 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "markdownReview.setAsDefaultEditor",
+        "title": "Markdown Review: Use as Default Markdown Editor"
+      },
+      {
         "command": "markdownReview.openWordPreview",
         "title": "Markdown Review: Open Word Document Preview",
         "icon": "$(file-text)"
@@ -423,7 +427,7 @@
     "bundle:pptx-viewer": "npx esbuild src/pptx-viewer-webview.ts --bundle --outfile=media/pptx-viewer.js --format=iife --global-name=PptxLib --platform=browser --target=es2020",
     "watch": "tsc -watch -p ./",
     "package": "npm run bundle && vsce package",
-    "test:agent-plugin": "npm run build:agent-plugin && npx tsc -p agent-plugin/tsconfig.json && node agent-plugin/test/test-server.js"
+    "test:agent-plugin": "npm run build:agent-plugin && npx tsc -p agent-plugin/tsconfig.json && node agent-plugin/test/test-server.js && node agent-plugin/test/test-canvas.js"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
